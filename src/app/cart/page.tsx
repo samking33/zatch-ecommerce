@@ -13,7 +13,8 @@ import { inr } from "@/lib/utils";
 
 type CartItem = {
   _id?: string;
-  product?: { _id?: string; name?: string; images?: { url: string }[] } | string;
+  productId?: string;
+  product?: { _id?: string; name?: string; images?: { url: string }[] } | string | null;
   name?: string;
   image?: string;
   variant?: { color?: string; size?: string };
@@ -24,6 +25,12 @@ type CartItem = {
   price?: number;
   bargainId?: string;
 };
+
+function lineProductId(it: CartItem): string | undefined {
+  if (it.productId) return it.productId;
+  if (it.product && typeof it.product === "object") return it.product._id;
+  return typeof it.product === "string" ? it.product : undefined;
+}
 type Cart = {
   items?: CartItem[];
   subtotal?: number;
@@ -65,24 +72,32 @@ export default function CartPage() {
     });
   }, []);
 
+  // Backend matches cart lines by flat productId + color + size (not a nested
+  // variant object), so send them flat.
+  function lineKeys(it: CartItem) {
+    return {
+      productId: lineProductId(it),
+      color: it.variant?.color ?? it.color,
+      size: it.variant?.size ?? it.size,
+    };
+  }
+
   async function changeQty(it: CartItem, qty: number) {
     if (!token) return;
-    const productId = typeof it.product === "object" ? it.product?._id : it.product;
     setCart((c) =>
-      c
-        ? { ...c, items: c.items?.map((x) => (x === it ? { ...x, qty } : x)) }
-        : c,
+      c ? { ...c, items: c.items?.map((x) => (x === it ? { ...x, qty } : x)) } : c,
     );
-    await cartApi.update({ productId, qty, variant: it.variant }, token);
+    await cartApi.update({ ...lineKeys(it), qty }, token);
     const fresh = await cartApi.get(token);
     setCart((fresh as Cart) ?? cart);
   }
 
   async function remove(it: CartItem) {
     if (!token) return;
-    const productId = typeof it.product === "object" ? it.product?._id : it.product;
     setCart((c) => (c ? { ...c, items: c.items?.filter((x) => x !== it) } : c));
-    await cartApi.remove({ productId, variant: it.variant }, token);
+    await cartApi.remove(lineKeys(it), token);
+    const fresh = await cartApi.get(token);
+    setCart((fresh as Cart) ?? { items: [] });
   }
 
   const [coupon, setCoupon] = useState("");

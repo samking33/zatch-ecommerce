@@ -13,7 +13,8 @@ import { inr } from "@/lib/utils";
 
 type Addr = { _id: string; label?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
 type CItem = {
-  product?: { _id?: string } | string;
+  productId?: string;
+  product?: { _id?: string } | string | null;
   variant?: { color?: string; size?: string };
   color?: string;
   size?: string;
@@ -70,7 +71,7 @@ export default function CheckoutPage() {
     const checkoutData = {
       addressId: selected,
       items: items.map((it) => ({
-        productId: typeof it.product === "object" ? it.product?._id : it.product,
+        productId: it.productId ?? (typeof it.product === "object" ? it.product?._id : it.product),
         variantColor: it.variant?.color ?? it.color,
         variantSize: it.variant?.size ?? it.size,
         bargainId: it.bargainId,
