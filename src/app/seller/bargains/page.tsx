@@ -1,9 +1,11 @@
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
+import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { BargainRespond } from "@/components/seller/bargain-respond";
 import { bargains as bargainsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 import { inr } from "@/lib/utils";
 
 export const metadata = { title: "Seller · Bargains" };
@@ -25,6 +27,9 @@ const PENDING = ["pending", "countered", "buyer_countered", "active"];
 export default async function SellerBargainsPage() {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your bargains" /></div></SellerShell>;
+
+  const gate = await sellerGate(t);
+  if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
   const all = ((await bargainsApi.sellerBargains(t)) as Bargain[] | null) ?? [];
   const pending = all.filter((b) => PENDING.includes((b.status ?? "").toLowerCase()));

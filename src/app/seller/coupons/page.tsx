@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, Check, Ticket } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
-import { coupons as couponsApi } from "@/lib/api";
+import { BecomeSeller } from "@/components/seller/become-seller";
+import { coupons as couponsApi, seller as sellerApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; isActive?: boolean; active?: boolean };
@@ -14,11 +15,18 @@ export default function SellerCouponsPage() {
   const [ready, setReady] = useState(false);
   const [list, setList] = useState<Coupon[]>([]);
   const [adding, setAdding] = useState(false);
+  const [seller, setSeller] = useState<{ approved: boolean; status: string; display?: import("@/lib/api").SellerStatusDisplay } | null>(null);
 
   useEffect(() => {
     const t = getToken();
     setToken(t); setReady(true);
-    if (t) couponsApi.list(t).then((c) => setList((c as Coupon[]) ?? []));
+    if (!t) return;
+    sellerApi.status(t).then((s) => {
+      const status = (s?.sellerStatus ?? "buyer").toLowerCase();
+      const approved = ["approved", "active"].includes(status);
+      setSeller({ approved, status, display: s?.statusDisplay });
+      if (approved) couponsApi.list(t).then((c) => setList((c as Coupon[]) ?? []));
+    });
   }, []);
 
   async function toggle(id: string) {
@@ -36,6 +44,8 @@ export default function SellerCouponsPage() {
     <SellerShell>
       {ready && !token ? (
         <div className="pt-2"><SignInRequired what="your coupons" /></div>
+      ) : seller && !seller.approved ? (
+        <BecomeSeller status={seller.status} display={seller.display} />
       ) : (
         <>
           <SellerHeader

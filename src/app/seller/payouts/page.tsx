@@ -1,8 +1,10 @@
 import { Wallet, Clock, CheckCircle2 } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
+import { BecomeSeller } from "@/components/seller/become-seller";
 import { payments as paymentsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 import { inr } from "@/lib/utils";
 
 export const metadata = { title: "Seller · Payouts" };
@@ -13,6 +15,9 @@ type Payout = { _id: string; amount?: number; status?: string; createdAt?: strin
 export default async function SellerPayoutsPage() {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your payouts" /></div></SellerShell>;
+
+  const gate = await sellerGate(t);
+  if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
   const [summary, due, done] = await Promise.all([
     paymentsApi.summary(t) as Promise<Summary | null>,

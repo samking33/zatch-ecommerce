@@ -2,9 +2,11 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
+import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductManage } from "@/components/seller/product-manage";
 import { products as productsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 import type { Product } from "@/lib/types";
 
 export const metadata = { title: "Seller · Products" };
@@ -12,6 +14,9 @@ export const metadata = { title: "Seller · Products" };
 export default async function SellerProductsPage() {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your products" /></div></SellerShell>;
+
+  const gate = await sellerGate(t);
+  if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
   const list = ((await productsApi.myProducts(t)) as (Product & { status?: string })[] | null) ?? [];
 

@@ -1,9 +1,11 @@
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
+import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { OrderStatusControl } from "@/components/seller/order-status-control";
 import { orders as ordersApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 import { inr } from "@/lib/utils";
 
 export const metadata = { title: "Seller · Orders" };
@@ -14,6 +16,9 @@ type Order = { _id: string; orderId?: string; status?: string; createdAt?: strin
 export default async function SellerOrdersPage() {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your orders" /></div></SellerShell>;
+
+  const gate = await sellerGate(t);
+  if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
   const list = ((await ordersApi.sellerOrders(t)) as Order[] | null) ?? [];
 

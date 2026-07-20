@@ -30,14 +30,14 @@ export default function SellPage() {
             Zatch handles payments, delivery, and payouts.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/seller/dashboard" className="pill-lime inline-flex items-center gap-3 rounded-full py-3.5 pl-6 pr-3.5 text-[15px] font-semibold">
-              Open seller dashboard
+            <Link href="/seller/register" className="pill-lime inline-flex items-center gap-3 rounded-full py-3.5 pl-6 pr-3.5 text-[15px] font-semibold">
+              Become a seller
               <span className="btn-ink grid h-8 w-8 place-items-center rounded-full">
                 <ArrowUpRight className="h-4 w-4" />
               </span>
             </Link>
-            <Link href="/seller/products/new" className="rounded-full border border-hairline px-6 py-3.5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-2">
-              Add a product
+            <Link href="/seller/dashboard" className="rounded-full border border-hairline px-6 py-3.5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-2">
+              Seller dashboard
             </Link>
           </div>
         </div>

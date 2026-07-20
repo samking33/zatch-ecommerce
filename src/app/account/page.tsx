@@ -6,18 +6,10 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { AccountForms } from "@/components/account/account-forms";
 import { users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 import type { SessionUser } from "@/lib/client-auth";
 
 export const metadata = { title: "Account" };
-
-const links = [
-  ["My orders", "/orders", Package],
-  ["My bargains", "/bargains", Tag],
-  ["Addresses", "/account/addresses", MapPin],
-  ["Wishlist", "/wishlist", Heart],
-  ["Notifications", "/notifications", Bell],
-  ["Seller dashboard", "/seller/dashboard", Store],
-] as const;
 
 export default async function AccountPage() {
   const t = await serverToken();
@@ -31,9 +23,28 @@ export default async function AccountPage() {
     );
   }
 
-  const user = (await users.profile(t)) as SessionUser | null;
+  const [user, gate] = await Promise.all([
+    users.profile(t) as Promise<SessionUser | null>,
+    sellerGate(t),
+  ]);
   const name = user?.username ?? "there";
   const initial = (user?.username?.[0] ?? "Z").toUpperCase();
+
+  // Sellers get the dashboard; buyers get an invite to onboard.
+  const sellerLink: readonly [string, string, typeof Store] = gate.approved
+    ? ["Seller dashboard", "/seller/dashboard", Store]
+    : gate.status === "pending"
+      ? ["Seller application", "/seller/dashboard", Store]
+      : ["Become a seller", "/seller/register", Store];
+
+  const links = [
+    ["My orders", "/orders", Package],
+    ["My bargains", "/bargains", Tag],
+    ["Addresses", "/account/addresses", MapPin],
+    ["Wishlist", "/wishlist", Heart],
+    ["Notifications", "/notifications", Bell],
+    sellerLink,
+  ] as const;
 
   return (
     <PageShell>

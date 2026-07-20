@@ -2,9 +2,11 @@ import Link from "next/link";
 import { TrendingUp, Package, Tag, Wallet, Eye, ArrowUpRight, Boxes } from "lucide-react";
 import { SellerShell, SellerHeader } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
+import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { orders as ordersApi, bargains as bargainsApi, payments as paymentsApi, products as productsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 import type { Product } from "@/lib/types";
 
 export const metadata = { title: "Seller dashboard" };
@@ -17,6 +19,9 @@ type PaySummary = { totalRevenueFormatted?: string; netRevenueFormatted?: string
 export default async function SellerDashboardPage() {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your seller dashboard" /></div></SellerShell>;
+
+  const gate = await sellerGate(t);
+  if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
   const [oDash, bDash, pay, myProducts] = await Promise.all([
     ordersApi.sellerDashboard(t) as Promise<OrdersDash | null>,

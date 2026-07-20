@@ -131,12 +131,22 @@ export const users = {
 };
 
 // ─── Seller onboarding & status (/user/seller) ──────────────────────────────
+export type SellerStatusDisplay = {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  mainText?: string;
+  status?: string;
+  action?: { label?: string; route?: string };
+};
+
 export const seller = {
   register: (b: unknown, t: string) =>
     api("/user/seller/register", { method: "POST", body: b, token: t }),
   approve: (b: unknown, t: string) =>
     api("/user/seller/approve", { method: "POST", body: b, token: t }),
-  status: (t: string) => api("/user/seller/status", { token: t }),
+  status: (t: string) =>
+    api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true }),
   terms: () => api("/user/seller/terms-and-conditions"),
   profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t }),
   benefits: (t: string) => api("/user/seller/benefits", { token: t }),
