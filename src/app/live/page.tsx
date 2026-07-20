@@ -36,7 +36,7 @@ export default async function LivePage() {
         {sessions.map((s, i) => (
           <Link
             key={`${s._id}-${i}`}
-            href={`/live/${s.channelName}`}
+            href={`/live/${s._id}`}
             className="card card-hover group relative flex flex-col overflow-hidden rounded-[1.75rem] p-3"
           >
             <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-surface-2">

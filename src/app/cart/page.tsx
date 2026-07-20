@@ -85,6 +85,27 @@ export default function CartPage() {
     await cartApi.remove({ productId, variant: it.variant }, token);
   }
 
+  const [coupon, setCoupon] = useState("");
+  const [couponMsg, setCouponMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function applyCoupon() {
+    if (!token || !coupon.trim()) return;
+    const res = await cartApi.applyCoupon({ code: coupon.trim().toUpperCase() }, token);
+    if (res) {
+      setCart((await cartApi.get(token)) as Cart);
+      setCouponMsg({ ok: true, text: "Coupon applied" });
+    } else {
+      setCouponMsg({ ok: false, text: "Invalid or expired coupon" });
+    }
+  }
+  async function removeCoupon() {
+    if (!token) return;
+    await cartApi.removeCoupon(token);
+    setCart((await cartApi.get(token)) as Cart);
+    setCoupon("");
+    setCouponMsg(null);
+  }
+
   const items = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? items.reduce((s, it) => s + itemPrice(it) * (it.qty ?? 1), 0);
   const total = cart?.total ?? subtotal;
@@ -164,6 +185,32 @@ export default function CartPage() {
 
             <aside className="card h-fit rounded-[1.75rem] p-6 lg:sticky lg:top-28">
               <h2 className="font-display text-lg font-semibold text-ink">Summary</h2>
+
+              {/* coupon */}
+              <div className="mt-4">
+                {cart?.discount ? (
+                  <div className="flex items-center justify-between rounded-2xl bg-lime px-4 py-2.5">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-lime-ink">
+                      <Tag className="h-3.5 w-3.5" /> Coupon applied
+                    </span>
+                    <button onClick={removeCoupon} className="text-sm font-medium text-lime-ink/70 hover:text-lime-ink">Remove</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      value={coupon}
+                      onChange={(e) => setCoupon(e.target.value)}
+                      placeholder="Coupon code"
+                      className="h-11 flex-1 rounded-full border border-hairline bg-surface-2 px-4 text-sm uppercase text-ink placeholder:normal-case placeholder:text-muted focus:border-ink focus:outline-none"
+                    />
+                    <button onClick={applyCoupon} className="btn-ink rounded-full px-5 py-2.5 text-sm font-semibold">Apply</button>
+                  </div>
+                )}
+                {couponMsg && (
+                  <p className={`mt-2 text-[13px] font-medium ${couponMsg.ok ? "text-ink" : "text-live"}`}>{couponMsg.text}</p>
+                )}
+              </div>
+
               <dl className="mt-4 space-y-3 text-[15px]">
                 <Row label="Subtotal" value={inr(subtotal)} />
                 {cart?.discount ? <Row label="Discount" value={`− ${inr(cart.discount)}`} /> : null}

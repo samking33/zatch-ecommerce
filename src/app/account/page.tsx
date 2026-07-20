@@ -3,6 +3,7 @@ import { Package, Tag, MapPin, Heart, Bell, Store, ChevronRight } from "lucide-r
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { AccountForms } from "@/components/account/account-forms";
 import { users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import type { SessionUser } from "@/lib/client-auth";
@@ -15,7 +16,7 @@ const links = [
   ["Addresses", "/account/addresses", MapPin],
   ["Wishlist", "/wishlist", Heart],
   ["Notifications", "/notifications", Bell],
-  ["Sell on Zatch", "/sell", Store],
+  ["Seller dashboard", "/seller/dashboard", Store],
 ] as const;
 
 export default async function AccountPage() {
@@ -59,20 +60,23 @@ export default async function AccountPage() {
           </div>
         </div>
 
-        <div className="card rounded-[1.75rem] p-3">
-          {links.map(([label, href, Icon]) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-colors hover:bg-surface-2"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-2 text-ink">
-                <Icon className="h-[18px] w-[18px]" />
-              </span>
-              <span className="font-medium text-ink">{label}</span>
-              <ChevronRight className="ml-auto h-4 w-4 text-muted" />
-            </Link>
-          ))}
+        <div className="flex flex-col gap-4">
+          <div className="card rounded-[1.75rem] p-3">
+            {links.map(([label, href, Icon]) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-colors hover:bg-surface-2"
+              >
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-2 text-ink">
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="font-medium text-ink">{label}</span>
+                <ChevronRight className="ml-auto h-4 w-4 text-muted" />
+              </Link>
+            ))}
+          </div>
+          <AccountForms user={user} />
         </div>
       </div>
     </PageShell>

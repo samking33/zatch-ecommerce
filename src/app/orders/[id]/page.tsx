@@ -3,6 +3,7 @@ import { ArrowLeft, Package } from "lucide-react";
 import { PageShell } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
+import { OrderActions } from "@/components/orders/order-actions";
 import { orders as ordersApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { inr } from "@/lib/utils";
@@ -114,6 +115,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </p>
             </div>
           )}
+
+          <OrderActions orderId={order._id} status={order.status} />
         </div>
 
         <aside className="card h-fit rounded-[1.75rem] p-6 lg:sticky lg:top-28">

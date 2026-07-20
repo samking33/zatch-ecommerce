@@ -47,21 +47,47 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
+async function post(path: string, body: unknown) {
+  const res = await fetch(`/api/v1${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || json?.success === false) {
+    throw new Error(json?.message ?? "Something went wrong. Try again.");
+  }
+  return json;
+}
+
 export async function login(input: {
   phone: string;
   countryCode: string;
   password: string;
 }): Promise<SessionUser> {
   // Same-origin via the Next rewrite → no CORS, no token header needed here.
-  const res = await fetch("/api/v1/user/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok || !json?.token) {
-    throw new Error(json?.message ?? "Login failed. Check your details.");
-  }
+  const json = await post("/user/login", input);
+  if (!json?.token) throw new Error(json?.message ?? "Login failed.");
   setSession(json.token, json.user);
   return json.user as SessionUser;
 }
+
+export async function register(input: {
+  username: string;
+  phone: string;
+  countryCode: string;
+  password: string;
+  email?: string;
+}): Promise<SessionUser> {
+  await post("/user/register", input);
+  // Registration succeeded — sign in to establish the session.
+  return login({ phone: input.phone, countryCode: input.countryCode, password: input.password });
+}
+
+// Forgot-password flow (3 steps).
+export const forgot = {
+  sendOtp: (phone: string, countryCode: string) => post("/user/forgot-password/send-otp", { phone, countryCode }),
+  verifyOtp: (phone: string, countryCode: string, otp: string) => post("/user/forgot-password/verify-otp", { phone, countryCode, otp }),
+  reset: (phone: string, countryCode: string, newPassword: string, confirmPassword: string) =>
+    post("/user/forgot-password/reset", { phone, countryCode, newPassword, confirmPassword }),
+};

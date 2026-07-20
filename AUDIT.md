@@ -154,13 +154,18 @@ All 200 unless noted. Read endpoints called live; mutations probed with empty bo
 
 ---
 
-## 6. Remaining gaps (by design or needing external creds)
+## 6. Gaps — now closed
 
-1. **Live video (Agora)** — the live room UI is built but the player and chat are simulated; real playback needs the Agora Web SDK wired to `POST /live/token`. No active sessions exist to test against right now.
-2. **Bits video playback** — real thumbnails render; tapping doesn't play the mp4 yet.
-3. **Real Razorpay payment** — flow is production-correct (initiate → Razorpay modal with backend key → verify) but a real charge was not executed during audit.
-4. **Seller dashboards** — all seller endpoints are wired in the client, but there's no seller-dashboard UI (that's the mobile app / a separate admin surface).
-5. **Secondary buyer surfaces** — edit-profile, change-password, preferences, cart-coupon, order cancel/review buttons, register/forgot-password forms: endpoints wired, UI not yet built.
+All items from the first pass are built:
+
+1. **Live video (Agora)** — ✅ real Agora Web SDK player (`agora-player.tsx`) joins the channel via `POST /live/session/:id/join` and plays the host track; live chat posts/polls real comments. (Can't fully demo until a seller goes live, but it's wired to the real endpoints.)
+2. **Bits video playback** — ✅ tapping a Bit opens a real `<video>` player of the mp4 + records a real view.
+3. **Seller dashboard** — ✅ `/seller/dashboard` with real KPIs (revenue, orders, bargains, payouts, views), and your live products grid.
+4. **Secondary buyer surfaces** — ✅ register, forgot-password (3-step), edit-profile, change-password, cart coupon apply/remove, order cancel/review/invoice — all built and wired.
+
+### Still needing external action (not code)
+- **Real Razorpay charge** — flow is production-correct; a live payment wasn't executed during audit (real money).
+- **`ZATCH_API_TOKEN`** — still a personal JWT used as the server default; swap for a service token before production (see §5).
 
 ---
 

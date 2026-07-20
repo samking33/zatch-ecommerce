@@ -59,7 +59,7 @@ export function GoingLiveCard({ session }: { session?: LiveSession }) {
   }
   return (
     <Link
-      href={`/live/${session.channelName}`}
+      href={`/live/${session._id}`}
       className="card card-hover group relative flex flex-1 flex-col overflow-hidden rounded-[1.75rem] p-3"
     >
       <div className="relative flex-1 overflow-hidden rounded-[1.25rem] bg-surface-2">

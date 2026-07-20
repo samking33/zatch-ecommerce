@@ -11,6 +11,7 @@ type Opts = {
   headers?: Record<string, string>;
   revalidate?: number; // GET only; ignored for mutations
   pick?: string; // envelope key holding the payload, e.g. "products"
+  raw?: boolean; // return the whole JSON envelope, no unwrap (dashboards)
 };
 
 /**
@@ -51,7 +52,7 @@ function unwrap<T>(json: unknown, pick?: string): T {
 }
 
 export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
-  const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick } = opts;
+  const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick, raw } = opts;
   const isRead = method === "GET";
   try {
     const res = await fetch(`${BASE}/api/v1${path}`, {
@@ -71,7 +72,7 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
     if (json && typeof json === "object" && "success" in json && json.success === false) {
       return null;
     }
-    return unwrap<T>(json, pick);
+    return raw ? (json as T) : unwrap<T>(json, pick);
   } catch {
     return null;
   }
@@ -241,8 +242,8 @@ export const orders = {
   generateInvoice: (id: string, t: string) => api(`/orders/${id}/generate-invoice`, { method: "POST", token: t }),
   invoiceUrl: (fileName: string) => `${BASE}/api/v1/orders/invoice/download/${fileName}`,
   // seller-side
-  sellerOrders: (t: string) => api("/orders/seller/orders", { token: t }),
-  sellerDashboard: (t: string) => api("/orders/seller/dashboard", { token: t }),
+  sellerOrders: (t: string) => api("/orders/seller/orders", { token: t, pick: "orders" }),
+  sellerDashboard: (t: string) => api("/orders/seller/dashboard", { token: t, raw: true }),
   groupedBySeller: (t: string) => api("/orders/grouped-by-seller", { token: t }),
   updateStatus: (id: string, b: unknown, t: string) =>
     api(`/orders/seller/orders/${id}/update-status`, { method: "POST", body: b, token: t }),
@@ -260,8 +261,8 @@ export const bargains = {
   acceptCounter: (id: string, t: string) => api(`/bargains/${id}/accept-counter`, { method: "POST", token: t }),
   rejectCounter: (id: string, t: string) => api(`/bargains/${id}/reject-counter`, { method: "POST", token: t }),
   // seller-side
-  sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t }),
-  sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t }),
+  sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t, pick: "bargains" }),
+  sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t, raw: true }),
   accept: (id: string, t: string) => api(`/bargains/${id}/accept`, { method: "POST", token: t }),
   reject: (id: string, t: string) => api(`/bargains/${id}/reject`, { method: "POST", token: t }),
   counter: (id: string, b: unknown, t: string) =>
@@ -283,9 +284,11 @@ export const live = {
   sessions: () => api<LiveSession[]>("/live/sessions"),
   details: (sessionId: string) => api(`/live/session/${sessionId}/details`),
   comments: (sessionId: string) => api(`/live/session/${sessionId}/comments`),
-  token: (b: unknown, t: string) => api("/live/token", { method: "POST", body: b, token: t }),
-  refreshToken: (b: unknown, t: string) => api("/live/refresh-token", { method: "POST", body: b, token: t }),
-  join: (sessionId: string, t: string) => api(`/live/session/${sessionId}/join`, { method: "POST", token: t }),
+  token: (b: unknown, t: string) => api("/live/token", { method: "POST", body: b, token: t, raw: true }),
+  refreshToken: (b: unknown, t: string) => api("/live/refresh-token", { method: "POST", body: b, token: t, raw: true }),
+  join: (sessionId: string, t: string) =>
+    api<{ appId?: string; token?: string; uid?: number; channelName?: string }>(
+      `/live/session/${sessionId}/join`, { method: "POST", token: t, raw: true }),
   leave: (sessionId: string, t: string) => api(`/live/session/${sessionId}/leave`, { method: "POST", token: t }),
   comment: (sessionId: string, b: unknown, t: string) =>
     api(`/live/session/${sessionId}/comment`, { method: "POST", body: b, token: t }),
