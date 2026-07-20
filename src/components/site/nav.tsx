@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Search, Heart, ShoppingBag } from "lucide-react";
+import { Search, Heart, ShoppingBag, Store } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/components/auth/auth-provider";
 
@@ -46,11 +46,11 @@ export function Nav() {
         </form>
 
         <Link
-          href="/live"
-          className="ml-auto hidden items-center gap-2 rounded-full border border-hairline px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 sm:flex md:ml-0"
+          href="/sell"
+          className="ml-auto hidden items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface transition-opacity hover:opacity-90 sm:flex md:ml-0"
         >
-          <span className="live-dot grid h-2 w-2 place-items-center rounded-full bg-live" />
-          Live now
+          <Store className="h-4 w-4" />
+          Sell
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:ml-0">

@@ -1,12 +1,29 @@
 import Link from "next/link";
-import Image from "next/image";
-import { ArrowUpRight, Play, Star, Heart } from "lucide-react";
+import {
+  ArrowUpRight, Play, Star, Heart, Sparkles, BedDouble, Shirt, Sofa,
+  Smartphone, Watch, Gem, LayoutGrid, type LucideIcon,
+} from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { type OrbTone } from "@/components/ui/product-orb";
 import { compact, inr } from "@/lib/utils";
 import type { Bit, Category, LiveSession, Product } from "@/lib/types";
 
-const dotHex = ["#2743c9", "#ff5a45", "#b4e81f", "#8b46e0", "#9aa6bd", "#22b8a6"];
+// Map each category to a clean icon + accent tint (check women before men —
+// "women" contains the substring "men").
+function catStyle(name: string): { Icon: LucideIcon; hex: string } {
+  const n = name.toLowerCase();
+  if (n.includes("beauty")) return { Icon: Sparkles, hex: "#ff5a45" };
+  if (n.includes("bed") || n.includes("bath")) return { Icon: BedDouble, hex: "#22b8a6" };
+  if (n.includes("accessor")) return n.includes("women")
+    ? { Icon: Gem, hex: "#8b46e0" }
+    : { Icon: Watch, hex: "#2743c9" };
+  if (n.includes("fashion")) return n.includes("women")
+    ? { Icon: Shirt, hex: "#e0559c" }
+    : { Icon: Shirt, hex: "#2743c9" };
+  if (n.includes("home") || n.includes("decor")) return { Icon: Sofa, hex: "#c07a2e" };
+  if (n.includes("electronic")) return { Icon: Smartphone, hex: "#3a7ad4" };
+  return { Icon: LayoutGrid, hex: "#6b6e63" };
+}
 
 export function CategoryCard({ categories }: { categories: Category[] }) {
   const list = categories.filter((c) => c.slug !== "explore-all").slice(0, 6);
@@ -19,26 +36,24 @@ export function CategoryCard({ categories }: { categories: Category[] }) {
         </Link>
       </div>
       <div className="mt-5 flex flex-wrap gap-2.5">
-        {list.map((c, i) => (
-          <Link
-            key={c._id}
-            href={`/category/${encodeURIComponent(c.slug)}`}
-            className="group inline-flex items-center gap-2 rounded-full border border-hairline bg-surface-2 py-1.5 pl-1.5 pr-3.5 text-sm font-medium text-ink transition-colors hover:bg-canvas"
-          >
-            {c.image?.url ? (
-              <Image
-                src={c.image.url}
-                alt=""
-                width={24}
-                height={24}
-                className="h-6 w-6 rounded-full object-cover"
-              />
-            ) : (
-              <span className="h-6 w-6 rounded-full" style={{ background: dotHex[i % dotHex.length] }} />
-            )}
-            {c.name}
-          </Link>
-        ))}
+        {list.map((c) => {
+          const { Icon, hex } = catStyle(c.name);
+          return (
+            <Link
+              key={c._id}
+              href={`/category/${encodeURIComponent(c.slug)}`}
+              className="group inline-flex items-center gap-2 rounded-full border border-hairline bg-surface-2 py-1.5 pl-1.5 pr-3.5 text-sm font-medium text-ink transition-colors hover:bg-canvas"
+            >
+              <span
+                className="grid h-7 w-7 place-items-center rounded-full"
+                style={{ background: `${hex}1f`, color: hex }}
+              >
+                <Icon className="h-[15px] w-[15px]" />
+              </span>
+              {c.name}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -140,26 +155,34 @@ export function SpotlightCard({ product }: { product?: Product }) {
 
 export function BitsCard({ bit }: { bit?: Bit }) {
   return (
-    <Link href="/bits" className="card card-hover group relative flex flex-col justify-between overflow-hidden rounded-[1.75rem] p-6">
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface-2 py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-ink">
-          <Play className="h-3.5 w-3.5 fill-current" /> Trending on Bits
+    <Link href="/bits" className="card card-hover group relative overflow-hidden rounded-[1.75rem] p-3">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-[1.25rem] bg-surface-2">
+        <ProductMedia src={bit?.thumbnail?.url} alt={bit?.title ?? "Bit"} tone="lime" sizes="(max-width:768px) 100vw, 33vw" className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent" />
+
+        {/* top row */}
+        <div className="absolute inset-x-3 top-3 flex items-center justify-between">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/85 py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-ink backdrop-blur">
+            <Play className="h-3.5 w-3.5 fill-current" /> Trending on Bits
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-ink/70 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+            {compact(bit?.viewCount ?? 0)} views
+          </span>
+        </div>
+
+        {/* center play */}
+        <span className="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-ink shadow-lg transition-transform group-hover:scale-110">
+          <Play className="h-6 w-6 translate-x-0.5 fill-current" />
         </span>
-        <span className="btn-ink grid h-8 w-8 place-items-center rounded-full">
-          <ArrowUpRight className="h-4 w-4" />
-        </span>
-      </div>
-      <div className="mt-8 flex items-end justify-between gap-4">
-        <div>
-          <p className="line-clamp-2 max-w-[9rem] font-display text-xl font-semibold leading-tight text-ink">
+
+        {/* bottom title */}
+        <div className="absolute inset-x-4 bottom-4">
+          <p className="line-clamp-2 font-display text-lg font-semibold leading-tight text-white">
             {bit?.title ?? "Watch product videos"}
           </p>
-          <p className="mt-1.5 inline-flex items-center gap-1 text-sm text-muted">
+          <p className="mt-1.5 inline-flex items-center gap-1 text-sm text-white/85">
             <Heart className="h-3.5 w-3.5 fill-live text-live" /> {compact(bit?.likeCount ?? 0)}
           </p>
-        </div>
-        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl">
-          <ProductMedia src={bit?.thumbnail?.url} alt={bit?.title ?? "Bit"} tone="lime" float sizes="96px" className="h-full w-full" />
         </div>
       </div>
     </Link>
