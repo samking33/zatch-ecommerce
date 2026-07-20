@@ -1,16 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Heart, ShoppingBag, Store } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/components/auth/auth-provider";
+import { cart as cartApi } from "@/lib/api";
+import { getToken } from "@/lib/client-auth";
 
 export function Nav() {
   const [q, setQ] = useState("");
   const { user } = useAuth();
   const label = user?.username || (user ? "Account" : "Sign in");
   const initial = (user?.username?.[0] ?? "Z").toUpperCase();
+
+  // Real cart count for the badge (0 → no badge).
+  const [cartCount, setCartCount] = useState(0);
+  useEffect(() => {
+    const t = getToken();
+    if (!t) { setCartCount(0); return; }
+    cartApi.get(t).then((c) => {
+      const cart = c as { totalItems?: number; items?: unknown[] } | null;
+      setCartCount(cart?.totalItems ?? cart?.items?.length ?? 0);
+    });
+  }, [user]);
 
   return (
     <header className="sticky top-0 z-50 px-3 pb-3 pt-3 sm:px-5 sm:pt-5">
@@ -57,7 +70,7 @@ export function Nav() {
           <IconButton href="/wishlist" label="Wishlist" className="hidden sm:grid">
             <Heart className="h-[18px] w-[18px]" />
           </IconButton>
-          <IconButton href="/cart" label="Cart" badge={2}>
+          <IconButton href="/cart" label="Cart" badge={cartCount || undefined}>
             <ShoppingBag className="h-[18px] w-[18px]" />
           </IconButton>
 
