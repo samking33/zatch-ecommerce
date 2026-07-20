@@ -15,8 +15,9 @@ const groups = [
     title: "Sell",
     links: [
       ["Become a seller", "/sell"],
-      ["Go live", "/sell"],
-      ["Seller payouts", "/account"],
+      ["Seller dashboard", "/seller/dashboard"],
+      ["Go live", "/seller/live"],
+      ["Seller payouts", "/seller/payouts"],
     ],
   },
   {

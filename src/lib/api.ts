@@ -296,7 +296,7 @@ export const live = {
   heartbeat: (sessionId: string, t: string) => api(`/live/session/${sessionId}/heartbeat`, { method: "POST", token: t }),
   share: (sessionId: string) => api(`/live/session/${sessionId}/share`),
   // seller-side
-  dashboard: (t: string) => api("/live/dashboard", { token: t }),
+  dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true }),
   schedule: (b: unknown, t: string) => api("/live/schedule", { method: "POST", body: b, token: t }),
   end: (sessionId: string, t: string) => api(`/live/session/${sessionId}/end`, { method: "PATCH", token: t }),
 };
