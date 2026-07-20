@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  ArrowUpRight, Play, Star, Heart, Sparkles, BedDouble, Shirt, Sofa,
+  ArrowUpRight, Play, Star, Heart, Flower2, BedDouble, Shirt, Sofa,
   Smartphone, Watch, Gem, LayoutGrid, type LucideIcon,
 } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
@@ -12,7 +12,7 @@ import type { Bit, Category, LiveSession, Product } from "@/lib/types";
 // "women" contains the substring "men").
 function catStyle(name: string): { Icon: LucideIcon; hex: string } {
   const n = name.toLowerCase();
-  if (n.includes("beauty")) return { Icon: Sparkles, hex: "#ff5a45" };
+  if (n.includes("beauty")) return { Icon: Flower2, hex: "#e0559c" };
   if (n.includes("bed") || n.includes("bath")) return { Icon: BedDouble, hex: "#22b8a6" };
   if (n.includes("accessor")) return n.includes("women")
     ? { Icon: Gem, hex: "#8b46e0" }
