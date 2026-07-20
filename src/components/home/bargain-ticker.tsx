@@ -1,20 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { inr } from "@/lib/utils";
 
-// The signature interaction: a live negotiation playing out. Buyer offers,
-// seller counters, deal locks — the loop that makes Zatch Zatch.
+// Live-negotiation signature, driven by a REAL product's list + deal price.
 type Step = { who: "list" | "buyer" | "seller" | "deal"; price: number; label: string };
-
-const script: Step[] = [
-  { who: "list", price: 8990, label: "List price" },
-  { who: "buyer", price: 5500, label: "You offered" },
-  { who: "seller", price: 6800, label: "Seller countered" },
-  { who: "buyer", price: 6200, label: "You countered" },
-  { who: "deal", price: 6490, label: "Deal locked" },
-];
 
 const tone: Record<Step["who"], string> = {
   list: "text-muted",
@@ -23,15 +14,37 @@ const tone: Record<Step["who"], string> = {
   deal: "text-lime-ink",
 };
 
-export function BargainTicker() {
+export function BargainTicker({
+  productName,
+  listPrice,
+  dealPrice,
+}: {
+  productName: string;
+  listPrice: number;
+  dealPrice?: number;
+}) {
+  const deal = dealPrice && dealPrice < listPrice ? dealPrice : Math.round(listPrice * 0.85);
+  const script = useMemo<Step[]>(() => {
+    const buyerFirst = Math.round(deal * 0.9);
+    const sellerCounter = Math.round((deal + listPrice) / 2);
+    return [
+      { who: "list", price: listPrice, label: "List price" },
+      { who: "buyer", price: buyerFirst, label: "You offered" },
+      { who: "seller", price: sellerCounter, label: "Seller countered" },
+      { who: "buyer", price: Math.round((buyerFirst + deal) / 2), label: "You countered" },
+      { who: "deal", price: deal, label: "Deal locked" },
+    ];
+  }, [listPrice, deal]);
+
   const [i, setI] = useState(0);
   const step = script[i];
+  const off = Math.round((1 - deal / listPrice) * 100);
 
   useEffect(() => {
     const ms = step.who === "deal" ? 2600 : 1700;
     const t = setTimeout(() => setI((n) => (n + 1) % script.length), ms);
     return () => clearTimeout(t);
-  }, [i, step.who]);
+  }, [i, step.who, script.length]);
 
   return (
     <div className="card w-[15.5rem] rounded-[1.25rem] p-4 backdrop-blur-xl">
@@ -40,7 +53,7 @@ export function BargainTicker() {
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink">
           Live bargain
         </span>
-        <span className="ml-auto text-[11px] text-muted">Aurora</span>
+        <span className="ml-auto max-w-[6rem] truncate text-[11px] text-muted">{productName}</span>
       </div>
 
       <div
@@ -48,9 +61,7 @@ export function BargainTicker() {
           step.who === "deal" ? "bg-lime" : "bg-surface-2"
         }`}
       >
-        <p className={`text-[11px] font-medium ${tone[step.who]} opacity-70`}>
-          {step.label}
-        </p>
+        <p className={`text-[11px] font-medium ${tone[step.who]} opacity-70`}>{step.label}</p>
         <div className="flex items-baseline gap-2 overflow-hidden">
           <AnimatePresence mode="popLayout">
             <motion.span
@@ -64,10 +75,8 @@ export function BargainTicker() {
               {inr(step.price)}
             </motion.span>
           </AnimatePresence>
-          {step.who === "deal" && (
-            <span className="text-[11px] font-semibold text-lime-ink/70">
-              −28%
-            </span>
+          {step.who === "deal" && off > 0 && (
+            <span className="text-[11px] font-semibold text-lime-ink/70">−{off}%</span>
           )}
         </div>
       </div>
@@ -76,9 +85,7 @@ export function BargainTicker() {
         {script.map((_, n) => (
           <span
             key={n}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              n <= i ? "bg-ink" : "bg-hairline"
-            }`}
+            className={`h-1 flex-1 rounded-full transition-colors ${n <= i ? "bg-ink" : "bg-hairline"}`}
           />
         ))}
       </div>

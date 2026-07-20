@@ -34,6 +34,9 @@ export interface Product {
   saveCount?: number;
   bargainSettings?: { autoAcceptDiscount?: number; maximumDiscount?: number };
   analytics?: { averageRating?: number; totalReviews?: number; totalSales?: number };
+  // Backend also returns these at the top level.
+  averageRating?: number;
+  commentCount?: number;
   sellerId?: string | Seller;
 }
 
@@ -66,7 +69,7 @@ export interface Bit {
   _id: string;
   title?: string;
   description?: string;
-  video?: string;
+  video?: string | ProductImage;
   thumbnail?: ProductImage;
   likeCount?: number;
   viewCount?: number;

@@ -1,41 +1,93 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Minus, Plus, X, Tag, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Minus, Plus, X, Tag, ArrowRight, ShoppingBag, Loader2 } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
-import { ProductOrb, type OrbTone } from "@/components/ui/product-orb";
+import { SignInRequired } from "@/components/auth/sign-in-required";
+import { ProductMedia } from "@/components/ui/product-media";
+import { cart as cartApi } from "@/lib/api";
+import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
 
-type Line = {
-  id: string;
-  name: string;
-  variant: string;
-  price: number;
-  qty: number;
-  tone: OrbTone;
-  bargained?: boolean;
+type CartItem = {
+  _id?: string;
+  product?: { _id?: string; name?: string; images?: { url: string }[] } | string;
+  name?: string;
+  image?: string;
+  variant?: { color?: string; size?: string };
+  color?: string;
+  size?: string;
+  qty?: number;
+  cartPrice?: number;
+  price?: number;
+  bargainId?: string;
+};
+type Cart = {
+  items?: CartItem[];
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
+  total?: number;
+  totalItems?: number;
 };
 
-const initial: Line[] = [
-  { id: "p1", name: "Aurora Over-Ear Headphone", variant: "Cobalt", price: 6490, qty: 1, tone: "cobalt", bargained: true },
-  { id: "p2", name: "X-Bud Pro Wireless", variant: "White", price: 3299, qty: 2, tone: "slate" },
-];
+function itemName(it: CartItem) {
+  if (typeof it.product === "object" && it.product?.name) return it.product.name;
+  return it.name ?? "Item";
+}
+function itemImage(it: CartItem) {
+  if (typeof it.product === "object") return it.product?.images?.[0]?.url;
+  return it.image;
+}
+function itemPrice(it: CartItem) {
+  return it.cartPrice ?? it.price ?? 0;
+}
 
 export default function CartPage() {
-  const [lines, setLines] = useState<Line[]>(initial);
+  const [token, setToken] = useState<string | undefined>(undefined);
+  const [cart, setCart] = useState<Cart | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
 
-  const setQty = (id: string, d: number) =>
-    setLines((ls) =>
-      ls.map((l) => (l.id === id ? { ...l, qty: Math.max(1, l.qty + d) } : l)),
+  useEffect(() => {
+    const t = getToken();
+    setToken(t);
+    setReady(true);
+    if (!t) {
+      setLoading(false);
+      return;
+    }
+    cartApi.get(t).then((c) => {
+      setCart((c as Cart) ?? { items: [] });
+      setLoading(false);
+    });
+  }, []);
+
+  async function changeQty(it: CartItem, qty: number) {
+    if (!token) return;
+    const productId = typeof it.product === "object" ? it.product?._id : it.product;
+    setCart((c) =>
+      c
+        ? { ...c, items: c.items?.map((x) => (x === it ? { ...x, qty } : x)) }
+        : c,
     );
-  const remove = (id: string) =>
-    setLines((ls) => ls.filter((l) => l.id !== id));
+    await cartApi.update({ productId, qty, variant: it.variant }, token);
+    const fresh = await cartApi.get(token);
+    setCart((fresh as Cart) ?? cart);
+  }
 
-  const subtotal = lines.reduce((s, l) => s + l.price * l.qty, 0);
-  const shipping = subtotal > 4999 ? 0 : 79;
-  const total = subtotal + shipping;
+  async function remove(it: CartItem) {
+    if (!token) return;
+    const productId = typeof it.product === "object" ? it.product?._id : it.product;
+    setCart((c) => (c ? { ...c, items: c.items?.filter((x) => x !== it) } : c));
+    await cartApi.remove({ productId, variant: it.variant }, token);
+  }
+
+  const items = cart?.items ?? [];
+  const subtotal = cart?.subtotal ?? items.reduce((s, it) => s + itemPrice(it) * (it.qty ?? 1), 0);
+  const total = cart?.total ?? subtotal;
 
   return (
     <>
@@ -46,16 +98,22 @@ export default function CartPage() {
             Your cart
           </h1>
           <p className="mt-1 text-[15px] text-muted">
-            {lines.length} item{lines.length !== 1 && "s"} · bargained prices locked
-            for 24h
+            {items.length} item{items.length !== 1 && "s"}
           </p>
         </div>
 
-        {lines.length === 0 ? (
+        {ready && !token ? (
+          <SignInRequired what="your cart" />
+        ) : loading ? (
+          <div className="card grid place-items-center rounded-[2rem] p-16 text-muted">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : items.length === 0 ? (
           <div className="card grid place-items-center rounded-[2rem] p-16 text-center">
-            <p className="font-display text-2xl font-semibold text-ink">
-              Nothing here yet
-            </p>
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink">
+              <ShoppingBag className="h-5 w-5" />
+            </span>
+            <p className="mt-4 font-display text-2xl font-semibold text-ink">Your cart is empty</p>
             <p className="mt-2 text-muted">Go strike a deal.</p>
             <Link href="/shop" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">
               Browse products
@@ -64,67 +122,60 @@ export default function CartPage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
             <div className="flex flex-col gap-4">
-              {lines.map((l) => (
-                <div key={l.id} className="card flex items-center gap-4 rounded-[1.5rem] p-3">
-                  <div className="h-24 w-24 shrink-0 rounded-2xl bg-surface-2 p-1">
-                    <ProductOrb tone={l.tone} className="h-full w-full" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">
-                        {l.name}
-                      </p>
-                      <button
-                        onClick={() => remove(l.id)}
-                        aria-label="Remove item"
-                        className="grid h-7 w-7 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-ink"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+              {items.map((it, idx) => {
+                const qty = it.qty ?? 1;
+                return (
+                  <div key={it._id ?? idx} className="card flex items-center gap-4 rounded-[1.5rem] p-3">
+                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
+                      <ProductMedia src={itemImage(it)} alt={itemName(it)} sizes="96px" className="h-full w-full" />
                     </div>
-                    <p className="text-sm text-muted">{l.variant}</p>
-                    {l.bargained && (
-                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-lime-ink">
-                        <Tag className="h-3 w-3" /> Bargained
-                      </span>
-                    )}
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="inline-flex items-center gap-1 rounded-full border border-hairline p-1">
-                        <button onClick={() => setQty(l.id, -1)} aria-label="Decrease" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2">
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold tabular-nums">{l.qty}</span>
-                        <button onClick={() => setQty(l.id, 1)} aria-label="Increase" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2">
-                          <Plus className="h-3.5 w-3.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{itemName(it)}</p>
+                        <button onClick={() => remove(it)} aria-label="Remove item" className="grid h-7 w-7 place-items-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-ink">
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                      <span className="font-display text-lg font-semibold text-ink">
-                        {inr(l.price * l.qty)}
-                      </span>
+                      <p className="text-sm text-muted">
+                        {[it.variant?.color ?? it.color, it.variant?.size ?? it.size].filter(Boolean).join(" · ")}
+                      </p>
+                      {it.bargainId && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-lime-ink">
+                          <Tag className="h-3 w-3" /> Bargained
+                        </span>
+                      )}
+                      <div className="mt-2 flex items-center justify-between">
+                        <div className="inline-flex items-center gap-1 rounded-full border border-hairline p-1">
+                          <button onClick={() => changeQty(it, Math.max(1, qty - 1))} aria-label="Decrease" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2">
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold tabular-nums">{qty}</span>
+                          <button onClick={() => changeQty(it, qty + 1)} aria-label="Increase" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2">
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <span className="font-display text-lg font-semibold text-ink">{inr(itemPrice(it) * qty)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <aside className="card h-fit rounded-[1.75rem] p-6 lg:sticky lg:top-28">
               <h2 className="font-display text-lg font-semibold text-ink">Summary</h2>
               <dl className="mt-4 space-y-3 text-[15px]">
                 <Row label="Subtotal" value={inr(subtotal)} />
-                <Row label="Shipping" value={shipping === 0 ? "Free" : inr(shipping)} />
+                {cart?.discount ? <Row label="Discount" value={`− ${inr(cart.discount)}`} /> : null}
+                {cart?.tax ? <Row label="Tax" value={inr(cart.tax)} /> : null}
                 <div className="border-t border-hairline pt-3">
                   <Row label="Total" value={inr(total)} strong />
                 </div>
               </dl>
-              <Link
-                href="/checkout"
-                className="pill-lime mt-5 flex items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold"
-              >
+              <Link href="/checkout" className="pill-lime mt-5 flex items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold">
                 Checkout <ArrowRight className="h-4 w-4" />
               </Link>
-              <p className="mt-3 text-center text-[13px] text-muted">
-                Secure payment via Razorpay
-              </p>
+              <p className="mt-3 text-center text-[13px] text-muted">Secure payment via Razorpay</p>
             </aside>
           </div>
         )}
@@ -138,9 +189,7 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   return (
     <div className="flex items-center justify-between">
       <dt className={strong ? "font-semibold text-ink" : "text-muted"}>{label}</dt>
-      <dd className={strong ? "font-display text-xl font-semibold text-ink" : "font-medium text-ink"}>
-        {value}
-      </dd>
+      <dd className={strong ? "font-display text-xl font-semibold text-ink" : "font-medium text-ink"}>{value}</dd>
     </div>
   );
 }

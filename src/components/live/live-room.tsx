@@ -22,7 +22,15 @@ const incoming = [
   "can you demo the bass?",
 ];
 
-export function LiveRoom({ title }: { title: string }) {
+export function LiveRoom({
+  title,
+  productId,
+  listPrice = 8990,
+}: {
+  title: string;
+  productId?: string;
+  listPrice?: number;
+}) {
   const [msgs, setMsgs] = useState<Msg[]>(seed);
   const [text, setText] = useState("");
   const [likes, setLikes] = useState(2410);
@@ -78,7 +86,7 @@ export function LiveRoom({ title }: { title: string }) {
 
       {/* chat + bargain */}
       <div className="flex flex-col gap-4">
-        <BargainBox listPrice={8990} autoAcceptDiscount={18} maxDiscount={32} />
+        <BargainBox productId={productId ?? ""} listPrice={listPrice} autoAcceptDiscount={18} maxDiscount={32} />
 
         <div className="card flex min-h-[20rem] flex-1 flex-col rounded-[1.75rem] p-4">
           <p className="px-1 text-[13px] font-semibold uppercase tracking-widest text-muted">

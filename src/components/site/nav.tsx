@@ -4,9 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { Search, Heart, ShoppingBag } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function Nav() {
   const [q, setQ] = useState("");
+  const { user } = useAuth();
+  const label = user?.username || (user ? "Account" : "Sign in");
+  const initial = (user?.username?.[0] ?? "Z").toUpperCase();
 
   return (
     <header className="sticky top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-5">
@@ -53,14 +57,14 @@ export function Nav() {
           </IconButton>
 
           <Link
-            href="/account"
+            href={user ? "/account" : "/login"}
             className="flex items-center gap-2.5 rounded-full border border-hairline bg-surface-2 py-1 pl-3.5 pr-1 transition-colors hover:bg-canvas"
           >
-            <span className="hidden text-sm font-medium text-ink sm:inline">
-              Account
+            <span className="hidden max-w-[7rem] truncate text-sm font-medium text-ink sm:inline">
+              {label}
             </span>
             <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[13px] font-semibold text-surface">
-              Z
+              {initial}
             </span>
           </Link>
         </div>

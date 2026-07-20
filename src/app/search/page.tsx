@@ -1,7 +1,7 @@
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
 import { api } from "@/lib/api";
-import { sampleProducts } from "@/lib/placeholder";
+import { serverToken } from "@/lib/session";
 import type { Product } from "@/lib/types";
 
 export const metadata = { title: "Search" };
@@ -13,14 +13,11 @@ export default async function SearchPage({
 }) {
   const { q = "" } = await searchParams;
   const results = q
-    ? await api<Product[]>(`/search/search?q=${encodeURIComponent(q)}`)
+    ? await api<Product[]>(`/search/search?q=${encodeURIComponent(q)}`, {
+        token: await serverToken(),
+      })
     : null;
-  const items =
-    results?.length
-      ? results
-      : sampleProducts.filter((p) =>
-          q ? p.name.toLowerCase().includes(q.toLowerCase()) : true,
-        );
+  const items = results ?? [];
 
   return (
     <PageShell>

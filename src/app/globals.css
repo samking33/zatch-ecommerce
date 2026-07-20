@@ -39,7 +39,13 @@
   }
 
   body {
-    background: var(--color-canvas);
+    background-color: #dbf29a;
+    /* prominent Zatch-lime wash, fixed so it stays behind the bento as you scroll */
+    background-image:
+      radial-gradient(58rem 42rem at 6% -6%, rgba(202, 254, 56, 0.95), transparent 58%),
+      radial-gradient(52rem 42rem at 100% 4%, rgba(202, 254, 56, 0.8), transparent 56%),
+      radial-gradient(78rem 56rem at 50% 118%, rgba(180, 232, 31, 0.75), transparent 60%);
+    background-attachment: fixed;
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;

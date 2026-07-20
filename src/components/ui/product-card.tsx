@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Star, Tag } from "lucide-react";
-import { ProductOrb, type OrbTone } from "./product-orb";
+import { ProductMedia } from "./product-media";
+import type { OrbTone } from "./product-orb";
 import { inr } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -12,6 +13,8 @@ export function ProductCard({ product, i = 0 }: { product: Product; i?: number }
     product.discountedPrice && product.price > product.discountedPrice
       ? Math.round((1 - product.discountedPrice / product.price) * 100)
       : 0;
+  const rating = product.averageRating ?? product.analytics?.averageRating ?? 0;
+  const img = product.images?.[0]?.url;
   // ponytail: Zatch is bargain-first, so the badge shows unless a seller
   // explicitly disabled it (maximumDiscount === 0).
   const canBargain = product.bargainSettings?.maximumDiscount !== 0;
@@ -22,7 +25,12 @@ export function ProductCard({ product, i = 0 }: { product: Product; i?: number }
       className="card card-hover group flex flex-col overflow-hidden rounded-[1.5rem] p-3"
     >
       <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-2">
-        <ProductOrb tone={tones[i % tones.length]} className="h-full w-full" />
+        <ProductMedia
+          src={img}
+          alt={product.name}
+          tone={tones[i % tones.length]}
+          className="h-full w-full"
+        />
         {off > 0 && (
           <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-surface">
             −{off}%
@@ -54,10 +62,10 @@ export function ProductCard({ product, i = 0 }: { product: Product; i?: number }
               </span>
             )}
           </div>
-          {product.analytics?.averageRating ? (
+          {rating > 0 ? (
             <span className="inline-flex items-center gap-1 text-[13px] text-ink-soft">
               <Star className="h-3.5 w-3.5 fill-lime text-lime" />
-              {product.analytics.averageRating}
+              {rating.toFixed(1)}
             </span>
           ) : null}
         </div>
