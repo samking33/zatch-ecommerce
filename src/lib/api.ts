@@ -147,8 +147,9 @@ export const seller = {
 export const products = {
   list: (o?: Record<string, string | number>) => api<Product[]>(`/product/products${qs(o)}`),
   topPicks: () => api<Product[]>("/product/top-picks"),
-  search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ q })}`, { token: t, pick: "products" }),
-  searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ q })}`, { token: t, pick: "products" }),
+  // Backend search param is `query` (not `q`).
+  search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products" }),
+  searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ query: q })}`, { token: t, pick: "products" }),
   filter: (o: Record<string, string | number | undefined>, t?: string) =>
     api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products" }),
   get: (id: string) => api<Product>(`/product/${id}`, { pick: "product" }),
@@ -180,8 +181,8 @@ export const categories = {
   subcategories: (id: string) => api(`/category/${id}/subcategories`, { pick: "subCategories" }),
 };
 export const search = {
-  query: (q: string) => api<Product[]>(`/search/search${qs({ q })}`),
-  popular: () => api<string[]>("/search/popular"),
+  query: (q: string, t?: string) => api<Product[]>(`/search/search${qs({ query: q })}`, { token: t, pick: "products" }),
+  popular: () => api<unknown[]>("/search/popular", { pick: "popularSearches" }),
 };
 
 // ─── Trending (/trending) ───────────────────────────────────────────────────

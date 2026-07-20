@@ -1,6 +1,6 @@
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
-import { api } from "@/lib/api";
+import { search as searchApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import type { Product } from "@/lib/types";
 
@@ -12,12 +12,8 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q = "" } = await searchParams;
-  const results = q
-    ? await api<Product[]>(`/search/search?q=${encodeURIComponent(q)}`, {
-        token: await serverToken(),
-      })
-    : null;
-  const items = results ?? [];
+  const results = q ? await searchApi.query(q, await serverToken()) : null;
+  const items = (results as Product[] | null) ?? [];
 
   return (
     <PageShell>

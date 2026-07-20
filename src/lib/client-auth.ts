@@ -34,13 +34,16 @@ export function getUser(): SessionUser | null {
   }
 }
 
+// Add Secure on HTTPS so the token is never sent over plain HTTP.
+const SECURE = typeof location !== "undefined" && location.protocol === "https:" ? "; secure" : "";
+
 function setSession(token: string, user: SessionUser) {
-  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${MAX_AGE}; samesite=lax`;
+  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${MAX_AGE}; samesite=lax${SECURE}`;
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function clearSession() {
-  document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; samesite=lax`;
+  document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; samesite=lax${SECURE}`;
   localStorage.removeItem(USER_KEY);
 }
 
