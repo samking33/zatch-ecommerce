@@ -6,7 +6,8 @@ import { Star, Loader2, FileText, XCircle } from "lucide-react";
 import { orders as ordersApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-const CANCELLABLE = ["pending", "confirmed", "processing"];
+// Backend only allows buyer cancellation before packing (orderController:1105).
+const CANCELLABLE = ["pending", "confirmed"];
 
 export function OrderActions({ orderId, status }: { orderId: string; status?: string }) {
   const router = useRouter();

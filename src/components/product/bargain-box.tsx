@@ -40,6 +40,7 @@ export function BargainBox({
   const [counter, setCounter] = useState(0);
   const [bargainId, setBargainId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [existing, setExisting] = useState<{ _id: string; status?: string; currentPrice?: number } | null>(null);
 
   const pct = useMemo(() => Math.round((1 - offer / listPrice) * 100), [offer, listPrice]);
 
@@ -60,12 +61,23 @@ export function BargainBox({
       },
       token,
     )) as
-      | { _id?: string; status?: string; counterOffer?: { price?: number }; currentPrice?: number }
+      | {
+          _id?: string; status?: string; counterOffer?: { price?: number }; currentPrice?: number;
+          success?: boolean; message?: string; tip?: string;
+          existingBargain?: { _id: string; status?: string; currentPrice?: number };
+        }
       | null;
 
     if (!res) {
       setPhase("idle");
       setError("Couldn't send your offer. Try again.");
+      return;
+    }
+    // 409: you already have a live bargain on this product — point at it.
+    if (res.existingBargain) {
+      setPhase("idle");
+      setExisting(res.existingBargain);
+      setError(res.tip ?? res.message ?? "You already have an active offer on this product.");
       return;
     }
     setBargainId(res._id ?? null);
@@ -151,7 +163,16 @@ export function BargainBox({
               <span>Floor {inr(floor)}</span>
               <span>List {inr(listPrice)}</span>
             </div>
-            {error && <p className="mt-2 text-sm font-medium text-live">{error}</p>}
+            {error && (
+              <div className="mt-2 rounded-xl bg-surface-2 px-3.5 py-2.5">
+                <p className="text-sm font-medium text-ink">{error}</p>
+                {existing && (
+                  <Link href={`/bargains/${existing._id}`} className="mt-1.5 inline-block text-sm font-semibold text-lime-deep hover:underline">
+                    View your offer{existing.currentPrice ? ` · ${inr(existing.currentPrice)}` : ""} →
+                  </Link>
+                )}
+              </div>
+            )}
             <button
               onClick={submit}
               disabled={phase === "waiting"}

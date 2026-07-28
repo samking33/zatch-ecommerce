@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Tag } from "lucide-react";
+import { Tag, Clock } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
@@ -21,6 +21,8 @@ type Bargain = {
   counterOffer?: { price?: number; message?: string };
   productId?: string | { _id?: string };
   productSnapshot?: { name?: string; image?: string };
+  // Backend computes a humanised countdown per bargain (48h clock).
+  timeLeft?: { text?: string | null; isExpiringSoon?: boolean };
 };
 
 const statusTone: Record<string, string> = {
@@ -86,11 +88,20 @@ export default async function BargainsPage() {
                     {b.productSnapshot?.name ?? "Product"}
                   </Link>
                   {b.originalPrice ? <p className="mt-0.5 text-sm text-muted">List {inr(b.originalPrice)}</p> : null}
-                  {b.status && (
-                    <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold capitalize ${statusTone[status] ?? "bg-surface-2 text-ink"}`}>
-                      {b.status.replace(/_/g, " ")}
-                    </span>
-                  )}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    {b.status && (
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold capitalize ${statusTone[status] ?? "bg-surface-2 text-ink"}`}>
+                        {b.status.replace(/_/g, " ")}
+                      </span>
+                    )}
+                    {b.timeLeft?.text && (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${
+                        b.timeLeft.isExpiringSoon ? "bg-live/10 text-live" : "bg-surface-2 text-muted"
+                      }`}>
+                        <Clock className="h-3 w-3" /> {b.timeLeft.text} left
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="text-right">

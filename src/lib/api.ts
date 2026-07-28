@@ -67,8 +67,10 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
         ? { next: { revalidate } }
         : { cache: "no-store" as RequestCache }),
     });
-    if (!res.ok) return null;
     const json = await res.json().catch(() => null);
+    // 409 carries useful context (e.g. an existing bargain) — hand it back so
+    // callers can show it instead of a generic failure.
+    if (!res.ok) return res.status === 409 ? (json as T) : null;
     if (json && typeof json === "object" && "success" in json && json.success === false) {
       return null;
     }
