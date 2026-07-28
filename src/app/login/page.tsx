@@ -6,15 +6,25 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
-import { login, loginWithOtp, otp as otpApi } from "@/lib/client-auth";
+import { login, loginWithOtp, otp as otpApi, emailOtp, bothOtp } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
+
+type Mode = "password" | "otp" | "email" | "both";
+const MODES: { key: Mode; label: string }[] = [
+  { key: "password", label: "Password" },
+  { key: "otp", label: "SMS OTP" },
+  { key: "email", label: "Email OTP" },
+  { key: "both", label: "2FA" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
   const { setUser } = useAuth();
-  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [mode, setMode] = useState<Mode>("password");
   const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -32,18 +42,25 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
+      const ph = phone.trim(), em = email.trim();
       if (mode === "password") {
-        done(await login({ phone: phone.trim(), countryCode, password }));
+        done(await login({ phone: ph, countryCode, password }));
         return;
       }
+      // Step 1 of every OTP flow: send the code(s).
       if (!otpSent) {
-        await otpApi.send(phone.trim(), countryCode);
+        if (mode === "otp") await otpApi.send(ph, countryCode);
+        else if (mode === "email") await emailOtp.send(em);
+        else await bothOtp.send(em, ph, countryCode);
         setOtpSent(true);
         setBusy(false);
         return;
       }
-      await otpApi.verify(phone.trim(), countryCode, code.trim());
-      done(await loginWithOtp({ phone: phone.trim(), countryCode }));
+      // Step 2: verify, then exchange for a session.
+      if (mode === "otp") await otpApi.verify(ph, countryCode, code.trim());
+      else if (mode === "email") await emailOtp.verify(em, emailCode.trim());
+      else await bothOtp.verify({ email: em, phone: ph, countryCode, emailOtp: emailCode.trim(), phoneOtp: code.trim() });
+      done(await loginWithOtp({ phone: ph, countryCode }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
       setBusy(false);
@@ -74,12 +91,39 @@ export default function LoginPage() {
           <h1 className="font-display text-2xl font-semibold text-ink">
             Welcome back
           </h1>
-          <p className="mt-1 text-[15px] text-muted">
-            Sign in with your phone and password.
-          </p>
+          <p className="mt-1 text-[15px] text-muted">Choose how you want to sign in.</p>
 
-          <form onSubmit={onSubmit} className="mt-7 space-y-4">
-            <label className="block">
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {MODES.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => { setMode(m.key); setOtpSent(false); setError(null); }}
+                className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                  mode === m.key ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={onSubmit} className="mt-5 space-y-4">
+            {(mode === "email" || mode === "both") && (
+              <label className="block">
+                <span className="text-[13px] font-medium text-muted">Email</span>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                />
+              </label>
+            )}
+
+            <label className={mode === "email" ? "hidden" : "block"}>
               <span className="text-[13px] font-medium text-muted">Phone number</span>
               <div className="mt-1.5 flex items-center rounded-2xl border border-hairline bg-surface-2 focus-within:border-ink">
                 <input
@@ -92,7 +136,7 @@ export default function LoginPage() {
                 <input
                   type="tel"
                   inputMode="numeric"
-                  required
+                  required={mode !== "email"}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="98765 43210"
@@ -114,17 +158,34 @@ export default function LoginPage() {
                 />
               </label>
             ) : otpSent ? (
-              <label className="block">
-                <span className="text-[13px] font-medium text-muted">Enter the code we texted you</span>
-                <input
-                  inputMode="numeric"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="6-digit code"
-                  className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-                />
-              </label>
+              <>
+                {mode !== "email" && (
+                  <label className="block">
+                    <span className="text-[13px] font-medium text-muted">Code sent to your phone</span>
+                    <input
+                      inputMode="numeric"
+                      required
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      placeholder="6-digit code"
+                      className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                    />
+                  </label>
+                )}
+                {(mode === "email" || mode === "both") && (
+                  <label className="block">
+                    <span className="text-[13px] font-medium text-muted">Code sent to your email</span>
+                    <input
+                      inputMode="numeric"
+                      required
+                      value={emailCode}
+                      onChange={(e) => setEmailCode(e.target.value)}
+                      placeholder="6-digit code"
+                      className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                    />
+                  </label>
+                )}
+              </>
             ) : null}
 
             {error && (
@@ -142,13 +203,6 @@ export default function LoginPage() {
               {busy ? "Please wait…" : mode === "password" ? "Sign in" : otpSent ? "Verify & sign in" : "Send code"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setMode(mode === "password" ? "otp" : "password"); setOtpSent(false); setError(null); }}
-              className="w-full text-center text-sm font-medium text-muted hover:text-ink"
-            >
-              {mode === "password" ? "Sign in with OTP instead" : "Use password instead"}
-            </button>
           </form>
 
           <div className="mt-5 flex items-center justify-between text-sm">

@@ -80,9 +80,9 @@ export default async function BargainsPage() {
                 </Link>
 
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">
+                  <Link href={`/bargains/${b._id}`} className="line-clamp-1 font-display text-[15px] font-semibold text-ink hover:underline">
                     {b.productSnapshot?.name ?? "Product"}
-                  </p>
+                  </Link>
                   {b.originalPrice ? <p className="mt-0.5 text-sm text-muted">List {inr(b.originalPrice)}</p> : null}
                   {b.status && (
                     <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold capitalize ${statusTone[status] ?? "bg-surface-2 text-ink"}`}>

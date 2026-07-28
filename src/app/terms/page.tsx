@@ -1,7 +1,13 @@
-import { ComingSoon } from "@/components/site/coming-soon";
+import { PageShell, PageHeader } from "@/components/site/page-shell";
+import { DocFrame } from "@/components/site/doc-frame";
 
 export const metadata = { title: "Terms & conditions" };
 
 export default function Page() {
-  return <ComingSoon title="Terms & conditions" note="The rules of the marketplace." />;
+  return (
+    <PageShell>
+      <PageHeader eyebrow="Legal" title="Terms & conditions" />
+      <DocFrame path="/terms-and-conditions" title="Terms & conditions" />
+    </PageShell>
+  );
 }

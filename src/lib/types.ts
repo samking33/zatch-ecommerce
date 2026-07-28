@@ -82,6 +82,7 @@ export interface LiveSession {
   viewersCount?: number;
   thumbnail?: ProductImage;
   hostId?: string | Seller;
+  productId?: string | { _id?: string; name?: string; price?: number };
 }
 
 export interface BitComment {

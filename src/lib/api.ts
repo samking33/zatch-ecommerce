@@ -273,7 +273,7 @@ export const orders = {
 // ─── Bargains (/bargains) — the core negotiation flow ───────────────────────
 export const bargains = {
   create: (b: unknown, t: string) => api("/bargains/create", { method: "POST", body: b, token: t }),
-  get: (id: string, t: string) => api(`/bargains/${id}`, { token: t }),
+  get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain" }),
   myBargains: (t: string) => api("/bargains/buyer/my-bargains", { token: t }),
   buyerCounter: (id: string, b: unknown, t: string) =>
     api(`/bargains/${id}/buyer-counter`, { method: "POST", body: b, token: t }),
@@ -294,14 +294,17 @@ export const address = {
   save: (b: unknown, t: string) => api("/address/save", { method: "POST", body: b, token: t }),
   update: (id: string, b: unknown, t: string) => api(`/address/${id}`, { method: "PUT", body: b, token: t }),
   remove: (id: string, t: string) => api(`/address/${id}`, { method: "DELETE", token: t }),
-  geocode: (b: unknown) => api("/address/geocode", { method: "POST", body: b }),
+  geocode: (lat: number, lng: number, t?: string) =>
+    api<{ formatted?: string; line1?: string; city?: string; state?: string; pincode?: string }>(
+      "/address/geocode", { method: "POST", body: { lat, lng }, token: t, pick: "address" }),
 };
 export const ifsc = { lookup: (code: string) => api(`/ifsc${qs({ ifsc: code })}`) };
 
 // ─── Live (/live) ───────────────────────────────────────────────────────────
 export const live = {
   sessions: () => api<LiveSession[]>("/live/sessions"),
-  details: (sessionId: string) => api(`/live/session/${sessionId}/details`),
+  details: (sessionId: string, t?: string) =>
+    api<{ session?: LiveSession } & LiveSession>(`/live/session/${sessionId}/details`, { token: t, raw: true }),
   comments: (sessionId: string) => api(`/live/session/${sessionId}/comments`),
   token: (b: unknown, t: string) => api("/live/token", { method: "POST", body: b, token: t, raw: true }),
   refreshToken: (b: unknown, t: string) => api("/live/refresh-token", { method: "POST", body: b, token: t, raw: true }),
@@ -313,7 +316,7 @@ export const live = {
     api(`/live/session/${sessionId}/comment`, { method: "POST", body: b, token: t }),
   like: (sessionId: string, t: string) => api(`/live/session/${sessionId}/like`, { method: "POST", token: t }),
   heartbeat: (sessionId: string, t: string) => api(`/live/session/${sessionId}/heartbeat`, { method: "POST", token: t }),
-  share: (sessionId: string) => api(`/live/session/${sessionId}/share`),
+  share: (sessionId: string) => api(`/live/session/${sessionId}/share`, { raw: true }),
   // seller-side
   dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true }),
   schedule: (b: unknown, t: string) => api("/live/schedule", { method: "POST", body: b, token: t }),
@@ -354,7 +357,7 @@ export const payments = {
   due: (t: string) => api("/payments/due", { token: t }),
   done: (t: string) => api("/payments/done", { token: t }),
   adjustments: (t: string) => api("/payments/adjustments", { token: t }),
-  payout: (payoutId: string, t: string) => api(`/payments/payout/${payoutId}`, { token: t }),
+  payout: (payoutId: string, t: string) => api(`/payments/payout/${payoutId}`, { token: t, raw: true }),
 };
 
 // ─── Support & legal ────────────────────────────────────────────────────────

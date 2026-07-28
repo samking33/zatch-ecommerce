@@ -109,7 +109,29 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
     phone: initial?.phone ?? "",
   });
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+
+  // Browser geolocation -> backend reverse-geocode -> autofill.
+  function useMyLocation() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const a = await addressApi.geocode(pos.coords.latitude, pos.coords.longitude, token);
+        setLocating(false);
+        if (a) setF((prev) => ({
+          ...prev,
+          line1: a.line1?.trim() || a.formatted || prev.line1,
+          city: a.city || prev.city,
+          state: a.state || prev.state,
+          pincode: a.pincode || prev.pincode,
+        }));
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -130,6 +152,15 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
       <F label="City" v={f.city} on={set("city")} />
       <F label="State" v={f.state} on={set("state")} />
       <F label="Pincode" v={f.pincode} on={set("pincode")} />
+      <button
+        type="button"
+        onClick={useMyLocation}
+        disabled={locating}
+        className="sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full border border-hairline py-2.5 text-sm font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
+      >
+        {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+        {locating ? "Finding you…" : "Use my current location"}
+      </button>
       <button disabled={saving} className="pill-lime sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save address
       </button>

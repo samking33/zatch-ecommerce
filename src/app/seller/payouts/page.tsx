@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Wallet, Clock, CheckCircle2 } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
@@ -64,13 +65,13 @@ function PayoutList({ title, payouts, empty }: { title: string; payouts: Payout[
       ) : (
         <div className="mt-3 flex flex-col gap-3">
           {payouts.map((p) => (
-            <div key={p._id} className="card flex items-center justify-between rounded-[1.5rem] p-5">
+            <Link key={p._id} href={`/seller/payouts/${p._id}`} className="card card-hover flex items-center justify-between rounded-[1.5rem] p-5">
               <div>
                 <p className="font-display text-[15px] font-semibold text-ink">{inr(p.amount ?? 0)}</p>
                 <p className="text-sm capitalize text-muted">{p.status ?? title.toLowerCase()}{p.orderId ? ` · order ${String(p.orderId).slice(-6)}` : ""}</p>
               </div>
               <span className="rounded-full bg-surface-2 px-3 py-1.5 text-[13px] font-medium capitalize text-ink">{p.status ?? title}</span>
-            </div>
+            </Link>
           ))}
         </div>
       )}

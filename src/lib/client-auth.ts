@@ -93,6 +93,22 @@ export const otp = {
     post("/twilio-sms/verify-otp", { phoneNumber: phone, countryCode, otp: code }),
 };
 
+// Email OTP, and the combined phone+email 2FA the app uses for sensitive flows.
+export const emailOtp = {
+  send: (email: string) => post("/email/send-email-otp", { email }),
+  verify: (email: string, code: string) => post("/email/verify-email-otp", { email, otp: code }),
+};
+
+export const bothOtp = {
+  send: (email: string, phone: string, countryCode: string) =>
+    post("/otp/send-both", { email, countryCode, phoneNumber: phone }),
+  verify: (i: { email: string; phone: string; countryCode: string; emailOtp: string; phoneOtp: string }) =>
+    post("/otp/verify-both", {
+      email: i.email, countryCode: i.countryCode, phoneNumber: i.phone,
+      emailOtp: i.emailOtp, phoneOtp: i.phoneOtp,
+    }),
+};
+
 export async function loginWithOtp(input: {
   phone: string;
   countryCode: string;

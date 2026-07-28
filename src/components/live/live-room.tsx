@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Heart } from "lucide-react";
+import { Send, Heart, Share2, Check } from "lucide-react";
 import { AgoraPlayer } from "./agora-player";
 import { BargainBox } from "@/components/product/bargain-box";
 import { live as liveApi } from "@/lib/api";
@@ -62,6 +62,19 @@ export function LiveRoom({
     if (t) liveApi.like(sessionId, t).catch(() => {});
   }
 
+  const [shared, setShared] = useState(false);
+  async function share() {
+    // Backend mints the canonical share link; fall back to this URL.
+    const res = (await liveApi.share(sessionId)) as { shareLink?: string; url?: string } | null;
+    const url = res?.shareLink ?? res?.url ?? window.location.href;
+    try {
+      if (navigator.share) await navigator.share({ title, url });
+      else await navigator.clipboard.writeText(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    } catch { /* dismissed */ }
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
       {/* stage */}
@@ -72,9 +85,14 @@ export function LiveRoom({
             <h1 className="font-display text-xl font-semibold text-ink">{title}</h1>
             <p className="mt-1 text-sm text-muted">Bargains open · tap to join the negotiation</p>
           </div>
-          <button onClick={like} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-3 py-2 text-[13px] font-semibold text-ink hover:bg-canvas">
-            <Heart className="h-4 w-4 fill-live text-live" /> {compact(likes)}
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button onClick={like} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-2 text-[13px] font-semibold text-ink hover:bg-canvas">
+              <Heart className="h-4 w-4 fill-live text-live" /> {compact(likes)}
+            </button>
+            <button onClick={share} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-2 text-[13px] font-semibold text-ink hover:bg-canvas">
+              {shared ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />} {shared ? "Copied" : "Share"}
+            </button>
+          </div>
         </div>
       </div>
 
