@@ -9,7 +9,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { address as addressApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-type Addr = { _id: string; label?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
+type Addr = { _id: string; label?: string; type?: string; isDefault?: boolean; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
 
 export default function AddressesPage() {
   const [token, setToken] = useState<string | undefined>();
@@ -71,7 +71,12 @@ export default function AddressesPage() {
                     <MapPin className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-display text-[15px] font-semibold text-ink">{a.label ?? "Address"}</p>
+                    <p className="flex items-center gap-2 font-display text-[15px] font-semibold text-ink">
+                      {a.label ?? a.type ?? "Address"}
+                      {a.isDefault && (
+                        <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-lime-ink">Default</span>
+                      )}
+                    </p>
                     <p className="mt-0.5 text-sm text-muted">
                       {[a.line1, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
                       {a.phone ? ` · ${a.phone}` : ""}
@@ -146,7 +151,12 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
 
   return (
     <form onSubmit={save} className="card grid gap-3 rounded-[1.5rem] p-6 sm:grid-cols-2">
-      <F label="Label" v={f.label} on={set("label")} />
+      <label className="block">
+        <span className="text-[12px] font-medium text-muted">Type</span>
+        <select value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
+          {["Home", "Office", "Others"].map((x) => <option key={x} value={x}>{x}</option>)}
+        </select>
+      </label>
       <F label="Phone" v={f.phone} on={set("phone")} />
       <F label="Address" v={f.line1} on={set("line1")} full />
       <F label="City" v={f.city} on={set("city")} />

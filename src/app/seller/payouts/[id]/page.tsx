@@ -24,6 +24,11 @@ type Payout = {
   createdAt?: string;
   paidAt?: string;
   utr?: string;
+  utrNumber?: string;
+  holdReason?: string;
+  failureReason?: string;
+  destination?: { type?: string; accountNumber?: string; upiId?: string };
+  mode?: string;
   orders?: Line[];
   items?: Line[];
   breakdown?: Line[];
@@ -89,7 +94,20 @@ export default async function PayoutDetailPage({ params }: { params: Promise<{ i
               <Row label="Net payout" value={inr(p.netAmount ?? p.amount ?? 0)} strong />
             </div>
           </dl>
-          {p.utr && <p className="mt-4 text-[13px] text-muted">UTR {p.utr}</p>}
+          {(p.holdReason || p.failureReason) && (
+            <p className="mt-4 rounded-xl bg-live/10 px-3.5 py-2.5 text-[13px] font-medium text-live">
+              {p.failureReason ?? p.holdReason}
+            </p>
+          )}
+          {(p.utrNumber ?? p.utr) && (
+            <p className="mt-4 text-[13px] text-muted">UTR {p.utrNumber ?? p.utr}</p>
+          )}
+          {p.destination && (
+            <p className="mt-1 text-[13px] text-muted">
+              To {p.destination.type === "upi" ? p.destination.upiId : p.destination.accountNumber}
+              {p.mode ? ` · ${p.mode}` : ""}
+            </p>
+          )}
           {(p.payoutId ?? p._id) && (
             <p className="mt-1 text-[13px] text-muted">Ref {p.payoutId ?? p._id}</p>
           )}

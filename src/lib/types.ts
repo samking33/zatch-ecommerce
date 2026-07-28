@@ -42,6 +42,11 @@ export interface Product {
   comments?: ProductComment[];
   reviews?: ProductReview[];
   sellerId?: string | Seller;
+  SKU?: string;
+  isSold?: boolean;
+  status?: string;
+  orderAcceptingType?: string;
+  shipping?: { estimatedDeliveryDays?: number; codAvailable?: boolean; returnPolicy?: string };
 }
 
 export interface ProductComment {

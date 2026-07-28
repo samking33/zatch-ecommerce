@@ -1,14 +1,51 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Check, Trash2, Loader2 } from "lucide-react";
+import {
+  Bell, Check, Trash2, Loader2, Tag, Package, Truck, CheckCircle2, XCircle,
+  Radio, Heart, MessageCircle, UserPlus, Wallet, ShieldCheck, TrendingDown, ShoppingCart,
+  type LucideIcon,
+} from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { notifications as notifApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
+// The backend tags every notification with one of ~40 types — map to an icon.
+const TYPE_ICON: Record<string, LucideIcon> = {
+  bargain_new: Tag, bargain_sent: Tag, bargain_accepted: CheckCircle2,
+  bargain_auto_accepted: CheckCircle2, bargain_countered: Tag, bargain_rejected: XCircle,
+  bargain_buyer_accepted: CheckCircle2, bargain_buyer_countered: Tag, bargain_buyer_rejected: XCircle,
+  order_new: Package, order_confirmed: CheckCircle2, order_paid: Wallet, order_packed: Package,
+  pickup_scheduled: Truck, order_shipped: Truck, courier_delay: Truck,
+  order_delivered: CheckCircle2, order_delivered_seller: CheckCircle2,
+  order_cancelled: XCircle, order_cancelled_seller: XCircle,
+  return_request: XCircle, return_approved: CheckCircle2, return_rejected: XCircle,
+  refund_issued: Wallet, refund_processed: Wallet, payout_processed: Wallet,
+  live_now: Radio, live_scheduled: Radio, live_starting_soon: Radio, live_summary: Radio,
+  new_follower: UserPlus, follower_milestone: UserPlus,
+  product_liked: Heart, product_commented: MessageCircle,
+  price_drop: TrendingDown, cart_reminder: ShoppingCart,
+  kyc_pending: ShieldCheck, kyc_verified: ShieldCheck, kyc_expiring: ShieldCheck,
+  account_verified: ShieldCheck, password_changed: ShieldCheck,
+};
+
+// Notification types the backend pairs with an in-app destination.
+function hrefFor(n: { type?: string; actionUrl?: string }): string | undefined {
+  if (n.actionUrl?.startsWith("/")) return n.actionUrl;
+  const t = n.type ?? "";
+  if (t.startsWith("bargain_")) return "/bargains";
+  if (t.startsWith("order_") || t.startsWith("return_") || t.startsWith("refund_")) return "/orders";
+  if (t.startsWith("live_")) return "/live";
+  if (t.startsWith("payout_")) return "/seller/payouts";
+  if (t === "cart_reminder") return "/cart";
+  return undefined;
+}
+
 type Notif = {
   _id: string;
+  type?: string;
+  actionUrl?: string;
   title?: string;
   message?: string;
   body?: string;
@@ -89,7 +126,12 @@ export default function NotificationsPage() {
             return (
               <div key={n._id} className={`group flex items-start gap-3 rounded-2xl px-4 py-3.5 ${isRead ? "" : "bg-surface-2"}`}>
                 <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${isRead ? "bg-hairline" : "bg-lime-deep"}`} />
-                <button onClick={() => !isRead && markRead(n._id)} className="min-w-0 flex-1 text-left">
+                {(() => { const I = TYPE_ICON[n.type ?? ""] ?? Bell; return (
+                  <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${isRead ? "bg-surface text-muted" : "bg-lime text-lime-ink"}`}>
+                    <I className="h-4 w-4" />
+                  </span>
+                ); })()}
+                <button onClick={() => { if (!isRead) markRead(n._id); const h = hrefFor(n); if (h) window.location.href = h; }} className="min-w-0 flex-1 text-left">
                   {n.title && <p className="font-medium text-ink">{n.title}</p>}
                   <p className="text-[15px] text-ink-soft">{n.message ?? n.body}</p>
                   {n.createdAt && (

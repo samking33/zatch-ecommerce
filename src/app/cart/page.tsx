@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Minus, Plus, X, Tag, ArrowRight, ShoppingBag, Loader2 } from "lucide-react";
+import { Minus, Plus, X, Tag, ArrowRight, ShoppingBag, Loader2, Play, Radio } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
@@ -24,6 +24,8 @@ type CartItem = {
   cartPrice?: number;
   price?: number;
   bargainId?: string;
+  bitId?: string;
+  liveSessionId?: string;
 };
 
 function lineProductId(it: CartItem): string | undefined {
@@ -175,11 +177,23 @@ export default function CartPage() {
                       <p className="text-sm text-muted">
                         {[it.variant?.color ?? it.color, it.variant?.size ?? it.size].filter(Boolean).join(" · ")}
                       </p>
-                      {it.bargainId && (
-                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-lime-ink">
-                          <Tag className="h-3 w-3" /> Bargained
-                        </span>
-                      )}
+                      <span className="mt-1.5 flex flex-wrap gap-1.5">
+                        {it.bargainId && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-lime-ink">
+                            <Tag className="h-3 w-3" /> Bargained price
+                          </span>
+                        )}
+                        {it.bitId && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink">
+                            <Play className="h-3 w-3 fill-current" /> From a Bit
+                          </span>
+                        )}
+                        {it.liveSessionId && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink">
+                            <Radio className="h-3 w-3" /> From a live
+                          </span>
+                        )}
+                      </span>
                       <div className="mt-2 flex items-center justify-between">
                         <div className="inline-flex items-center gap-1 rounded-full border border-hairline p-1">
                           <button onClick={() => changeQty(it, Math.max(1, qty - 1))} aria-label="Decrease" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2">

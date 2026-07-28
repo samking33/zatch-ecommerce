@@ -19,6 +19,9 @@ type Order = {
   items?: Line[];
   deliveryAddress?: { label?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
   payment?: { method?: string; status?: string };
+  orderType?: string;
+  deliveryType?: string;
+  cancellation?: { reason?: string; cancelledBy?: string; cancelledAt?: string };
   pricing?: { subtotal?: number; discount?: number; shipping?: number; tax?: number; total?: number };
   // Server-computed UI contract (same one the app renders).
   timeline?: TimelineEvent[];
@@ -151,6 +154,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </div>
           )}
 
+          {order.cancellation?.reason && (
+            <div className="card rounded-[1.75rem] p-6">
+              <h2 className="font-display text-lg font-semibold text-live">Order cancelled</h2>
+              <p className="mt-1.5 text-[15px] text-ink-soft">{order.cancellation.reason}</p>
+              <p className="mt-1 text-[13px] text-muted">
+                Cancelled by {order.cancellation.cancelledBy ?? "—"}
+                {order.cancellation.cancelledAt
+                  ? ` · ${new Date(order.cancellation.cancelledAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}`
+                  : ""}
+              </p>
+            </div>
+          )}
+
           <OrderActions
             orderId={order._id}
             actions={order.availableActions}
@@ -171,7 +187,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </div>
           </dl>
           {order.payment?.method && (
-            <p className="mt-3 text-sm text-muted">Paid via {order.payment.method} · {order.payment.status}</p>
+            <p className="mt-3 text-sm capitalize text-muted">
+              {order.orderType ?? order.payment.method} · {order.payment.status}
+              {order.deliveryType ? ` · ${order.deliveryType}` : ""}
+            </p>
           )}
 
           {/* Seller settlement sheet — only present when the API returns it. */}

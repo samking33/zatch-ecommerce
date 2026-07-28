@@ -140,6 +140,12 @@ export function ProductView({ product }: { product: Product }) {
             <p className="text-[13px] font-semibold uppercase tracking-widest text-muted">{product.brand}</p>
           )}
           <h1 className="mt-1.5 font-display text-[clamp(1.8rem,3.5vw,2.6rem)] font-semibold text-ink">{product.name}</h1>
+          {(product.isSold || product.status === "out_of_stock") && (
+            <p className="mt-2 inline-block rounded-full bg-live/10 px-3 py-1 text-[13px] font-semibold text-live">
+              {product.isSold ? "Sold" : "Out of stock"}
+            </p>
+          )}
+          {product.SKU && <p className="mt-2 text-[12px] text-muted">SKU {product.SKU}</p>}
 
           <div className="mt-5 flex items-baseline gap-3">
             <span className="font-display text-3xl font-semibold text-ink">{inr(price)}</span>
@@ -217,14 +223,24 @@ export function ProductView({ product }: { product: Product }) {
 
           <ProductActions product={product} />
 
+          {/* Per-product shipping + returns policy from the API. */}
           <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-            {([[Truck, "Free delivery"], [ShieldCheck, "Buyer protected"], [RefreshCw, "7-day returns"]] as const).map(([Icon, label], i) => (
+            {([
+              [Truck, `Delivered in ${product.shipping?.estimatedDeliveryDays ?? 7} days`],
+              [ShieldCheck, product.shipping?.codAvailable === false ? "Prepaid only" : "COD available"],
+              [RefreshCw, product.shipping?.returnPolicy ?? "7 days return policy"],
+            ] as const).map(([Icon, label], i) => (
               <div key={i} className="rounded-2xl bg-surface-2 px-2 py-3">
                 <Icon className="mx-auto h-5 w-5 text-ink" />
-                <p className="mt-1.5 text-[12px] text-muted">{label}</p>
+                <p className="mt-1.5 text-[12px] leading-snug text-muted">{label}</p>
               </div>
             ))}
           </div>
+          {product.orderAcceptingType === "askBeforeAccepting" && (
+            <p className="mt-3 text-[13px] text-muted">
+              This seller reviews each order before confirming it.
+            </p>
+          )}
         </div>
 
         <BargainBox
