@@ -30,9 +30,11 @@ export default async function WishlistPage() {
   ] as string[];
   const bitIds = (profile?.savedBits ?? []).map(idOf).filter(Boolean) as string[];
 
+  // ponytail: one request per saved item — the backend has no bulk-by-ids
+  // endpoint. Capped at 24 so a big wishlist can't stall the page.
   const [items, savedBits] = await Promise.all([
-    Promise.all(ids.map((id) => productsApi.get(id))).then((r) => r.filter(Boolean) as Product[]),
-    Promise.all(bitIds.map((id) => bitsApi.get(id, t))).then((r) => r.filter(Boolean) as Bit[]),
+    Promise.all(ids.slice(0, 24).map((id) => productsApi.get(id))).then((r) => r.filter(Boolean) as Product[]),
+    Promise.all(bitIds.slice(0, 24).map((id) => bitsApi.get(id, t))).then((r) => r.filter(Boolean) as Bit[]),
   ]);
 
   return (

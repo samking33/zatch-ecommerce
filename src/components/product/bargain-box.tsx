@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Tag, Check, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { Tag, Check } from "lucide-react";
 import { bargains as bargainsApi, cart as cartApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
@@ -92,12 +93,6 @@ export function BargainBox({
     router.push("/cart");
   }
 
-  function reset() {
-    setPhase("idle");
-    setOffer(start);
-    setError(null);
-  }
-
   return (
     <div className="card rounded-[1.5rem] p-5">
       <div className="flex items-center gap-2">
@@ -125,21 +120,16 @@ export function BargainBox({
           <motion.div key="countered" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-surface-2 p-4">
             <p className="text-[13px] text-muted">Seller countered at</p>
             <p className="mt-0.5 font-display text-2xl font-semibold text-ink">{inr(counter)}</p>
-            {bargainId ? (
-              // Real thread actions on the existing bargain.
-              <div className="mt-3">
+            <div className="mt-3">
+              {bargainId ? (
                 <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} />
-              </div>
-            ) : (
-              <div className="mt-3 flex gap-2">
-                <button onClick={acceptAndCart} className="pill-lime flex-1 rounded-full py-3 text-sm font-semibold">
-                  Accept {inr(counter)}
-                </button>
-                <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-surface">
-                  <RotateCcw className="h-3.5 w-3.5" /> Re-offer
-                </button>
-              </div>
-            )}
+              ) : (
+                // ponytail: backend didn't return an id — send them to the thread.
+                <Link href="/bargains" className="pill-lime inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
+                  Respond in My bargains
+                </Link>
+              )}
+            </div>
           </motion.div>
         ) : (
           <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">

@@ -3,14 +3,11 @@ import { Check, Circle, ArrowRight } from "lucide-react";
 
 type Item = { label: string; completed?: boolean; action?: string; route?: string; info?: string };
 
-// Maps the backend's mobile-app routes onto the web app's equivalents.
+// Only the mobile routes that differ on web; the rest pass through as-is.
 const ROUTE_MAP: Record<string, string> = {
   "/seller/products/create": "/seller/products/new",
-  "/seller/products": "/seller/products",
   "/seller/settings/bargain": "/seller/settings",
   "/seller/bits/create": "/seller/bits",
-  "/seller/bits": "/seller/bits",
-  "/seller/live": "/seller/live",
   "/seller/live/schedule": "/seller/live",
 };
 
@@ -45,7 +42,7 @@ export function OnboardingChecklist({
 
       <div className="mt-5 space-y-1.5">
         {items.map((it, i) => {
-          const href = ROUTE_MAP[it.route ?? ""] ?? "/seller/dashboard";
+          const href = ROUTE_MAP[it.route ?? ""] ?? it.route ?? "/seller/dashboard";
           return (
             <Link
               key={i}

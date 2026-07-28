@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart, Bookmark, Share2, Check, Star, Send, Loader2 } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
 import { products as productsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { compact } from "@/lib/utils";
@@ -181,10 +181,3 @@ export function ProductReviews({ product }: { product: Product }) {
   );
 }
 
-function Avatar({ name, url }: { name?: string; url?: string }) {
-  return (
-    <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-[13px] font-semibold text-ink">
-      {url ? <Image src={url} alt="" width={36} height={36} className="h-full w-full object-cover" /> : (name?.[0] ?? "?").toUpperCase()}
-    </span>
-  );
-}

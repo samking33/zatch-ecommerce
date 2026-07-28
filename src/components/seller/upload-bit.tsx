@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Upload, Video, X, Plus } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
-import { inr } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
 /** Real Bit upload → POST /bits/upload (multipart: video + thumbnail).
@@ -94,7 +93,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
                     className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors ${on ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"}`}
                   >
                     <span className="line-clamp-1 flex-1">{p.name}</span>
-                    <span className={on ? "text-surface/70" : "text-muted"}>{inr(p.discountedPrice ?? p.price)}</span>
+                    <span className={on ? "text-surface/70" : "text-muted"}>₹{p.discountedPrice ?? p.price}</span>
                   </button>
                 );
               })}

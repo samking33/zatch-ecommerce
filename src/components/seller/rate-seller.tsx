@@ -18,7 +18,7 @@ export function RateSeller({ userId }: { userId: string }) {
     const t = getToken();
     if (!t) { router.push("/login"); return; }
     setState("saving");
-    const res = await users.review({ sellerId: userId, targetUserId: userId, rating, comment }, t);
+    const res = await users.review({ userId, rating, comment }, t);
     setState(res ? "saved" : "error");
     if (res) setTimeout(() => { setOpen(false); router.refresh(); }, 900);
   }

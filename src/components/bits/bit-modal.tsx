@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Heart, MessageCircle, Share2, Bookmark, Send, ShoppingBag, Check, Loader2,
 } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
+import { Avatar } from "@/components/ui/avatar";
 import { bits as bitsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { compact, inr } from "@/lib/utils";
@@ -147,11 +147,7 @@ export function BitModal({ bit, onClose }: { bit: Bit; onClose: () => void }) {
                   <p className="text-sm text-muted">No comments yet. Be the first.</p>
                 ) : comments.map((c) => (
                   <div key={c._id} className="flex gap-2.5">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-[12px] font-semibold text-ink">
-                      {c.user?.profilePic?.url
-                        ? <Image src={c.user.profilePic.url} alt="" width={32} height={32} className="h-full w-full object-cover" />
-                        : (c.user?.username?.[0] ?? "?").toUpperCase()}
-                    </span>
+                    <Avatar name={c.user?.username} url={c.user?.profilePic?.url} size={32} />
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-ink">{c.user?.username ?? "guest"}</p>
                       <p className="text-[14px] leading-snug text-ink-soft">{c.text}</p>

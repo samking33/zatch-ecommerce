@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, RotateCcw, Loader2, ShoppingBag } from "lucide-react";
+import { X, RotateCcw, Loader2, ShoppingBag } from "lucide-react";
 import { bargains as bargainsApi, cart as cartApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
@@ -99,5 +99,3 @@ export function BuyerBargainActions({
     </div>
   );
 }
-
-export { Check };
