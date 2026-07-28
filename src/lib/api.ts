@@ -231,7 +231,7 @@ export const coupons = {
   trackView: (b: unknown) => api("/coupons/track-view", { method: "POST", body: b }),
   // seller-side
   list: (t: string) => api("/coupons/list", { token: t }),
-  dashboard: (t: string) => api("/coupons/dashboard", { token: t }),
+  dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true }),
   get: (id: string, t: string) => api(`/coupons/${id}`, { token: t }),
   create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t }),
   update: (id: string, b: unknown, t: string) =>
@@ -258,7 +258,7 @@ export const orders = {
   verifyPayment: (b: unknown, t: string) => api("/orders/verify-payment", { method: "POST", body: b, token: t }),
   cancel: (id: string, b: unknown, t: string) => api(`/orders/${id}/cancel`, { method: "POST", body: b, token: t }),
   review: (id: string, b: unknown, t: string) => api(`/orders/${id}/review`, { method: "POST", body: b, token: t }),
-  generateInvoice: (id: string, t: string) => api(`/orders/${id}/generate-invoice`, { method: "POST", token: t }),
+  generateInvoice: (id: string, t: string) => api(`/orders/${id}/generate-invoice`, { method: "POST", token: t, raw: true }),
   invoiceUrl: (fileName: string) => `${BASE}/api/v1/orders/invoice/download/${fileName}`,
   // seller-side
   sellerOrders: (t: string) => api("/orders/seller/orders", { token: t, pick: "orders" }),

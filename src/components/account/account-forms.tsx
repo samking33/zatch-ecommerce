@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, Check, ChevronDown, Trash2 } from "lucide-react";
 import { users, auth } from "@/lib/api";
 import { getToken, type SessionUser } from "@/lib/client-auth";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function AccountForms({ user }: { user: SessionUser | null }) {
   return (
@@ -11,7 +13,51 @@ export function AccountForms({ user }: { user: SessionUser | null }) {
       <EditProfile user={user} />
       <div className="mx-4 h-px bg-hairline" />
       <ChangePassword />
+      <div className="mx-4 h-px bg-hairline" />
+      <DeleteAccount />
     </div>
+  );
+}
+
+function DeleteAccount() {
+  const router = useRouter();
+  const { logout } = useAuth();
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function remove() {
+    const t = getToken();
+    if (!t) return;
+    setBusy(true); setErr(null);
+    const res = await auth.deleteAccount(t);
+    setBusy(false);
+    if (res) { logout(); router.push("/"); router.refresh(); }
+    else setErr("Couldn't delete your account. Contact support.");
+  }
+
+  return (
+    <Section title="Delete account">
+      <p className="text-[15px] text-muted">
+        This permanently deletes your account, orders history and saved items. It can&apos;t be undone.
+      </p>
+      <label className="mt-3 block">
+        <span className="text-[12px] font-medium text-muted">Type DELETE to confirm</span>
+        <input
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          className="mt-1 h-11 w-full max-w-xs rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none"
+        />
+      </label>
+      {err && <p className="mt-2 text-sm font-medium text-live">{err}</p>}
+      <button
+        onClick={remove}
+        disabled={confirm !== "DELETE" || busy}
+        className="mt-3 inline-flex items-center gap-2 rounded-full border border-live px-5 py-2.5 text-sm font-semibold text-live transition-colors hover:bg-live/5 disabled:opacity-40"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Delete my account
+      </button>
+    </Section>
   );
 }
 

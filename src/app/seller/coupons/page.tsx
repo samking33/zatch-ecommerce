@@ -9,6 +9,10 @@ import { coupons as couponsApi, seller as sellerApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; isActive?: boolean; active?: boolean };
+type Dash = {
+  performanceSummary?: { orders?: number; gmv?: number; views?: number; period?: string };
+  overview?: { totalCoupons?: number; activeCoupons?: number; expiredCoupons?: number };
+};
 
 export default function SellerCouponsPage() {
   const [token, setToken] = useState<string | undefined>();
@@ -16,6 +20,7 @@ export default function SellerCouponsPage() {
   const [list, setList] = useState<Coupon[]>([]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
+  const [dash, setDash] = useState<Dash | null>(null);
   const [seller, setSeller] = useState<{ approved: boolean; status: string; display?: import("@/lib/api").SellerStatusDisplay } | null>(null);
 
   useEffect(() => {
@@ -26,7 +31,10 @@ export default function SellerCouponsPage() {
       const status = (s?.sellerStatus ?? "buyer").toLowerCase();
       const approved = ["approved", "active"].includes(status);
       setSeller({ approved, status, display: s?.statusDisplay });
-      if (approved) couponsApi.list(t).then((c) => setList((c as Coupon[]) ?? []));
+      if (approved) {
+        couponsApi.list(t).then((c) => setList((c as Coupon[]) ?? []));
+        couponsApi.dashboard(t).then((d) => setDash(d as Dash));
+      }
     });
   }, []);
 
@@ -54,6 +62,22 @@ export default function SellerCouponsPage() {
             sub={`${list.length} coupon${list.length !== 1 ? "s" : ""}`}
             action={<button onClick={() => setAdding((v) => !v)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"><Plus className="h-4 w-4" /> New coupon</button>}
           />
+
+          {dash && (
+            <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[
+                { label: "Active", value: String(dash.overview?.activeCoupons ?? 0) },
+                { label: "Orders", value: String(dash.performanceSummary?.orders ?? 0) },
+                { label: "GMV", value: `₹${(dash.performanceSummary?.gmv ?? 0).toLocaleString("en-IN")}` },
+                { label: "Views", value: String(dash.performanceSummary?.views ?? 0) },
+              ].map((k) => (
+                <div key={k.label} className="card rounded-[1.25rem] p-4">
+                  <p className="font-display text-xl font-semibold text-ink">{k.value}</p>
+                  <p className="text-[12px] text-muted">{k.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
           {adding && token && <CouponForm token={token} onSaved={(c) => { setList((l) => [c, ...l]); setAdding(false); }} />}
 

@@ -7,6 +7,7 @@ import { Tag, Check, RotateCcw } from "lucide-react";
 import { bargains as bargainsApi, cart as cartApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
+import { BuyerBargainActions } from "./buyer-bargain-actions";
 
 type Phase = "idle" | "waiting" | "countered" | "accepted";
 
@@ -124,14 +125,21 @@ export function BargainBox({
           <motion.div key="countered" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-surface-2 p-4">
             <p className="text-[13px] text-muted">Seller countered at</p>
             <p className="mt-0.5 font-display text-2xl font-semibold text-ink">{inr(counter)}</p>
-            <div className="mt-3 flex gap-2">
-              <button onClick={acceptAndCart} className="pill-lime flex-1 rounded-full py-3 text-sm font-semibold">
-                Accept {inr(counter)}
-              </button>
-              <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-surface">
-                <RotateCcw className="h-3.5 w-3.5" /> Re-offer
-              </button>
-            </div>
+            {bargainId ? (
+              // Real thread actions on the existing bargain.
+              <div className="mt-3">
+                <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} />
+              </div>
+            ) : (
+              <div className="mt-3 flex gap-2">
+                <button onClick={acceptAndCart} className="pill-lime flex-1 rounded-full py-3 text-sm font-semibold">
+                  Accept {inr(counter)}
+                </button>
+                <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-surface">
+                  <RotateCcw className="h-3.5 w-3.5" /> Re-offer
+                </button>
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">

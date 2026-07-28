@@ -19,10 +19,11 @@ export default async function SellerPayoutsPage() {
   const gate = await sellerGate(t);
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
-  const [summary, due, done] = await Promise.all([
+  const [summary, due, done, adjustments] = await Promise.all([
     paymentsApi.summary(t) as Promise<Summary | null>,
     paymentsApi.due(t) as Promise<Payout[] | null>,
     paymentsApi.done(t) as Promise<Payout[] | null>,
+    paymentsApi.adjustments(t) as Promise<Payout[] | null>,
   ]);
 
   const kpis = [
@@ -47,6 +48,9 @@ export default async function SellerPayoutsPage() {
 
       <PayoutList title="Due" payouts={due ?? []} empty="No pending payouts." />
       <PayoutList title="Completed" payouts={done ?? []} empty="No completed payouts yet." />
+      {(adjustments ?? []).length > 0 && (
+        <PayoutList title="Adjustments" payouts={adjustments ?? []} empty="No adjustments." />
+      )}
     </SellerShell>
   );
 }

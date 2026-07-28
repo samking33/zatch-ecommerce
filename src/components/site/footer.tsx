@@ -6,6 +6,7 @@ const groups = [
     title: "Shop",
     links: [
       ["All products", "/shop"],
+      ["Trending", "/trending"],
       ["Live now", "/live"],
       ["Bits", "/bits"],
       ["Sellers", "/sellers"],

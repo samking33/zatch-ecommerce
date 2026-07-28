@@ -25,6 +25,10 @@ export function AgoraPlayer({ sessionId, viewers }: { sessionId: string; viewers
 
     let client: import("agora-rtc-sdk-ng").IAgoraRTCClient | null = null;
     let cancelled = false;
+    // Keep the backend's viewer count accurate while we're watching.
+    const heartbeat = setInterval(() => {
+      liveApi.heartbeat(sessionId, token).catch(() => {});
+    }, 30_000);
 
     (async () => {
       const creds = await liveApi.join(sessionId, token);
@@ -61,6 +65,7 @@ export function AgoraPlayer({ sessionId, viewers }: { sessionId: string; viewers
 
     return () => {
       cancelled = true;
+      clearInterval(heartbeat);
       liveApi.leave(sessionId, token).catch(() => {});
       client?.removeAllListeners();
       client?.leave().catch(() => {});

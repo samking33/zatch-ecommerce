@@ -41,10 +41,14 @@ export function OrderActions({ orderId, status }: { orderId: string; status?: st
   async function invoice() {
     if (!token) return;
     setBusy("invoice");
-    await ordersApi.generateInvoice(orderId, token);
+    // The generate call returns the filename to download.
+    const res = (await ordersApi.generateInvoice(orderId, token)) as
+      | { fileName?: string; invoiceUrl?: string; url?: string } | null;
     setBusy(null);
-    // Filenames are order-specific; open the orders API host directly.
-    window.open(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/invoices/${orderId}.pdf`, "_blank");
+    const file = res?.fileName;
+    const url = res?.invoiceUrl ?? res?.url ?? (file ? ordersApi.invoiceUrl(file) : null);
+    if (url) window.open(url, "_blank");
+    else setMsg("Invoice isn't ready yet. Try again in a moment.");
   }
 
   return (

@@ -6,6 +6,7 @@ import { PageShell } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
 import { ProductMedia } from "@/components/ui/product-media";
 import { FollowButton, ShareProfileButton } from "@/components/seller/follow-button";
+import { RateSeller } from "@/components/seller/rate-seller";
 import { users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { compact } from "@/lib/utils";
@@ -66,8 +67,9 @@ export default async function SellerStorefront({ params }: { params: Promise<{ u
               ))}
             </div>
           </div>
-          <div className="flex gap-2.5">
+          <div className="flex flex-wrap gap-2.5">
             <FollowButton userId={seller._id} initialFollowing={seller.isFollowing} followers={seller.followerCount ?? 0} />
+            <RateSeller userId={seller._id} />
             <ShareProfileButton userId={seller._id} />
           </div>
         </div>
