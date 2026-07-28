@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Package, Tag, Boxes, Ticket, Wallet, Radio } from "lucide-react";
+import { LayoutGrid, Package, Tag, Boxes, Ticket, Wallet, Radio, Play } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 
@@ -11,6 +11,7 @@ const tabs = [
   ["Orders", "/seller/orders", Package],
   ["Bargains", "/seller/bargains", Tag],
   ["Products", "/seller/products", Boxes],
+  ["Bits", "/seller/bits", Play],
   ["Coupons", "/seller/coupons", Ticket],
   ["Payouts", "/seller/payouts", Wallet],
   ["Live", "/seller/live", Radio],

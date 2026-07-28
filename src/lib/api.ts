@@ -119,9 +119,9 @@ export const users = {
   profile: (t: string) => api("/user/profile", { token: t, pick: "user" }),
   updateProfile: (b: unknown, t: string) =>
     api("/user/profile-update", { method: "PUT", body: b, token: t }),
-  publicProfile: (userId: string) => api(`/user/profile/${userId}`),
+  publicProfile: (userId: string, t?: string) => api(`/user/profile/${userId}`, { token: t, pick: "user" }),
   shareProfile: (userId: string) => api(`/user/share-profile/${userId}`),
-  all: (t: string) => api("/user/all-users", { token: t }),
+  all: (t?: string) => api("/user/all-users", { token: t, pick: "sellers" }),
   searchHistory: (t: string) => api("/user/search-history", { token: t }),
   follow: (b: unknown, t: string) => api("/user/follow", { method: "POST", body: b, token: t }),
   unfollow: (b: unknown, t: string) => api("/user/unfollow", { method: "POST", body: b, token: t }),
@@ -148,7 +148,7 @@ export const seller = {
   status: (t: string) =>
     api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true }),
   terms: () => api("/user/seller/terms-and-conditions"),
-  profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t }),
+  profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t, raw: true }),
   benefits: (t: string) => api("/user/seller/benefits", { token: t }),
   recordSale: (b: unknown, t: string) =>
     api("/user/record-sale", { method: "POST", body: b, token: t }),
@@ -313,16 +313,16 @@ export const live = {
 
 // ─── Bits — short shopping videos (/bits) ───────────────────────────────────
 export const bits = {
-  list: () => api<Bit[]>("/bits/list"),
-  get: (id: string) => api<Bit>(`/bits/${id}`),
-  dashboard: (t: string) => api("/bits/dashboard", { token: t }),
-  uploadToken: (t: string) => api("/bits/upload-token", { token: t }),
+  list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits" }),
+  get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bit" }),
+  dashboard: (t: string) => api("/bits/dashboard", { token: t, raw: true }),
+  uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true }),
   upload: (b: unknown, t: string) => api("/bits/upload", { method: "POST", body: b, token: t }),
-  toggleLike: (id: string, t: string) => api(`/bits/${id}/toggleLike`, { method: "POST", token: t }),
-  save: (id: string, t: string) => api(`/bits/${id}/save`, { method: "POST", token: t }),
-  comment: (id: string, b: unknown, t: string) => api(`/bits/${id}/comments`, { method: "POST", body: b, token: t }),
-  share: (id: string) => api(`/bits/${id}/share`, { method: "POST" }),
-  view: (id: string) => api(`/bits/${id}/view`, { method: "POST" }),
+  toggleLike: (id: string, t: string) => api(`/bits/${id}/toggleLike`, { method: "POST", token: t, raw: true }),
+  save: (id: string, t: string) => api(`/bits/${id}/save`, { method: "POST", token: t, raw: true }),
+  comment: (id: string, b: unknown, t: string) => api(`/bits/${id}/comments`, { method: "POST", body: b, token: t, raw: true }),
+  share: (id: string, t?: string) => api(`/bits/${id}/share`, { method: "POST", token: t, raw: true }),
+  view: (id: string, t?: string) => api(`/bits/${id}/view`, { method: "POST", token: t }),
 };
 
 // ─── Notifications & preferences ────────────────────────────────────────────

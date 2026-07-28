@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, XCircle } from "lucide-react";
 import { orders as ordersApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
@@ -26,6 +26,17 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
     if (res) { setSaved(true); router.refresh(); } else setValue(status ?? "pending");
   }
 
+  async function sellerCancel() {
+    const t = getToken();
+    if (!t) return;
+    const reason = window.prompt("Why are you cancelling this order?");
+    if (reason === null) return;
+    setBusy(true);
+    const res = await ordersApi.sellerCancel(orderId, { reason: reason || "Seller cancelled" }, t);
+    setBusy(false);
+    if (res) { setValue("cancelled"); router.refresh(); }
+  }
+
   return (
     <div className="flex items-center gap-2">
       <select
@@ -37,6 +48,11 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
         {FLOW.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
         {done && !FLOW.includes(value) && <option value={value}>{value}</option>}
       </select>
+      {!done && (
+        <button onClick={sellerCancel} disabled={busy} title="Cancel order" className="grid h-9 w-9 place-items-center rounded-full border border-hairline text-live transition-colors hover:bg-live/5 disabled:opacity-60">
+          <XCircle className="h-4 w-4" />
+        </button>
+      )}
       {busy ? <Loader2 className="h-4 w-4 animate-spin text-muted" /> : saved ? <Check className="h-4 w-4 text-lime-deep" /> : null}
     </div>
   );

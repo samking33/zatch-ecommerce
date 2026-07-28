@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/site/page-shell";
 import { ProductView } from "@/components/product/product-view";
+import { ProductReviews } from "@/components/product/product-social";
 import { catalog } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 
@@ -32,6 +33,8 @@ export default async function ProductPage({
           </p>
         </div>
       )}
+
+      <ProductReviews product={product} />
     </PageShell>
   );
 }

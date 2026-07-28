@@ -4,6 +4,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { ScheduleLive } from "@/components/seller/schedule-live";
+import { EndLiveButton } from "@/components/seller/end-live-button";
 import { live as liveApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
@@ -51,12 +52,17 @@ function Group({ title, sessions, empty, icon: Icon }: { title: string; sessions
                   <Icon className="h-3 w-3" /> {s.status ?? title}
                 </span>
               </div>
-              <div className="px-2 py-3">
-                <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{s.title ?? "Untitled live"}</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  {s.scheduledStartTime ? new Date(s.scheduledStartTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}
-                  {s.peakViewers ? ` · ${compact(s.peakViewers)} peak` : ""}
-                </p>
+              <div className="flex items-end justify-between gap-2 px-2 py-3">
+                <div className="min-w-0">
+                  <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{s.title ?? "Untitled live"}</p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {s.scheduledStartTime ? new Date(s.scheduledStartTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}
+                    {s.peakViewers ? ` · ${compact(s.peakViewers)} peak` : ""}
+                  </p>
+                </div>
+                {["live", "active", "started"].includes((s.status ?? "").toLowerCase()) && (
+                  <EndLiveButton sessionId={s._id} />
+                )}
               </div>
             </div>
           ))}

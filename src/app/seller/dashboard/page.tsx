@@ -3,8 +3,9 @@ import { TrendingUp, Package, Tag, Wallet, Eye, ArrowUpRight, Boxes } from "luci
 import { SellerShell, SellerHeader } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
+import { OnboardingChecklist } from "@/components/seller/onboarding-checklist";
 import { ProductMedia } from "@/components/ui/product-media";
-import { orders as ordersApi, bargains as bargainsApi, payments as paymentsApi, products as productsApi } from "@/lib/api";
+import { orders as ordersApi, bargains as bargainsApi, payments as paymentsApi, products as productsApi, seller as sellerApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
 import type { Product } from "@/lib/types";
@@ -15,6 +16,10 @@ type Perf = { totalRevenue?: string; totalOrders?: number; pendingOrders?: numbe
 type OrdersDash = { performanceSummary?: Perf; topCards?: { totalProducts?: number; totalProductViews?: number } };
 type BargainDash = { stats?: { totalBargains?: number; pendingBargains?: number; activeCount?: number } };
 type PaySummary = { totalRevenueFormatted?: string; netRevenueFormatted?: string; pendingFormatted?: string };
+type Completion = {
+  completion?: { percentage?: number; completedCount?: number; totalCount?: number };
+  checklist?: { label: string; completed?: boolean; action?: string; route?: string; info?: string }[];
+};
 
 export default async function SellerDashboardPage() {
   const t = await serverToken();
@@ -23,11 +28,12 @@ export default async function SellerDashboardPage() {
   const gate = await sellerGate(t);
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
-  const [oDash, bDash, pay, myProducts] = await Promise.all([
+  const [oDash, bDash, pay, myProducts, completion] = await Promise.all([
     ordersApi.sellerDashboard(t) as Promise<OrdersDash | null>,
     bargainsApi.sellerDashboard(t) as Promise<BargainDash | null>,
     paymentsApi.summary(t) as Promise<PaySummary | null>,
     productsApi.myProducts(t) as Promise<Product[] | null>,
+    sellerApi.profileCompletion(t) as Promise<Completion | null>,
   ]);
 
   const perf = oDash?.performanceSummary ?? {};
@@ -54,6 +60,8 @@ export default async function SellerDashboardPage() {
           </Link>
         }
       />
+
+      <OnboardingChecklist completion={completion?.completion} checklist={completion?.checklist} />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {kpis.map((k) => (

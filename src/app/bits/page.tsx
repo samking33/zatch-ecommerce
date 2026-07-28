@@ -6,6 +6,8 @@ import { serverToken } from "@/lib/session";
 
 export const metadata = { title: "Bits" };
 
+export const dynamic = "force-dynamic";
+
 export default async function BitsPage() {
   const bits = (await catalog.bits(await serverToken())) ?? [];
 

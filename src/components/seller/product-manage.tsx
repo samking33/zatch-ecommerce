@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag, Loader2, Check } from "lucide-react";
+import { Tag, Loader2, Check, Sparkles } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { products as productsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
@@ -17,7 +17,18 @@ export function ProductManage({ product }: { product: Product & { status?: strin
   const [status, setStatus] = useState((product.status ?? "active").toLowerCase());
   const [busy, setBusy] = useState(false);
   const [bargainOpen, setBargainOpen] = useState(false);
+  const [topPick, setTopPick] = useState(!!product.isTopPick);
   const price = product.discountedPrice ?? product.price;
+
+  async function toggleTopPick() {
+    const t = getToken();
+    if (!t) return;
+    const next = !topPick;
+    setTopPick(next);
+    const res = await productsApi.setTopPick(product._id, { isTopPick: next }, t);
+    if (!res) setTopPick(!next);
+    else router.refresh();
+  }
 
   async function changeStatus(next: string) {
     const t = getToken();
@@ -47,6 +58,15 @@ export function ProductManage({ product }: { product: Product & { status?: strin
         >
           {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
         </select>
+        <button
+          onClick={toggleTopPick}
+          title="Feature as a top pick"
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition-colors ${
+            topPick ? "border-lime bg-lime text-lime-ink" : "border-hairline text-ink hover:bg-surface-2"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" /> Top pick
+        </button>
         <button onClick={() => setBargainOpen((v) => !v)} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-surface-2">
           <Tag className="h-3.5 w-3.5" /> Bargain
         </button>

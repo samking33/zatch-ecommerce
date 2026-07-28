@@ -37,7 +37,26 @@ export interface Product {
   // Backend also returns these at the top level.
   averageRating?: number;
   commentCount?: number;
+  isLiked?: boolean;
+  isSaved?: boolean;
+  comments?: ProductComment[];
+  reviews?: ProductReview[];
   sellerId?: string | Seller;
+}
+
+export interface ProductComment {
+  _id: string;
+  text: string;
+  createdAt?: string;
+  user?: { _id: string; username?: string; profilePic?: { url?: string } };
+}
+
+export interface ProductReview {
+  _id: string;
+  rating?: number;
+  comment?: string;
+  createdAt?: string;
+  user?: { _id: string; username?: string; profilePic?: { url?: string } };
 }
 
 export interface Seller {
@@ -65,6 +84,23 @@ export interface LiveSession {
   hostId?: string | Seller;
 }
 
+export interface BitComment {
+  _id: string;
+  text: string;
+  createdAt?: string;
+  likes?: number;
+  user?: { _id: string; username?: string; profilePic?: { url?: string } };
+}
+
+export interface BitProduct {
+  _id: string;
+  name: string;
+  price: number;
+  discountedPrice?: number;
+  image?: ProductImage;
+  category?: string;
+}
+
 export interface Bit {
   _id: string;
   title?: string;
@@ -73,4 +109,13 @@ export interface Bit {
   thumbnail?: ProductImage;
   likeCount?: number;
   viewCount?: number;
+  commentCount?: number;
+  shareCount?: number;
+  isLiked?: boolean;
+  isSaved?: boolean;
+  shareLink?: string;
+  createdAt?: string;
+  comments?: BitComment[];
+  products?: BitProduct[];
+  uploadedBy?: { _id: string; username?: string; profilePic?: { url?: string }; rating?: number };
 }

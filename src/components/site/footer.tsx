@@ -8,7 +8,7 @@ const groups = [
       ["All products", "/shop"],
       ["Live now", "/live"],
       ["Bits", "/bits"],
-      ["Top picks", "/shop?sort=top"],
+      ["Sellers", "/sellers"],
     ],
   },
   {

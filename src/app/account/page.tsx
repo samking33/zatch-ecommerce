@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Tag, MapPin, Heart, Bell, Store, ChevronRight } from "lucide-react";
+import { Package, Tag, MapPin, Heart, Bell, Store, ChevronRight, Ticket, SlidersHorizontal } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -40,8 +40,10 @@ export default async function AccountPage() {
   const links = [
     ["My orders", "/orders", Package],
     ["My bargains", "/bargains", Tag],
+    ["Saved & liked", "/wishlist", Heart],
+    ["My coupons", "/account/coupons", Ticket],
     ["Addresses", "/account/addresses", MapPin],
-    ["Wishlist", "/wishlist", Heart],
+    ["Shopping preferences", "/account/preferences", SlidersHorizontal],
     ["Notifications", "/notifications", Bell],
     sellerLink,
   ] as const;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MapPin, Plus, Trash2, Loader2, Check } from "lucide-react";
+import { MapPin, Plus, Trash2, Loader2, Check, Pencil } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
@@ -16,6 +16,7 @@ export default function AddressesPage() {
   const [ready, setReady] = useState(false);
   const [list, setList] = useState<Addr[]>([]);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Addr | null>(null);
 
   useEffect(() => {
     const t = getToken();
@@ -53,23 +54,38 @@ export default function AddressesPage() {
             {adding && token && (
               <AddressForm token={token} onSaved={(a) => { setList((l) => [...l, a]); setAdding(false); }} />
             )}
-            {list.map((a) => (
-              <div key={a._id} className="card flex items-start gap-3 rounded-[1.5rem] p-6">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink">
-                  <MapPin className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-[15px] font-semibold text-ink">{a.label ?? "Address"}</p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    {[a.line1, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
-                    {a.phone ? ` · ${a.phone}` : ""}
-                  </p>
+            {list.map((a) =>
+              editing?._id === a._id && token ? (
+                <AddressForm
+                  key={a._id}
+                  token={token}
+                  initial={a}
+                  onSaved={(saved) => {
+                    setList((l) => l.map((x) => (x._id === a._id ? { ...x, ...saved } : x)));
+                    setEditing(null);
+                  }}
+                />
+              ) : (
+                <div key={a._id} className="card flex items-start gap-3 rounded-[1.5rem] p-6">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink">
+                    <MapPin className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-[15px] font-semibold text-ink">{a.label ?? "Address"}</p>
+                    <p className="mt-0.5 text-sm text-muted">
+                      {[a.line1, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
+                      {a.phone ? ` · ${a.phone}` : ""}
+                    </p>
+                  </div>
+                  <button onClick={() => setEditing(a)} aria-label="Edit" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => remove(a._id)} aria-label="Delete" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-live">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <button onClick={() => remove(a._id)} aria-label="Delete" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-live">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+              ),
+            )}
             {list.length === 0 && !adding && (
               <div className="card rounded-[1.5rem] p-8 text-muted lg:col-span-2">
                 No saved addresses yet. <Link href="#" onClick={() => setAdding(true)} className="font-medium text-ink underline">Add one</Link> for faster checkout.
@@ -83,18 +99,27 @@ export default function AddressesPage() {
   );
 }
 
-function AddressForm({ token, onSaved }: { token: string; onSaved: (a: Addr) => void }) {
-  const [f, setF] = useState({ label: "Home", line1: "", city: "", state: "", pincode: "", phone: "" });
+function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: Addr) => void; initial?: Addr }) {
+  const [f, setF] = useState({
+    label: initial?.label ?? "Home",
+    line1: initial?.line1 ?? "",
+    city: initial?.city ?? "",
+    state: initial?.state ?? "",
+    pincode: initial?.pincode ?? "",
+    phone: initial?.phone ?? "",
+  });
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const res = (await addressApi.save(f, token)) as { address?: Addr } | Addr | null;
+    const res = initial
+      ? ((await addressApi.update(initial._id, f, token)) as { address?: Addr } | Addr | null)
+      : ((await addressApi.save(f, token)) as { address?: Addr } | Addr | null);
     setSaving(false);
     const saved = (res as { address?: Addr })?.address ?? (res as Addr);
-    onSaved(saved && (saved as Addr)._id ? (saved as Addr) : { _id: crypto.randomUUID(), ...f });
+    onSaved(saved && (saved as Addr)._id ? (saved as Addr) : { _id: initial?._id ?? crypto.randomUUID(), ...f });
   }
 
   return (

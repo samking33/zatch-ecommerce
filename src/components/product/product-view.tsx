@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
+import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
 import { cart as cartApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
@@ -195,6 +196,8 @@ export function ProductView({ product }: { product: Product }) {
             )}
             {status === "error" && <p className="mt-2 text-sm font-medium text-live">Couldn&apos;t add to cart. Try again.</p>}
           </div>
+
+          <ProductActions product={product} />
 
           <div className="mt-5 grid grid-cols-3 gap-3 text-center">
             {([[Truck, "Free delivery"], [ShieldCheck, "Buyer protected"], [RefreshCw, "7-day returns"]] as const).map(([Icon, label], i) => (
