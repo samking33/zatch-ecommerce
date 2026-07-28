@@ -122,7 +122,11 @@ export const users = {
   publicProfile: (userId: string, t?: string) => api(`/user/profile/${userId}`, { token: t, pick: "user" }),
   shareProfile: (userId: string) => api(`/user/share-profile/${userId}`),
   all: (t?: string) => api("/user/all-users", { token: t, pick: "sellers" }),
-  searchHistory: (t: string) => api("/user/search-history", { token: t }),
+  // Entries are { query, createdAt, _id } objects, not plain strings.
+  searchHistory: (t: string) =>
+    api<{ query: string; createdAt?: string; _id?: string }[]>("/user/search-history", {
+      token: t, pick: "searchHistory",
+    }),
   follow: (b: unknown, t: string) => api("/user/follow", { method: "POST", body: b, token: t }),
   unfollow: (b: unknown, t: string) => api("/user/unfollow", { method: "POST", body: b, token: t }),
   toggleFollow: (targetUserId: string, t: string) =>
@@ -131,6 +135,11 @@ export const users = {
 };
 
 // ─── Seller onboarding & status (/user/seller) ──────────────────────────────
+export type SellerBenefits = {
+  header?: { title?: string; images?: string[] };
+  features?: { icon?: string; iconBg?: string; title?: string; description?: string }[];
+};
+
 export type SellerStatusDisplay = {
   title?: string;
   subtitle?: string;
@@ -149,7 +158,7 @@ export const seller = {
     api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true }),
   terms: () => api("/user/seller/terms-and-conditions"),
   profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t, raw: true }),
-  benefits: (t: string) => api("/user/seller/benefits", { token: t }),
+  benefits: (t: string) => api<SellerBenefits>("/user/seller/benefits", { token: t, pick: "data" }),
   recordSale: (b: unknown, t: string) =>
     api("/user/record-sale", { method: "POST", body: b, token: t }),
 };

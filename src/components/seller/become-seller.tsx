@@ -1,9 +1,18 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Store, Clock, XCircle, ArrowRight } from "lucide-react";
-import type { SellerStatusDisplay } from "@/lib/api";
+import type { SellerStatusDisplay, SellerBenefits } from "@/lib/api";
 
 // Shown on any seller page when the user isn't an approved seller yet.
-export function BecomeSeller({ status, display }: { status: string; display?: SellerStatusDisplay }) {
+export function BecomeSeller({
+  status,
+  display,
+  benefits,
+}: {
+  status: string;
+  display?: SellerStatusDisplay;
+  benefits?: SellerBenefits | null;
+}) {
   const pending = status === "pending";
   const rejected = status === "rejected";
   const Icon = pending ? Clock : rejected ? XCircle : Store;
@@ -29,6 +38,25 @@ export function BecomeSeller({ status, display }: { status: string; display?: Se
             {display?.action?.label ?? (rejected ? "Re-apply" : "Register as seller")}
             <ArrowRight className="h-4 w-4" />
           </Link>
+        )}
+
+        {/* Real benefits content from the backend (same copy the app shows). */}
+        {!!benefits?.features?.length && !pending && (
+          <div className="mt-12 grid gap-4 text-left sm:grid-cols-2 lg:grid-cols-3">
+            {benefits.features.map((f, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl bg-surface-2 p-4">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: f.iconBg ?? "#CAFE38" }}>
+                  {f.icon
+                    ? <Image src={f.icon} alt="" width={22} height={22} className="h-[22px] w-[22px] object-contain" />
+                    : <Store className="h-5 w-5 text-ink" />}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-display text-[15px] font-semibold text-ink">{f.title}</p>
+                  <p className="mt-0.5 text-sm text-muted">{f.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

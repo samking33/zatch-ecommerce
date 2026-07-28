@@ -6,27 +6,44 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
-import { login } from "@/lib/client-auth";
+import { login, loginWithOtp, otp as otpApi } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export default function LoginPage() {
   const router = useRouter();
   const { setUser } = useAuth();
+  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [otpSent, setOtpSent] = useState(false);
+  const [code, setCode] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function done(user: Awaited<ReturnType<typeof login>>) {
+    setUser(user);
+    router.push("/account");
+    router.refresh(); // re-run server components with the new session cookie
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const user = await login({ phone: phone.trim(), countryCode, password });
-      setUser(user);
-      router.push("/account");
-      router.refresh(); // re-run server components with the new session cookie
+      if (mode === "password") {
+        done(await login({ phone: phone.trim(), countryCode, password }));
+        return;
+      }
+      if (!otpSent) {
+        await otpApi.send(phone.trim(), countryCode);
+        setOtpSent(true);
+        setBusy(false);
+        return;
+      }
+      await otpApi.verify(phone.trim(), countryCode, code.trim());
+      done(await loginWithOtp({ phone: phone.trim(), countryCode }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
       setBusy(false);
@@ -84,17 +101,31 @@ export default function LoginPage() {
               </div>
             </label>
 
-            <label className="block">
-              <span className="text-[13px] font-medium text-muted">Password</span>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-              />
-            </label>
+            {mode === "password" ? (
+              <label className="block">
+                <span className="text-[13px] font-medium text-muted">Password</span>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                />
+              </label>
+            ) : otpSent ? (
+              <label className="block">
+                <span className="text-[13px] font-medium text-muted">Enter the code we texted you</span>
+                <input
+                  inputMode="numeric"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="6-digit code"
+                  className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                />
+              </label>
+            ) : null}
 
             {error && (
               <p className="rounded-xl bg-live/10 px-3.5 py-2.5 text-sm font-medium text-live">
@@ -108,7 +139,15 @@ export default function LoginPage() {
               className="pill-lime flex w-full items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold disabled:opacity-70"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {busy ? "Signing in…" : "Sign in"}
+              {busy ? "Please wait…" : mode === "password" ? "Sign in" : otpSent ? "Verify & sign in" : "Send code"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setMode(mode === "password" ? "otp" : "password"); setOtpSent(false); setError(null); }}
+              className="w-full text-center text-sm font-medium text-muted hover:text-ink"
+            >
+              {mode === "password" ? "Sign in with OTP instead" : "Use password instead"}
             </button>
           </form>
 

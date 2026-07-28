@@ -26,7 +26,10 @@ export default async function SellerDashboardPage() {
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your seller dashboard" /></div></SellerShell>;
 
   const gate = await sellerGate(t);
-  if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
+  if (!gate.approved) {
+    const benefits = await sellerApi.benefits(t);
+    return <SellerShell><BecomeSeller status={gate.status} display={gate.display} benefits={benefits} /></SellerShell>;
+  }
 
   const [oDash, bDash, pay, myProducts, completion] = await Promise.all([
     ordersApi.sellerDashboard(t) as Promise<OrdersDash | null>,

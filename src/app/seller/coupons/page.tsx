@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Loader2, Check, Ticket } from "lucide-react";
+import { Plus, Trash2, Loader2, Check, Ticket, Pencil } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
@@ -15,6 +15,7 @@ export default function SellerCouponsPage() {
   const [ready, setReady] = useState(false);
   const [list, setList] = useState<Coupon[]>([]);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Coupon | null>(null);
   const [seller, setSeller] = useState<{ approved: boolean; status: string; display?: import("@/lib/api").SellerStatusDisplay } | null>(null);
 
   useEffect(() => {
@@ -62,6 +63,19 @@ export default function SellerCouponsPage() {
             <div className="mt-2 grid gap-3 md:grid-cols-2">
               {list.map((c) => {
                 const active = c.isActive ?? c.active ?? true;
+                if (editing?._id === c._id && token) {
+                  return (
+                    <CouponForm
+                      key={c._id}
+                      token={token}
+                      initial={c}
+                      onSaved={(saved) => {
+                        setList((l) => l.map((x) => (x._id === c._id ? { ...x, ...saved } : x)));
+                        setEditing(null);
+                      }}
+                    />
+                  );
+                }
                 return (
                   <div key={c._id} className="card flex items-center gap-4 rounded-[1.5rem] p-5">
                     <span className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-surface"><Ticket className="h-5 w-5" /></span>
@@ -75,6 +89,7 @@ export default function SellerCouponsPage() {
                     <button onClick={() => toggle(c._id)} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${active ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>
                       {active ? "Active" : "Off"}
                     </button>
+                    <button onClick={() => setEditing(c)} aria-label="Edit" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => remove(c._id)} aria-label="Delete" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-live"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 );
@@ -87,8 +102,15 @@ export default function SellerCouponsPage() {
   );
 }
 
-function CouponForm({ token, onSaved }: { token: string; onSaved: (c: Coupon) => void }) {
-  const [f, setF] = useState({ name: "", code: "", discountType: "percentage", discountValue: "", maxDiscount: "", minSpend: "" });
+function CouponForm({ token, onSaved, initial }: { token: string; onSaved: (c: Coupon) => void; initial?: Coupon }) {
+  const [f, setF] = useState({
+    name: initial?.name ?? "",
+    code: initial?.code ?? "",
+    discountType: initial?.discountType ?? "percentage",
+    discountValue: initial?.discountValue != null ? String(initial.discountValue) : "",
+    maxDiscount: "",
+    minSpend: initial?.minSpend != null ? String(initial.minSpend) : "",
+  });
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
@@ -101,10 +123,16 @@ function CouponForm({ token, onSaved }: { token: string; onSaved: (c: Coupon) =>
       minSpend: f.minSpend ? Number(f.minSpend) : undefined,
       startDate: new Date().toISOString(),
     };
-    const res = (await couponsApi.create(body, token)) as { coupon?: Coupon } | Coupon | null;
+    const res = initial
+      ? ((await couponsApi.update(initial._id, body, token)) as { coupon?: Coupon } | Coupon | null)
+      : ((await couponsApi.create(body, token)) as { coupon?: Coupon } | Coupon | null);
     setSaving(false);
     const saved = (res as { coupon?: Coupon })?.coupon ?? (res as Coupon);
-    onSaved(saved && (saved as Coupon)._id ? (saved as Coupon) : { _id: crypto.randomUUID(), ...body, isActive: true } as Coupon);
+    onSaved(
+      saved && (saved as Coupon)._id
+        ? (saved as Coupon)
+        : ({ _id: initial?._id ?? crypto.randomUUID(), ...body, isActive: true } as Coupon),
+    );
   }
 
   return (
@@ -120,7 +148,8 @@ function CouponForm({ token, onSaved }: { token: string; onSaved: (c: Coupon) =>
       <F label={f.discountType === "percentage" ? "Discount %" : "Discount ₹"} v={f.discountValue} on={set("discountValue")} type="number" required />
       <F label="Min spend ₹ (optional)" v={f.minSpend} on={set("minSpend")} type="number" />
       <button disabled={saving} className="btn-ink sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Create coupon
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        {initial ? "Save changes" : "Create coupon"}
       </button>
     </form>
   );
