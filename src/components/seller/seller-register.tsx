@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
@@ -24,6 +25,7 @@ export function SellerRegister() {
   const [shop, setShop] = useState({ businessName: "", gstin: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
   const [addr, setAddr] = useState({ pickupAddress: "", pinCode: "", state: "", shippingMethod: "self" });
+  const [tc, setTc] = useState(false);
   const [bank, setBank] = useState({ accountHolderName: "", accountNumber: "", ifscCode: "", bankName: "", upiId: "" });
 
   async function submitStep1(e: React.FormEvent) {
@@ -56,11 +58,11 @@ export function SellerRegister() {
   return (
     <div className="card mx-auto max-w-2xl rounded-[2rem] p-6 sm:p-8">
       <div className="mb-6 flex items-center gap-2">
-        {["Shop & KYC", "Pickup address", "Bank details"].map((label, i) => (
+        {["Shop & KYC", "Address", "Bank", "Submit"].map((label, i) => (
           <div key={label} className="flex flex-1 items-center gap-2">
             <span className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-semibold ${i + 1 <= step ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>{i + 1}</span>
             <span className={`hidden text-sm font-medium sm:inline ${i + 1 === step ? "text-ink" : "text-muted"}`}>{label}</span>
-            {i < 2 && <span className={`h-0.5 flex-1 rounded ${i + 1 < step ? "bg-lime" : "bg-hairline"}`} />}
+            {i < 3 && <span className={`h-0.5 flex-1 rounded ${i + 1 < step ? "bg-lime" : "bg-hairline"}`} />}
           </div>
         ))}
       </div>
@@ -119,7 +121,41 @@ export function SellerRegister() {
           {error && <p className="text-sm font-medium text-live">{error}</p>}
           <div className="flex gap-3">
             <Back onClick={() => setStep(2)} />
-            <button onClick={() => submitJson(3, bank, "done")} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
+            <button onClick={() => submitJson(3, bank, 4)} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4 — accepting T&C is what actually submits the application. */}
+      {step === 4 && (
+        <div className="grid gap-4">
+          <p className="text-[15px] text-muted">
+            Last step. Read the seller terms and accept to submit your application for approval.
+          </p>
+          <Link href="/seller/terms" target="_blank" className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-ink underline-offset-4 hover:underline">
+            Read seller terms & conditions →
+          </Link>
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-surface-2 p-4">
+            <input
+              type="checkbox"
+              checked={tc}
+              onChange={(e) => setTc(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-ink"
+            />
+            <span className="text-[15px] text-ink">
+              I accept the Zatch seller terms & conditions and confirm the details I&apos;ve provided are accurate.
+            </span>
+          </label>
+          {error && <p className="text-sm font-medium text-live">{error}</p>}
+          <div className="flex gap-3">
+            <Back onClick={() => setStep(3)} />
+            <button
+              onClick={() => submitJson(4, { tcAccepted: true }, "done")}
+              disabled={busy || !tc}
+              className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-50"
+            >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Submit for approval
             </button>
           </div>

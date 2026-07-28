@@ -5,7 +5,7 @@ import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { ScheduleLive } from "@/components/seller/schedule-live";
 import { LiveActions } from "@/components/seller/live-actions";
-import { live as liveApi } from "@/lib/api";
+import { live as liveApi, products as productsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
 import { compact } from "@/lib/utils";
@@ -22,13 +22,16 @@ export default async function SellerLivePage() {
   const gate = await sellerGate(t);
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
-  const dash = (await liveApi.dashboard(t)) as Dash | null;
+  const [dash, myProducts] = await Promise.all([
+    liveApi.dashboard(t) as Promise<Dash | null>,
+    productsApi.myProducts(t) as Promise<import("@/lib/types").Product[] | null>,
+  ]);
   const upcoming = dash?.upcomingLives ?? [];
   const past = dash?.pastLives ?? [];
 
   return (
     <SellerShell>
-      <SellerHeader title="Live" sub="Schedule drops and go live to sell in real time." action={<ScheduleLive />} />
+      <SellerHeader title="Live" sub="Schedule drops and go live to sell in real time." action={<ScheduleLive myProducts={myProducts ?? []} />} />
 
       <Group title="Upcoming" sessions={upcoming} empty="No scheduled lives. Schedule one to get started." icon={Calendar} />
       <Group title="Past streams" sessions={past} empty="Your past streams will show here." icon={Radio} />
