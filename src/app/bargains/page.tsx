@@ -37,7 +37,16 @@ const statusTone: Record<string, string> = {
 // Statuses where the ball is in the buyer's court.
 const NEEDS_BUYER = ["countered", "seller_countered"];
 
-export default async function BargainsPage() {
+const TABS = [
+  { key: "active", label: "Active" },
+  { key: "history", label: "History" },
+] as const;
+
+export default async function BargainsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const t = await serverToken();
   if (!t) {
     return (
@@ -47,7 +56,8 @@ export default async function BargainsPage() {
     );
   }
 
-  const data = (await bargainsApi.myBargains(t)) as Bargain[] | null;
+  const { tab = "active" } = await searchParams;
+  const data = (await bargainsApi.myBargains(t, tab)) as Bargain[] | null;
   const list = Array.isArray(data) ? data : [];
   const waiting = list.filter((b) => NEEDS_BUYER.includes((b.status ?? "").toLowerCase())).length;
 
@@ -59,6 +69,20 @@ export default async function BargainsPage() {
         title="My bargains"
         sub={waiting > 0 ? `${waiting} seller counter${waiting !== 1 ? "s" : ""} waiting on you` : "Your live offers and seller counters."}
       />
+      <div className="mb-5 flex gap-2">
+        {TABS.map((x) => (
+          <Link
+            key={x.key}
+            href={`/bargains?tab=${x.key}`}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              tab === x.key ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"
+            }`}
+          >
+            {x.label}
+          </Link>
+        ))}
+      </div>
+
       {list.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] px-6 py-20 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-full bg-lime text-lime-ink">

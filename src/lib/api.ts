@@ -276,7 +276,9 @@ export const orders = {
 export const bargains = {
   create: (b: unknown, t: string) => api("/bargains/create", { method: "POST", body: b, token: t }),
   get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain" }),
-  myBargains: (t: string) => api("/bargains/buyer/my-bargains", { token: t }),
+  // status accepts the backend's tab pseudo-values: "active" | "history".
+  myBargains: (t: string, status?: string) =>
+    api(`/bargains/buyer/my-bargains${qs({ status })}`, { token: t }),
   buyerCounter: (id: string, b: unknown, t: string) =>
     api(`/bargains/${id}/buyer-counter`, { method: "POST", body: b, token: t }),
   acceptCounter: (id: string, t: string) => api(`/bargains/${id}/accept-counter`, { method: "POST", token: t }),

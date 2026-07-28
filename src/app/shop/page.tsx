@@ -18,17 +18,20 @@ const ALL_SLUG = "explore-all";
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; sort?: string }>;
+  searchParams: Promise<{ category?: string; sort?: string; min?: string; max?: string; stock?: string }>;
 }) {
-  const { category = "", sort = "" } = await searchParams;
+  const { category = "", sort = "", min = "", max = "", stock = "" } = await searchParams;
   const t = await serverToken();
 
   const [products, categories] = await Promise.all([
-    // `filter` honours the category param; `products` does not.
+    // `filter` honours category/price/stock; `products` does not.
     productsApi.filter(
       {
         category: category && category !== ALL_SLUG ? category : undefined,
         sortBy: sort || undefined,
+        minPrice: min || undefined,
+        maxPrice: max || undefined,
+        hasStock: stock === "1" ? "true" : undefined,
         limit: 40,
       },
       t,
@@ -94,6 +97,24 @@ export default async function ShopPage({
           </Link>
         ))}
       </div>
+
+      {/* price range + in-stock (server-side filter) */}
+      <form action="/shop" className="mb-6 flex flex-wrap items-center gap-2 text-sm">
+        {category && <input type="hidden" name="category" value={category} />}
+        {sort && <input type="hidden" name="sort" value={sort} />}
+        <span className="text-muted">Price</span>
+        <input name="min" defaultValue={min} inputMode="numeric" placeholder="Min ₹" className="h-9 w-24 rounded-full border border-hairline bg-surface-2 px-3.5 text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
+        <span className="text-muted">–</span>
+        <input name="max" defaultValue={max} inputMode="numeric" placeholder="Max ₹" className="h-9 w-24 rounded-full border border-hairline bg-surface-2 px-3.5 text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-hairline px-3.5 py-1.5 text-ink">
+          <input type="checkbox" name="stock" value="1" defaultChecked={stock === "1"} className="accent-ink" />
+          In stock
+        </label>
+        <button type="submit" className="btn-ink rounded-full px-4 py-2 font-semibold">Apply</button>
+        {(min || max || stock) && (
+          <Link href={`/shop${category ? `?category=${encodeURIComponent(category)}` : ""}`} className="text-muted hover:text-ink">Clear</Link>
+        )}
+      </form>
 
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">
