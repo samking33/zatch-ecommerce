@@ -75,6 +75,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function EditProfile({ user }: { user: SessionUser | null }) {
+  // Changing an email parks it in pendingEmail until an OTP verifies it.
+  const pendingEmail = user?.pendingEmail as string | undefined;
+  const emailVerified = user?.isEmailVerified as boolean | undefined;
   const [f, setF] = useState({
     username: (user?.username as string) ?? "",
     email: (user?.email as string) ?? "",
@@ -96,7 +99,16 @@ function EditProfile({ user }: { user: SessionUser | null }) {
     <Section title="Edit profile">
       <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
         <Field label="Username" value={f.username} on={set("username")} />
-        <Field label="Email" value={f.email} on={set("email")} type="email" />
+        <div className="block">
+          <Field label="Email" value={f.email} on={set("email")} type="email" />
+          {pendingEmail ? (
+            <p className="mt-1 text-[12px] font-medium text-live">
+              {pendingEmail} awaiting verification — check your inbox for the code.
+            </p>
+          ) : emailVerified === false && f.email ? (
+            <p className="mt-1 text-[12px] text-muted">Email not verified yet.</p>
+          ) : null}
+        </div>
         <label className="block">
           <span className="text-[12px] font-medium text-muted">Gender</span>
           <select value={f.gender} onChange={set("gender")} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">

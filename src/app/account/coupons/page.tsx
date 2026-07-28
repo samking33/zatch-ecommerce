@@ -17,6 +17,9 @@ type Coupon = {
   minSpend?: number;
   endDate?: string;
   isUsed?: boolean;
+  alreadyUsed?: boolean;
+  isExpired?: boolean;
+  daysRemaining?: number;
 };
 
 export default async function MyCouponsPage() {
@@ -45,7 +48,7 @@ export default async function MyCouponsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((c) => (
-            <div key={c._id} className={`card flex items-center gap-4 rounded-[1.5rem] p-5 ${c.isUsed ? "opacity-60" : ""}`}>
+            <div key={c._id} className={`card flex items-center gap-4 rounded-[1.5rem] p-5 ${c.isUsed || c.alreadyUsed || c.isExpired ? "opacity-60" : ""}`}>
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-lime text-lime-ink">
                 <Ticket className="h-5 w-5" />
               </span>
@@ -61,7 +64,15 @@ export default async function MyCouponsPage() {
                   </p>
                 )}
               </div>
-              {c.isUsed && <span className="rounded-full bg-surface-2 px-2.5 py-1 text-[12px] font-medium text-muted">Used</span>}
+              {(c.isUsed || c.alreadyUsed) ? (
+                <span className="rounded-full bg-surface-2 px-2.5 py-1 text-[12px] font-medium text-muted">Used</span>
+              ) : c.isExpired ? (
+                <span className="rounded-full bg-live/10 px-2.5 py-1 text-[12px] font-medium text-live">Expired</span>
+              ) : c.daysRemaining != null && c.daysRemaining <= 3 ? (
+                <span className="rounded-full bg-live/10 px-2.5 py-1 text-[12px] font-medium text-live">
+                  {c.daysRemaining}d left
+                </span>
+              ) : null}
             </div>
           ))}
         </div>

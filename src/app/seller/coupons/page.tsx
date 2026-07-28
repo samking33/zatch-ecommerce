@@ -8,7 +8,7 @@ import { BecomeSeller } from "@/components/seller/become-seller";
 import { coupons as couponsApi, seller as sellerApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; isActive?: boolean; active?: boolean };
+type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; isActive?: boolean; active?: boolean; isExpired?: boolean; status?: string; daysRemaining?: number };
 type Dash = {
   performanceSummary?: { orders?: number; gmv?: number; views?: number; period?: string };
   overview?: { totalCoupons?: number; activeCoupons?: number; expiredCoupons?: number };
@@ -110,9 +110,15 @@ export default function SellerCouponsPage() {
                         {c.minSpend ? ` · min ₹${c.minSpend}` : ""}
                       </p>
                     </div>
-                    <button onClick={() => toggle(c._id)} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${active ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>
-                      {active ? "Active" : "Off"}
-                    </button>
+                    {c.isExpired || c.status === "expired" ? (
+                      <span title="Edit the end date to reactivate" className="rounded-full bg-live/10 px-3 py-1.5 text-[13px] font-semibold text-live">
+                        Expired
+                      </span>
+                    ) : (
+                      <button onClick={() => toggle(c._id)} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${active ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>
+                        {active ? "Active" : "Off"}
+                      </button>
+                    )}
                     <button onClick={() => setEditing(c)} aria-label="Edit" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => remove(c._id)} aria-label="Delete" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-live"><Trash2 className="h-4 w-4" /></button>
                   </div>

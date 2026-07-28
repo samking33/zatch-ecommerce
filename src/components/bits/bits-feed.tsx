@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Play, Heart, MessageCircle, ShoppingBag } from "lucide-react";
+import { Play, Heart, MessageCircle, ShoppingBag, Flame } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { type OrbTone } from "@/components/ui/product-orb";
 import { BitModal } from "./bit-modal";
@@ -40,6 +40,11 @@ export function BitsFeed({ bits }: { bits: Bit[] }) {
               <span className="grid h-9 w-9 place-items-center rounded-full bg-white/85 text-ink backdrop-blur transition-transform group-hover:scale-110">
                 <Play className="h-4 w-4 fill-current" />
               </span>
+              {(b as { isTrending?: boolean }).isTrending && (
+                <span className="mr-1 inline-flex items-center gap-1 rounded-full bg-live px-2.5 py-1 text-[11px] font-semibold text-white">
+                  <Flame className="h-3 w-3" /> Trending
+                </span>
+              )}
               {!!b.products?.length && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[11px] font-semibold text-lime-ink">
                   <ShoppingBag className="h-3 w-3" /> {b.products.length}

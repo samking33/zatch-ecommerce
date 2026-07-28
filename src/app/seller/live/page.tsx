@@ -12,7 +12,7 @@ import { compact } from "@/lib/utils";
 
 export const metadata = { title: "Seller · Live" };
 
-type Session = { _id: string; title?: string; status?: string; scheduledStartTime?: string; thumbnail?: { url?: string }; viewersCount?: number; peakViewers?: number };
+type Session = { _id: string; title?: string; status?: string; scheduledStartTime?: string; thumbnail?: { url?: string }; viewersCount?: number; peakViewers?: number; queuePosition?: number };
 type Dash = { upcomingLives?: Session[]; pastLives?: Session[]; performanceSummary?: { totalLives?: number; totalViews?: number } };
 
 export default async function SellerLivePage() {
@@ -54,6 +54,11 @@ function Group({ title, sessions, empty, icon: Icon }: { title: string; sessions
                 <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-ink/80 px-2.5 py-1 text-[11px] font-semibold uppercase text-white backdrop-blur">
                   <Icon className="h-3 w-3" /> {s.status ?? title}
                 </span>
+                {s.queuePosition ? (
+                  <span className="absolute right-3 top-3 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur">
+                    #{s.queuePosition} in queue
+                  </span>
+                ) : null}
               </div>
               <div className="flex items-end justify-between gap-2 px-2 py-3">
                 <div className="min-w-0">

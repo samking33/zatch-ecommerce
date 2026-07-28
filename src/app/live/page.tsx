@@ -9,6 +9,9 @@ import { compact } from "@/lib/utils";
 
 export const metadata = { title: "Live now" };
 
+// Extra per-session fields the discovery endpoint returns.
+type LiveRow = { canJoin?: boolean; canJoinAt?: string; queuePosition?: number };
+
 const tones: OrbTone[] = ["coral", "cobalt", "violet", "lime", "slate"];
 
 export default async function LivePage() {
@@ -61,7 +64,13 @@ export default async function LivePage() {
               <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">
                 {s.title}
               </p>
-              <p className="mt-1 text-sm text-muted">Bargains open · tap to join</p>
+              <p className="mt-1 text-sm text-muted">
+                {(s as LiveRow).canJoin === false
+                  ? (s as LiveRow).canJoinAt
+                    ? `Opens ${new Date((s as LiveRow).canJoinAt!).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}`
+                    : "Starting soon"
+                  : "Bargains open · tap to join"}
+              </p>
             </div>
           </Link>
         ))}
