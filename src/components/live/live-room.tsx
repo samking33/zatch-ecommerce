@@ -5,6 +5,7 @@ import { Send, Heart, Share2, Check } from "lucide-react";
 import { AgoraPlayer } from "./agora-player";
 import { BargainBox } from "@/components/product/bargain-box";
 import { live as liveApi } from "@/lib/api";
+import { onEvent, rooms } from "@/lib/socket";
 import { getToken } from "@/lib/client-auth";
 import { compact } from "@/lib/utils";
 
@@ -26,20 +27,40 @@ export function LiveRoom({
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [likes, setLikes] = useState(0);
+  const [liveViewers, setLiveViewers] = useState(viewers ?? 0);
+  const [ended, setEnded] = useState(false);
   const feed = useRef<HTMLDivElement>(null);
   const localId = useRef(0);
 
-  // Poll real chat comments.
+  // Seed history once, then take live updates over the socket — same events
+  // the mobile app listens to (newComment / likeUpdated / viewersUpdated).
   useEffect(() => {
     let stop = false;
-    async function poll() {
-      const res = (await liveApi.comments(sessionId)) as { comments?: Msg[] } | Msg[] | null;
-      const list = Array.isArray(res) ? res : res?.comments ?? [];
+    liveApi.comments(sessionId).then((res) => {
+      const list = Array.isArray(res) ? res : (res as { comments?: Msg[] })?.comments ?? [];
       if (!stop && list.length) setMsgs(list.slice(-40));
-    }
-    poll();
-    const iv = setInterval(poll, 4000);
-    return () => { stop = true; clearInterval(iv); };
+    });
+
+    rooms.joinSession(sessionId);
+    const offs = [
+      onEvent("newComment", (p) => {
+        const c = (p.comment ?? p) as Msg;
+        if (c?.text) setMsgs((m) => [...m, c].slice(-40));
+      }),
+      onEvent("likeUpdated", (p) => {
+        if (typeof p.likeCount === "number") setLikes(p.likeCount);
+      }),
+      onEvent("viewersUpdated", (p) => {
+        const n = p.viewersCount ?? p.count;
+        if (typeof n === "number") setLiveViewers(n);
+      }),
+      onEvent("sessionEnded", () => setEnded(true)),
+    ];
+    return () => {
+      stop = true;
+      offs.forEach((off) => off());
+      rooms.leaveSession(sessionId);
+    };
   }, [sessionId]);
 
   useEffect(() => {
@@ -79,11 +100,13 @@ export function LiveRoom({
     <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
       {/* stage */}
       <div className="card relative overflow-hidden rounded-[2rem] p-3">
-        <AgoraPlayer sessionId={sessionId} viewers={viewers} />
+        <AgoraPlayer sessionId={sessionId} viewers={liveViewers} />
         <div className="flex items-center justify-between px-3 py-4">
           <div>
             <h1 className="font-display text-xl font-semibold text-ink">{title}</h1>
-            <p className="mt-1 text-sm text-muted">Bargains open · tap to join the negotiation</p>
+            <p className="mt-1 text-sm text-muted">
+              {ended ? "This stream has ended." : "Bargains open · tap to join the negotiation"}
+            </p>
           </div>
           <div className="flex shrink-0 gap-2">
             <button onClick={like} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-2 text-[13px] font-semibold text-ink hover:bg-canvas">

@@ -4,6 +4,7 @@ import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
 import { BuyerBargainActions } from "@/components/product/buyer-bargain-actions";
+import { RefreshOn } from "@/components/realtime/refresh-on";
 import { bargains as bargainsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { inr } from "@/lib/utils";
@@ -50,6 +51,7 @@ export default async function BargainsPage() {
 
   return (
     <PageShell>
+      <RefreshOn events={["bargain_countered", "bargain_accepted", "bargain_rejected"]} />
       <PageHeader
         eyebrow="Account"
         title="My bargains"

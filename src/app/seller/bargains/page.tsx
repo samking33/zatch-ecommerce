@@ -3,6 +3,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { BargainRespond } from "@/components/seller/bargain-respond";
+import { RefreshOn } from "@/components/realtime/refresh-on";
 import { bargains as bargainsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
@@ -37,6 +38,7 @@ export default async function SellerBargainsPage() {
 
   return (
     <SellerShell>
+      <RefreshOn events={["new_bargain", "buyer_countered", "counter_accepted", "counter_rejected"]} />
       <SellerHeader title="Bargains" sub={`${pending.length} offer${pending.length !== 1 ? "s" : ""} awaiting your reply`} />
 
       {all.length === 0 ? (

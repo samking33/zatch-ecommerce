@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import "./globals.css";
 
 const interTight = Inter_Tight({
@@ -34,7 +35,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${interTight.variable} ${inter.variable}`}>
       <body suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <RealtimeProvider>{children}</RealtimeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
