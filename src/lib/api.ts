@@ -244,7 +244,9 @@ export const coupons = {
 
 // ─── Checkout & payments (/checkout) ────────────────────────────────────────
 export const checkout = {
-  initiate: (b: unknown, t: string) => api("/checkout/initiate", { method: "POST", body: b, token: t }),
+  // Dry-run pricing for the checkout screen — resolves bargain prices,
+  // coupons, shipping and tax without creating an order.
+  initiate: (b: unknown, t: string) => api("/checkout/initiate", { method: "POST", body: b, token: t, raw: true }),
   razorpayInitiate: (b: unknown, t: string) =>
     api("/checkout/payment/razorpay/initiate", { method: "POST", body: b, token: t }),
   razorpayVerify: (b: unknown, t: string) =>
@@ -356,6 +358,8 @@ export const bits = {
 // ─── Notifications & preferences ────────────────────────────────────────────
 export const notifications = {
   list: (t: string) => api("/notifications", { token: t }),
+  // Envelope carries an unreadCount alongside the list — used for the nav badge.
+  unreadCount: (t: string) => api<{ unreadCount?: number }>("/notifications", { token: t, raw: true }),
   markRead: (id: string, t: string) => api(`/notifications/${id}/read`, { method: "PUT", token: t }),
   markAllRead: (t: string) => api("/notifications/read-all", { method: "PUT", token: t }),
   remove: (id: string, t: string) => api(`/notifications/${id}`, { method: "DELETE", token: t }),

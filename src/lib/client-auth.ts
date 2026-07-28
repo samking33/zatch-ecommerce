@@ -37,14 +37,32 @@ export function getUser(): SessionUser | null {
 // Add Secure on HTTPS so the token is never sent over plain HTTP.
 const SECURE = typeof location !== "undefined" && location.protocol === "https:" ? "; secure" : "";
 
-function setSession(token: string, user: SessionUser) {
+const REFRESH_KEY = "zatch_refresh";
+
+function setSession(token: string, user: SessionUser, refreshToken?: string) {
   document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; path=/; max-age=${MAX_AGE}; samesite=lax${SECURE}`;
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  // Kept for when the backend mounts its refresh endpoint (the controller
+  // exists but has no route yet), so sessions can be renewed silently.
+  if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+}
+
+/** Access tokens last 7 days. Returns true when the stored one has expired. */
+export function isTokenExpired(): boolean {
+  const t = getToken();
+  if (!t) return false;
+  try {
+    const p = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof p.exp === "number" && p.exp * 1000 < Date.now();
+  } catch {
+    return false;
+  }
 }
 
 export function clearSession() {
   document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; samesite=lax${SECURE}`;
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(REFRESH_KEY);
 }
 
 async function post(path: string, body: unknown) {
@@ -68,7 +86,7 @@ export async function login(input: {
   // Same-origin via the Next rewrite → no CORS, no token header needed here.
   const json = await post("/user/login", input);
   if (!json?.token) throw new Error(json?.message ?? "Login failed.");
-  setSession(json.token, json.user);
+  setSession(json.token, json.user, json.refreshToken);
   return json.user as SessionUser;
 }
 
@@ -115,7 +133,7 @@ export async function loginWithOtp(input: {
 }): Promise<SessionUser> {
   const json = await post("/user/login", { ...input, method: "otp" });
   if (!json?.token) throw new Error(json?.message ?? "Login failed.");
-  setSession(json.token, json.user);
+  setSession(json.token, json.user, json.refreshToken);
   return json.user as SessionUser;
 }
 

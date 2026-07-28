@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   getUser,
   clearSession,
+  isTokenExpired,
   type SessionUser,
 } from "@/lib/client-auth";
 
@@ -23,6 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
+    // Access tokens live 7 days. If the stored one has lapsed, clear the
+    // session so the user sees "sign in" instead of silently empty pages.
+    if (isTokenExpired()) {
+      clearSession();
+      setUser(null);
+      return;
+    }
     setUser(getUser());
   }, []);
 

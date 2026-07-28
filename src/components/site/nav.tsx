@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Search, Heart, ShoppingBag, Store } from "lucide-react";
+import { Search, Heart, ShoppingBag, Store, Bell } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/components/auth/auth-provider";
-import { cart as cartApi } from "@/lib/api";
+import { cart as cartApi, notifications as notifApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
+import { onEvent } from "@/lib/socket";
 
 export function Nav() {
   const [q, setQ] = useState("");
@@ -14,15 +15,21 @@ export function Nav() {
   const label = user?.username || (user ? "Account" : "Sign in");
   const initial = (user?.username?.[0] ?? "Z").toUpperCase();
 
-  // Real cart count for the badge (0 → no badge).
+  // Real cart count + unread notifications for the badges (0 → no badge).
   const [cartCount, setCartCount] = useState(0);
+  const [unread, setUnread] = useState(0);
   useEffect(() => {
     const t = getToken();
-    if (!t) { setCartCount(0); return; }
+    if (!t) { setCartCount(0); setUnread(0); return; }
     cartApi.get(t).then((c) => {
       const cart = c as { totalItems?: number; items?: unknown[] } | null;
       setCartCount(cart?.totalItems ?? cart?.items?.length ?? 0);
     });
+    const loadUnread = () =>
+      notifApi.unreadCount(t).then((r) => setUnread((r as { unreadCount?: number })?.unreadCount ?? 0));
+    loadUnread();
+    // A new notification arrives over the socket — bump the badge live.
+    return onEvent("new_notification", loadUnread);
   }, [user]);
 
   return (
@@ -67,6 +74,9 @@ export function Nav() {
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          <IconButton href="/notifications" label="Notifications" badge={unread || undefined} className="hidden sm:grid">
+            <Bell className="h-[18px] w-[18px]" />
+          </IconButton>
           <IconButton href="/wishlist" label="Wishlist" className="hidden sm:grid">
             <Heart className="h-[18px] w-[18px]" />
           </IconButton>

@@ -21,6 +21,18 @@ type CItem = {
   bargainId?: string;
 };
 type Cart = { items?: CItem[]; total?: number; subtotal?: number };
+type Money = { subtotal?: number; discount?: number; shipping?: number; tax?: number; total?: number };
+type Preview = { summary?: Money; pricing?: Money };
+
+// One place that builds the item payload both preview and pay use.
+function itemPayload(items: CItem[]) {
+  return items.map((it) => ({
+    productId: it.productId ?? (typeof it.product === "object" ? it.product?._id : it.product),
+    variantColor: it.variant?.color ?? it.color,
+    variantSize: it.variant?.size ?? it.size,
+    bargainId: it.bargainId,
+  }));
+}
 
 function loadRazorpay(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -59,7 +71,20 @@ export default function CheckoutPage() {
   }, []);
 
   const items = cart?.items ?? [];
-  const total = cart?.total ?? cart?.subtotal ?? 0;
+
+  // Server-side price preview (bargains, coupon, shipping, tax) — recomputed
+  // whenever the chosen address changes, since shipping can depend on it.
+  const [preview, setPreview] = useState<Preview | null>(null);
+  useEffect(() => {
+    if (!token || items.length === 0) return;
+    checkoutApi
+      .initiate({ addressId: selected || undefined, items: itemPayload(items) }, token)
+      .then((p) => setPreview((p as Preview) ?? null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selected, items.length]);
+
+  const sum = preview?.summary ?? preview?.pricing ?? {};
+  const total = sum.total ?? cart?.total ?? cart?.subtotal ?? 0;
 
   async function pay() {
     setError(null);
@@ -68,15 +93,7 @@ export default function CheckoutPage() {
     if (items.length === 0) return setError("Your cart is empty.");
 
     setPaying(true);
-    const checkoutData = {
-      addressId: selected,
-      items: items.map((it) => ({
-        productId: it.productId ?? (typeof it.product === "object" ? it.product?._id : it.product),
-        variantColor: it.variant?.color ?? it.color,
-        variantSize: it.variant?.size ?? it.size,
-        bargainId: it.bargainId,
-      })),
-    };
+    const checkoutData = { addressId: selected, items: itemPayload(items) };
 
     const init = (await api<{ razorpayOrderId: string; amount: number; keyId: string; currency?: string }>(
       "/checkout/payment/razorpay/initiate",
@@ -180,10 +197,15 @@ export default function CheckoutPage() {
 
             <aside className="card h-fit rounded-[1.75rem] p-6 lg:sticky lg:top-28">
               <h2 className="font-display text-lg font-semibold text-ink">Order total</h2>
-              <div className="mt-4 flex items-center justify-between border-t border-hairline pt-4">
-                <span className="font-semibold text-ink">Total</span>
-                <span className="font-display text-2xl font-semibold text-ink">{inr(total)}</span>
-              </div>
+              <dl className="mt-4 space-y-2.5 text-[15px]">
+                {sum.subtotal != null && <PRow label="Subtotal" value={inr(sum.subtotal)} />}
+                {sum.discount ? <PRow label="Discount" value={`− ${inr(sum.discount)}`} /> : null}
+                {sum.shipping != null && <PRow label="Shipping" value={sum.shipping ? inr(sum.shipping) : "Free"} />}
+                {sum.tax ? <PRow label="Tax (GST)" value={inr(sum.tax)} /> : null}
+                <div className="border-t border-hairline pt-2.5">
+                  <PRow label="Total" value={inr(total)} strong />
+                </div>
+              </dl>
               {error && <p className="mt-3 rounded-xl bg-live/10 px-3.5 py-2.5 text-sm font-medium text-live">{error}</p>}
               <button
                 onClick={pay}
@@ -230,6 +252,15 @@ function AddressForm({ onSaved, token }: { onSaved: (a: Addr) => void; token: st
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save address
       </button>
     </form>
+  );
+}
+
+function PRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className={strong ? "font-semibold text-ink" : "text-muted"}>{label}</dt>
+      <dd className={strong ? "font-display text-2xl font-semibold text-ink" : "font-medium text-ink"}>{value}</dd>
+    </div>
   );
 }
 

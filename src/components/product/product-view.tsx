@@ -38,7 +38,21 @@ export function ProductView({ product }: { product: Product }) {
       ],
     [variants, color],
   );
+
   const [size, setSize] = useState<string | undefined>(sizes[0]);
+
+  // Per-variant availability — backend sends isOutOfStock/stock on each combo.
+  const soldOut = (v?: Variant) => !!v && (v.isOutOfStock === true || v.stock === 0);
+  const colorSoldOut = (c: string) =>
+    variants.filter((v) => v.color === c).every((v) => soldOut(v));
+  const sizeSoldOut = (s: string) =>
+    variants.filter((v) => (color ? v.color === color : true) && v.size === s).every((v) => soldOut(v));
+  const selected = variants.find(
+    (v) => (color ? v.color === color : true) && (size ? v.size === size : true),
+  );
+  const outOfStock = variants.length > 0
+    ? soldOut(selected)
+    : product.totalStock === 0;
 
   // All browsable images: product gallery + every variant image, de-duped.
   const gallery = useMemo<ProductImage[]>(() => {
@@ -147,9 +161,11 @@ export function ProductView({ product }: { product: Product }) {
                     <button
                       key={c}
                       onClick={() => pickColor(c)}
-                      aria-label={c}
+                      aria-label={colorSoldOut(c) ? `${c} (sold out)` : c}
                       aria-pressed={active}
-                      className={`h-11 w-11 overflow-hidden rounded-full p-0.5 ring-2 transition ${active ? "ring-ink" : "ring-hairline hover:ring-ink/40"}`}
+                      disabled={colorSoldOut(c)}
+                      title={colorSoldOut(c) ? "Sold out" : c}
+                      className={`h-11 w-11 overflow-hidden rounded-full p-0.5 ring-2 transition ${active ? "ring-ink" : "ring-hairline hover:ring-ink/40"} ${colorSoldOut(c) ? "opacity-35 grayscale" : ""}`}
                     >
                       {v?.images?.[0]?.url ? (
                         <Image src={v.images[0].url} alt={c} width={44} height={44} className="h-full w-full rounded-full object-cover" />
@@ -172,7 +188,9 @@ export function ProductView({ product }: { product: Product }) {
                     key={s}
                     onClick={() => setSize(s)}
                     aria-pressed={s === size}
-                    className={`min-w-[3rem] rounded-xl border px-3.5 py-2.5 text-sm font-medium capitalize transition ${s === size ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"}`}
+                    disabled={sizeSoldOut(s)}
+                    title={sizeSoldOut(s) ? "Sold out" : undefined}
+                    className={`min-w-[3rem] rounded-xl border px-3.5 py-2.5 text-sm font-medium capitalize transition ${s === size ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"} ${sizeSoldOut(s) ? "cursor-not-allowed text-muted line-through opacity-50" : ""}`}
                   >
                     {s.toLowerCase()}
                   </button>
@@ -189,9 +207,9 @@ export function ProductView({ product }: { product: Product }) {
                 <Link href="/cart" className="btn-ink ml-auto rounded-full px-5 py-2.5 text-sm font-semibold">View cart</Link>
               </div>
             ) : (
-              <button onClick={addToCart} disabled={status === "adding"} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-70">
+              <button onClick={addToCart} disabled={status === "adding" || outOfStock} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
                 {status === "adding" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ShoppingBag className="h-[18px] w-[18px]" />}
-                {status === "adding" ? "Adding…" : "Add to cart"}
+                {outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
               </button>
             )}
             {status === "error" && <p className="mt-2 text-sm font-medium text-live">Couldn&apos;t add to cart. Try again.</p>}
