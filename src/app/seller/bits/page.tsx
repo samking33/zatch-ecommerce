@@ -1,4 +1,4 @@
-import { Eye, TrendingUp, Activity, Play, Heart, MessageCircle } from "lucide-react";
+import { Eye, TrendingUp, Activity, Play, Heart, MessageCircle, ShoppingBag } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
@@ -13,6 +13,7 @@ import type { Bit, Product } from "@/lib/types";
 
 export const metadata = { title: "Seller · Bits" };
 
+type BitStats = { orders?: number; revenue?: number; isActive?: boolean };
 type Dash = {
   performanceSummary?: { views?: number; revenue?: string; avgEngagement?: string };
   buyBits?: Bit[];
@@ -74,7 +75,7 @@ export default async function SellerBitsPage() {
                     <Play className="h-3 w-3 fill-current" />
                   </span>
                   <div className="absolute right-2 top-2">
-                    <BitActions bitId={b._id} isActive={(b as { isActive?: boolean }).isActive !== false} />
+                    <BitActions bitId={b._id} isActive={(b as BitStats).isActive !== false} />
                   </div>
                   <div className="absolute inset-x-2 bottom-2">
                     <p className="line-clamp-1 text-[12px] font-semibold text-white">{b.title}</p>
@@ -84,6 +85,15 @@ export default async function SellerBitsPage() {
                       <span className="inline-flex items-center gap-0.5"><MessageCircle className="h-3 w-3" />{compact(b.commentCount ?? 0)}</span>
                     </div>
                   </div>
+                </div>
+                {/* per-reel funnel the API attributes to this Bit */}
+                <div className="flex items-center justify-between px-1 pt-2 text-[11px] text-muted">
+                  <span className="inline-flex items-center gap-1">
+                    <ShoppingBag className="h-3 w-3" />{(b as BitStats).orders ?? 0} orders
+                  </span>
+                  <span className="font-medium text-ink">
+                    ₹{((b as BitStats).revenue ?? 0).toLocaleString("en-IN")}
+                  </span>
                 </div>
               </div>
             ))}

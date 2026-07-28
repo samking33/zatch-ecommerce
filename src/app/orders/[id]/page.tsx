@@ -23,8 +23,15 @@ type Order = {
   // Server-computed UI contract (same one the app renders).
   timeline?: TimelineEvent[];
   availableActions?: ServerAction[];
-  tracking?: { awb?: string; courier?: string; isAvailable?: boolean };
+  tracking?: { awb?: string; courier?: string; isAvailable?: boolean; estimatedDelivery?: string };
   sellerId?: string | { _id?: string };
+  expectedDelivery?: string;
+  expectedDeliveryFormatted?: string;
+  // Seller-only settlement sheet (commission, GST, TCS/TDS) per order.
+  paymentSection?: {
+    type?: string; paymentId?: string; isPaid?: boolean;
+    breakdown?: { label: string; value?: number; formatted?: string; type?: string }[];
+  };
 };
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -82,9 +89,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <h1 className="font-display text-xl font-semibold text-ink">
                 Order #{order.orderId ?? order._id.slice(-8)}
               </h1>
-              {order.status && (
-                <span className="rounded-full bg-surface-2 px-3 py-1 text-sm font-medium capitalize text-ink">{order.status}</span>
-              )}
+              <div className="flex items-center gap-2">
+                {order.expectedDeliveryFormatted && (
+                  <span className="hidden rounded-full bg-surface-2 px-3 py-1 text-[13px] text-muted sm:inline">
+                    Arrives by {order.expectedDeliveryFormatted}
+                  </span>
+                )}
+                {order.status && (
+                  <span className="rounded-full bg-surface-2 px-3 py-1 text-sm font-medium capitalize text-ink">{order.status}</span>
+                )}
+              </div>
             </div>
             {/* server-computed tracking timeline */}
             <div className="mt-6 flex items-center gap-1">
@@ -158,6 +172,26 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </dl>
           {order.payment?.method && (
             <p className="mt-3 text-sm text-muted">Paid via {order.payment.method} · {order.payment.status}</p>
+          )}
+
+          {/* Seller settlement sheet — only present when the API returns it. */}
+          {!!order.paymentSection?.breakdown?.length && (
+            <div className="mt-5 border-t border-hairline pt-4">
+              <h3 className="font-display text-[15px] font-semibold text-ink">Settlement</h3>
+              <dl className="mt-2.5 space-y-1.5 text-[13px]">
+                {order.paymentSection.breakdown.map((b, i) => (
+                  <div key={i} className="flex items-start justify-between gap-3">
+                    <dt className="text-muted">{b.label}</dt>
+                    <dd className={`shrink-0 font-medium ${b.type === "deduction" ? "text-live" : "text-ink"}`}>
+                      {b.formatted ?? inr(b.value ?? 0)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {order.paymentSection.paymentId && (
+                <p className="mt-2 text-[12px] text-muted">Ref {order.paymentSection.paymentId}</p>
+              )}
+            </div>
           )}
         </aside>
       </div>

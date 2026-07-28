@@ -123,7 +123,9 @@ export const users = {
     api("/user/profile-update", { method: "PUT", body: b, token: t }),
   publicProfile: (userId: string, t?: string) => api(`/user/profile/${userId}`, { token: t, pick: "user" }),
   shareProfile: (userId: string) => api(`/user/share-profile/${userId}`),
-  all: (t?: string) => api("/user/all-users", { token: t, pick: "sellers" }),
+  // sortBy: content (default) | rating | products | reels | sales
+  all: (t?: string, o?: Record<string, string | undefined>) =>
+    api(`/user/all-users${qs(o)}`, { token: t, pick: "sellers" }),
   // Entries are { query, createdAt, _id } objects, not plain strings.
   searchHistory: (t: string) =>
     api<{ query: string; createdAt?: string; _id?: string }[]>("/user/search-history", {

@@ -23,8 +23,20 @@ type SellerRow = {
   activeBitsCount?: number;
 };
 
-export default async function SellersPage() {
-  const list = ((await users.all(await serverToken())) as SellerRow[] | null) ?? [];
+const SORTS = [
+  { key: "", label: "Most active" },
+  { key: "rating", label: "Top rated" },
+  { key: "products", label: "Most products" },
+  { key: "reels", label: "Most Bits" },
+];
+
+export default async function SellersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
+  const { sort = "" } = await searchParams;
+  const list = ((await users.all(await serverToken(), { sortBy: sort || undefined })) as SellerRow[] | null) ?? [];
 
   return (
     <PageShell>
@@ -33,6 +45,21 @@ export default async function SellersPage() {
         title="Sellers on Zatch"
         sub={`${list.length} sellers going live, dropping Bits, and open to offers.`}
       />
+
+      <div className="mb-5 flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="text-muted">Sort</span>
+        {SORTS.map((x) => (
+          <Link
+            key={x.key}
+            href={x.key ? `/sellers?sort=${x.key}` : "/sellers"}
+            className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+              (sort || "") === x.key ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"
+            }`}
+          >
+            {x.label}
+          </Link>
+        ))}
+      </div>
 
       {list.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] px-6 py-16 text-center">
