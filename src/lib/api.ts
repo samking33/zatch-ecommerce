@@ -263,7 +263,10 @@ export const orders = {
   generateInvoice: (id: string, t: string) => api(`/orders/${id}/generate-invoice`, { method: "POST", token: t, raw: true }),
   invoiceUrl: (fileName: string) => `${BASE}/api/v1/orders/invoice/download/${fileName}`,
   // seller-side
-  sellerOrders: (t: string) => api("/orders/seller/orders", { token: t, pick: "orders" }),
+  sellerOrders: (t: string, o?: Record<string, string | undefined>) =>
+    api(`/orders/seller/orders${qs(o)}`, { token: t, pick: "orders" }),
+  sellerOrdersRaw: (t: string, o?: Record<string, string | undefined>) =>
+    api(`/orders/seller/orders${qs(o)}`, { token: t, raw: true }),
   sellerDashboard: (t: string) => api("/orders/seller/dashboard", { token: t, raw: true }),
   groupedBySeller: (t: string) => api("/orders/grouped-by-seller", { token: t }),
   updateStatus: (id: string, b: unknown, t: string) =>
@@ -325,6 +328,12 @@ export const live = {
   dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true }),
   schedule: (b: unknown, t: string) => api("/live/schedule", { method: "POST", body: b, token: t }),
   end: (sessionId: string, t: string) => api(`/live/session/${sessionId}/end`, { method: "PATCH", token: t }),
+  // Seller-side: edit | cancel | reschedule
+  action: (
+    sessionId: string,
+    b: { action: string; title?: string; description?: string; scheduledStartTime?: string },
+    t: string,
+  ) => api(`/live/session/${sessionId}/action`, { method: "PATCH", body: b, token: t, raw: true }),
 };
 
 // ─── Bits — short shopping videos (/bits) ───────────────────────────────────
@@ -339,6 +348,9 @@ export const bits = {
   comment: (id: string, b: unknown, t: string) => api(`/bits/${id}/comments`, { method: "POST", body: b, token: t, raw: true }),
   share: (id: string, t?: string) => api(`/bits/${id}/share`, { method: "POST", token: t, raw: true }),
   view: (id: string, t?: string) => api(`/bits/${id}/view`, { method: "POST", token: t }),
+  // Seller-side: Edit | Delete | Deactivate | Activate
+  action: (id: string, b: { action: string; title?: string; description?: string }, t: string) =>
+    api(`/bits/${id}/action`, { method: "PATCH", body: b, token: t, raw: true }),
 };
 
 // ─── Notifications & preferences ────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { ScheduleLive } from "@/components/seller/schedule-live";
-import { EndLiveButton } from "@/components/seller/end-live-button";
+import { LiveActions } from "@/components/seller/live-actions";
 import { live as liveApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
@@ -60,8 +60,8 @@ function Group({ title, sessions, empty, icon: Icon }: { title: string; sessions
                     {s.peakViewers ? ` · ${compact(s.peakViewers)} peak` : ""}
                   </p>
                 </div>
-                {["live", "active", "started"].includes((s.status ?? "").toLowerCase()) && (
-                  <EndLiveButton sessionId={s._id} />
+                {(s.status ?? "").toLowerCase() !== "ended" && (
+                  <LiveActions sessionId={s._id} status={s.status} />
                 )}
               </div>
             </div>

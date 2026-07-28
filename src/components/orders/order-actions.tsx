@@ -1,33 +1,100 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Star, Loader2, FileText, XCircle } from "lucide-react";
+import {
+  Star, Loader2, FileText, XCircle, MapPin, Phone, Eye, Undo2, type LucideIcon,
+} from "lucide-react";
 import { orders as ordersApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-// Backend only allows buyer cancellation before packing (orderController:1105).
-const CANCELLABLE = ["pending", "confirmed"];
+export type ServerAction = {
+  action: string;
+  label: string;
+  type?: "primary" | "secondary" | "danger";
+  icon?: string;
+  requiresInput?: boolean;
+};
 
-export function OrderActions({ orderId, status }: { orderId: string; status?: string }) {
+// The backend sends Material icon names; map them to our icon set.
+const ICON: Record<string, LucideIcon> = {
+  cancel: XCircle,
+  visibility: Eye,
+  phone: Phone,
+  location_on: MapPin,
+  download: FileText,
+  star: Star,
+  undo: Undo2,
+};
+
+const STYLE: Record<string, string> = {
+  primary: "pill-lime",
+  danger: "border border-hairline text-live hover:bg-live/5",
+  secondary: "border border-hairline text-ink hover:bg-surface-2",
+};
+
+/** Renders exactly the actions the server says are valid for this order and
+ *  role — same contract the mobile app uses (orderController:getAvailableActions). */
+export function OrderActions({
+  orderId,
+  actions,
+  sellerId,
+  tracking,
+}: {
+  orderId: string;
+  actions?: ServerAction[];
+  sellerId?: string;
+  tracking?: { awb?: string; courier?: string; isAvailable?: boolean };
+}) {
   const router = useRouter();
   const token = getToken();
   const [busy, setBusy] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [reviewing, setReviewing] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const canCancel = !status || CANCELLABLE.includes(status.toLowerCase());
-  const delivered = status?.toLowerCase() === "delivered";
+  const [showTracking, setShowTracking] = useState(false);
 
-  async function cancel() {
+  const list = actions?.length ? actions : [{ action: "view_details", label: "View details", type: "secondary" as const, icon: "visibility" }];
+
+  async function run(a: ServerAction) {
     if (!token) return;
-    const reason = window.prompt("Reason for cancellation?") ?? "Changed my mind";
-    setBusy("cancel");
-    const res = await ordersApi.cancel(orderId, { reason }, token);
-    setBusy(null);
-    if (res) router.refresh();
-    else setMsg("Couldn't cancel this order.");
+    switch (a.action) {
+      case "cancel": {
+        const reason = window.prompt("Reason for cancellation?");
+        if (reason === null) return;
+        setBusy(a.action);
+        const res = await ordersApi.cancel(orderId, { reason: reason || "Changed my mind" }, token);
+        setBusy(null);
+        res ? router.refresh() : setMsg("Couldn't cancel this order.");
+        return;
+      }
+      case "download_invoice": {
+        setBusy(a.action);
+        const res = (await ordersApi.generateInvoice(orderId, token)) as
+          | { fileName?: string; invoiceUrl?: string; url?: string } | null;
+        setBusy(null);
+        const file = res?.fileName;
+        const url = res?.invoiceUrl ?? res?.url ?? (file ? ordersApi.invoiceUrl(file) : null);
+        url ? window.open(url, "_blank") : setMsg("Invoice isn't ready yet.");
+        return;
+      }
+      case "review":
+        setReviewing((v) => !v);
+        return;
+      case "track_order":
+        setShowTracking((v) => !v);
+        return;
+      case "contact_seller":
+        router.push(sellerId ? `/seller/${sellerId}` : "/support");
+        return;
+      case "return":
+        router.push("/returns");
+        return;
+      default:
+        return; // view_details — already here
+    }
   }
 
   async function submitReview() {
@@ -39,37 +106,40 @@ export function OrderActions({ orderId, status }: { orderId: string; status?: st
     else setMsg("Couldn't submit review.");
   }
 
-  async function invoice() {
-    if (!token) return;
-    setBusy("invoice");
-    // The generate call returns the filename to download.
-    const res = (await ordersApi.generateInvoice(orderId, token)) as
-      | { fileName?: string; invoiceUrl?: string; url?: string } | null;
-    setBusy(null);
-    const file = res?.fileName;
-    const url = res?.invoiceUrl ?? res?.url ?? (file ? ordersApi.invoiceUrl(file) : null);
-    if (url) window.open(url, "_blank");
-    else setMsg("Invoice isn't ready yet. Try again in a moment.");
-  }
-
   return (
     <div className="card rounded-[1.75rem] p-6">
       <h2 className="font-display text-lg font-semibold text-ink">Actions</h2>
+
       <div className="mt-4 flex flex-wrap gap-3">
-        <button onClick={invoice} disabled={busy === "invoice"} className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-surface-2 disabled:opacity-60">
-          {busy === "invoice" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Invoice
-        </button>
-        {delivered && !reviewing && (
-          <button onClick={() => setReviewing(true)} className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink hover:bg-surface-2">
-            <Star className="h-4 w-4" /> Write a review
-          </button>
-        )}
-        {canCancel && (
-          <button onClick={cancel} disabled={busy === "cancel"} className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-live transition-colors hover:bg-live/5 disabled:opacity-60">
-            {busy === "cancel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />} Cancel order
-          </button>
-        )}
+        {list.map((a) => {
+          const Icon = ICON[a.icon ?? ""] ?? Eye;
+          if (a.action === "view_details") return null;
+          return (
+            <button
+              key={a.action}
+              onClick={() => run(a)}
+              disabled={busy === a.action}
+              className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 ${STYLE[a.type ?? "secondary"]}`}
+            >
+              {busy === a.action ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+              {a.label}
+            </button>
+          );
+        })}
       </div>
+
+      {showTracking && (
+        <div className="mt-4 rounded-2xl bg-surface-2 p-4 text-[15px]">
+          {tracking?.awb ? (
+            <>
+              <p className="text-ink"><span className="text-muted">Courier:</span> {tracking.courier ?? "—"}</p>
+              <p className="mt-1 text-ink"><span className="text-muted">AWB:</span> {tracking.awb}</p>
+            </>
+          ) : (
+            <p className="text-muted">Tracking details aren&apos;t available yet.</p>
+          )}
+        </div>
+      )}
 
       {reviewing && (
         <div className="mt-4 rounded-2xl bg-surface-2 p-4">
@@ -88,6 +158,9 @@ export function OrderActions({ orderId, status }: { orderId: string; status?: st
       )}
 
       {msg && <p className="mt-3 text-sm font-medium text-ink">{msg}</p>}
+      <p className="mt-3 text-[13px] text-muted">
+        Need help? <Link href="/support" className="font-medium text-ink hover:underline">Contact support</Link>
+      </p>
     </div>
   );
 }

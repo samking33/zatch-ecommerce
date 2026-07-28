@@ -3,12 +3,13 @@ import { ArrowLeft, Package } from "lucide-react";
 import { PageShell } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
-import { OrderActions } from "@/components/orders/order-actions";
+import { OrderActions, type ServerAction } from "@/components/orders/order-actions";
 import { orders as ordersApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { inr } from "@/lib/utils";
 
 type Line = { name?: string; image?: string; qty?: number; price?: number; total?: number };
+type TimelineEvent = { key: string; label: string; description?: string; timestamp?: string | null; isDone?: boolean };
 type Order = {
   _id: string;
   orderId?: string;
@@ -19,9 +20,12 @@ type Order = {
   deliveryAddress?: { label?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
   payment?: { method?: string; status?: string };
   pricing?: { subtotal?: number; discount?: number; shipping?: number; tax?: number; total?: number };
+  // Server-computed UI contract (same one the app renders).
+  timeline?: TimelineEvent[];
+  availableActions?: ServerAction[];
+  tracking?: { awb?: string; courier?: string; isAvailable?: boolean };
+  sellerId?: string | { _id?: string };
 };
-
-const steps = ["pending", "confirmed", "shipped", "delivered"];
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -55,7 +59,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const lines = order.items?.length ? order.items : order.product ? [order.product] : [];
   const p = order.pricing ?? {};
-  const activeStep = Math.max(0, steps.indexOf((order.status ?? "pending").toLowerCase()));
+  // Prefer the server's computed timeline (labels, descriptions, timestamps).
+  const timeline: TimelineEvent[] = order.timeline?.length
+    ? order.timeline.filter((e) => e.key !== "in_transit")
+    : ["pending", "confirmed", "shipped", "delivered"].map((s, i) => ({
+        key: s,
+        label: s,
+        isDone: Math.max(0, ["pending", "confirmed", "shipped", "delivered"].indexOf((order.status ?? "pending").toLowerCase())) >= i,
+      }));
+  const sellerId = typeof order.sellerId === "object" ? order.sellerId?._id : order.sellerId;
 
   return (
     <PageShell>
@@ -74,17 +86,26 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <span className="rounded-full bg-surface-2 px-3 py-1 text-sm font-medium capitalize text-ink">{order.status}</span>
               )}
             </div>
-            {/* status timeline */}
+            {/* server-computed tracking timeline */}
             <div className="mt-6 flex items-center gap-1">
-              {steps.map((s, i) => (
-                <div key={s} className="flex flex-1 items-center gap-1">
-                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${i <= activeStep ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>{i + 1}</span>
-                  {i < steps.length - 1 && <span className={`h-1 flex-1 rounded-full ${i < activeStep ? "bg-lime" : "bg-hairline"}`} />}
+              {timeline.map((e, i) => (
+                <div key={e.key} className="flex flex-1 items-center gap-1">
+                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${e.isDone ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>{i + 1}</span>
+                  {i < timeline.length - 1 && <span className={`h-1 flex-1 rounded-full ${timeline[i + 1].isDone ? "bg-lime" : "bg-hairline"}`} />}
                 </div>
               ))}
             </div>
-            <div className="mt-2 flex justify-between text-[12px] capitalize text-muted">
-              {steps.map((s) => <span key={s}>{s}</span>)}
+            <div className="mt-2 flex justify-between gap-2 text-[12px] capitalize text-muted">
+              {timeline.map((e) => (
+                <span key={e.key} className="flex-1 last:text-right">
+                  {e.label}
+                  {e.timestamp && (
+                    <span className="block text-[11px] normal-case text-muted/70">
+                      {new Date(e.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </span>
+                  )}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -116,7 +137,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </div>
           )}
 
-          <OrderActions orderId={order._id} status={order.status} />
+          <OrderActions
+            orderId={order._id}
+            actions={order.availableActions}
+            sellerId={sellerId}
+            tracking={order.tracking}
+          />
         </div>
 
         <aside className="card h-fit rounded-[1.75rem] p-6 lg:sticky lg:top-28">

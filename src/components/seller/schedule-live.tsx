@@ -27,7 +27,10 @@ export function ScheduleLive() {
       .then((r) => r.json()).catch(() => null);
     setBusy(false);
     if (res?.success) { setOpen(false); router.refresh(); }
-    else setError(res?.message ?? "Couldn't schedule. Try again.");
+    else if (res?.suggestedTime) {
+      // 409 conflict — the backend proposes the next free slot.
+      setError(`${res.message ?? "That slot clashes with another live."} Next free: ${new Date(res.suggestedTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}.`);
+    } else setError(res?.message ?? "Couldn't schedule. Try again.");
   }
 
   if (!open) {

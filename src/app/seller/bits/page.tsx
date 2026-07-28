@@ -4,6 +4,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductMedia } from "@/components/ui/product-media";
 import { UploadBit } from "@/components/seller/upload-bit";
+import { BitActions } from "@/components/seller/bit-actions";
 import { bits as bitsApi, products as productsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
@@ -72,6 +73,9 @@ export default async function SellerBitsPage() {
                   <span className="absolute left-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/85 text-ink">
                     <Play className="h-3 w-3 fill-current" />
                   </span>
+                  <div className="absolute right-2 top-2">
+                    <BitActions bitId={b._id} isActive={(b as { isActive?: boolean }).isActive !== false} />
+                  </div>
                   <div className="absolute inset-x-2 bottom-2">
                     <p className="line-clamp-1 text-[12px] font-semibold text-white">{b.title}</p>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-white/80">
