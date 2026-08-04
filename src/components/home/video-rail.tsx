@@ -27,7 +27,7 @@ export function VideoRail({
           <VideoRailCard key={b._id} bit={b} onOpen={() => setActive(b)} />
         ))}
       </Rail>
-      {active && <BitModal bit={active} onClose={() => setActive(null)} />}
+      {active && <BitModal bit={active} bits={bits} onClose={() => setActive(null)} />}
     </>
   );
 }

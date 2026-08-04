@@ -68,7 +68,7 @@ export function BitsFeed({ bits }: { bits: Bit[] }) {
         ))}
       </div>
 
-      {active && <BitModal bit={active} onClose={() => setActive(null)} />}
+      {active && <BitModal bit={active} bits={bits} onClose={() => setActive(null)} />}
     </>
   );
 }
