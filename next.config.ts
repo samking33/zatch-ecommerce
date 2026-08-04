@@ -12,6 +12,17 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
+    // Seller uploads are raw phone photos (up to ~21MB), and resizing them with
+    // sharp on a 0.5-CPU instance starves the event loop until outbound fetches
+    // time out. Cache each optimized result for a year so a given image is only
+    // ever resized once per container, instead of on every cold request.
+    minimumCacheTTL: 31536000,
+    // One format, not avif+webp: avif costs several times more CPU per image.
+    formats: ["image/webp"],
+    // Cards top out around 224px CSS width, so the huge variants are never used
+    // and only add sharp jobs. Trimmed to what the layouts actually request.
+    imageSizes: [64, 128, 256, 384],
+    deviceSizes: [640, 828, 1080, 1920],
     // Restrict the image optimizer to the app's own CDN + backend, not any host.
     remotePatterns: [
       { protocol: "https", hostname: "zatchp.b-cdn.net" },
