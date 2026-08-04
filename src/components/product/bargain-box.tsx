@@ -73,7 +73,7 @@ export function BargainBox({
       setError("Couldn't send your offer. Try again.");
       return;
     }
-    // 409: you already have a live bargain on this product — point at it.
+    // 409: you already have a live bargain on this product - point at it.
     if (res.existingBargain) {
       setPhase("idle");
       setExisting(res.existingBargain);
@@ -88,7 +88,7 @@ export function BargainBox({
       setCounter(res.counterOffer.price);
       setPhase("countered");
     } else {
-      // pending — seller will respond; treat as sent
+      // pending - seller will respond; treat as sent
       setCounter(res.counterOffer?.price ?? res.currentPrice ?? offer);
       setPhase(res.counterOffer?.price ? "countered" : "accepted");
     }
@@ -136,7 +136,7 @@ export function BargainBox({
               {bargainId ? (
                 <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} />
               ) : (
-                // ponytail: backend didn't return an id — send them to the thread.
+                // ponytail: backend didn't return an id - send them to the thread.
                 <Link href="/bargains" className="pill-lime inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
                   Respond in My bargains
                 </Link>

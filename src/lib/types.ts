@@ -1,4 +1,4 @@
-// Mirrors the shapes returned by zatch-main (Mongoose models). Partial —
+// Mirrors the shapes returned by zatch-main (Mongoose models). Partial -
 // only fields the storefront reads.
 
 export interface ProductImage {

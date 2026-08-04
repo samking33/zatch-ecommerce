@@ -20,7 +20,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Zatch — Shop Live. Name Your Price.",
+    default: "Zatch - Shop Live. Name Your Price.",
     template: "%s · Zatch",
   },
   description:

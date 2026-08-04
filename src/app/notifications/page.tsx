@@ -11,7 +11,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { notifications as notifApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-// The backend tags every notification with one of ~40 types — map to an icon.
+// The backend tags every notification with one of ~40 types - map to an icon.
 const TYPE_ICON: Record<string, LucideIcon> = {
   bargain_new: Tag, bargain_sent: Tag, bargain_accepted: CheckCircle2,
   bargain_auto_accepted: CheckCircle2, bargain_countered: Tag, bargain_rejected: XCircle,

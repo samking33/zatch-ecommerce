@@ -47,7 +47,7 @@ export default function PreferencesPage() {
       <PageHeader
         eyebrow="Account"
         title="Shopping preferences"
-        sub="Pick the categories you care about — we'll tune your feed to match."
+        sub="Pick the categories you care about - we'll tune your feed to match."
       />
 
       {ready && !token ? (

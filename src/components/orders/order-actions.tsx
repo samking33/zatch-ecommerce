@@ -35,7 +35,7 @@ const STYLE: Record<string, string> = {
 };
 
 /** Renders exactly the actions the server says are valid for this order and
- *  role — same contract the mobile app uses (orderController:getAvailableActions). */
+ *  role - same contract the mobile app uses (orderController:getAvailableActions). */
 export function OrderActions({
   orderId,
   actions,
@@ -93,7 +93,7 @@ export function OrderActions({
         router.push("/returns");
         return;
       default:
-        return; // view_details — already here
+        return; // view_details - already here
     }
   }
 
@@ -132,7 +132,7 @@ export function OrderActions({
         <div className="mt-4 rounded-2xl bg-surface-2 p-4 text-[15px]">
           {tracking?.awb ? (
             <>
-              <p className="text-ink"><span className="text-muted">Courier:</span> {tracking.courier ?? "—"}</p>
+              <p className="text-ink"><span className="text-muted">Courier:</span> {tracking.courier ?? "-"}</p>
               <p className="mt-1 text-ink"><span className="text-muted">AWB:</span> {tracking.awb}</p>
             </>
           ) : (

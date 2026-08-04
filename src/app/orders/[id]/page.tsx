@@ -159,7 +159,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <h2 className="font-display text-lg font-semibold text-live">Order cancelled</h2>
               <p className="mt-1.5 text-[15px] text-ink-soft">{order.cancellation.reason}</p>
               <p className="mt-1 text-[13px] text-muted">
-                Cancelled by {order.cancellation.cancelledBy ?? "—"}
+                Cancelled by {order.cancellation.cancelledBy ?? "-"}
                 {order.cancellation.cancelledAt
                   ? ` · ${new Date(order.cancellation.cancelledAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}`
                   : ""}
@@ -193,7 +193,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </p>
           )}
 
-          {/* Seller settlement sheet — only present when the API returns it. */}
+          {/* Seller settlement sheet - only present when the API returns it. */}
           {!!order.paymentSection?.breakdown?.length && (
             <div className="mt-5 border-t border-hairline pt-4">
               <h3 className="font-display text-[15px] font-semibold text-ink">Settlement</h3>

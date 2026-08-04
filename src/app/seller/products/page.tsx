@@ -52,7 +52,7 @@ export default async function SellerProductsPage({
       {list.length === 0 ? (
         <EmptyState
           title="No products yet"
-          sub="List your first product — set a price and a bargain range, and you're live."
+          sub="List your first product - set a price and a bargain range, and you're live."
           cta={<Link href="/seller/products/new" className="pill-lime rounded-full px-6 py-3 text-sm font-semibold">Add a product</Link>}
         />
       ) : (

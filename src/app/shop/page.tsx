@@ -63,10 +63,10 @@ export default async function ShopPage({
       <PageHeader
         eyebrow="Marketplace"
         title="Everything, up for negotiation"
-        sub="Browse the full catalogue. Every price is a starting point — make an offer on anything."
+        sub="Browse the full catalogue. Every price is a starting point - make an offer on anything."
       />
 
-      {/* category pills — use each category's slug, the value products store */}
+      {/* category pills - use each category's slug, the value products store */}
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <Pill href={href(ALL_SLUG)} active={active === ALL_SLUG}>
           All
@@ -104,7 +104,7 @@ export default async function ShopPage({
         {sort && <input type="hidden" name="sort" value={sort} />}
         <span className="text-muted">Price</span>
         <input name="min" defaultValue={min} inputMode="numeric" placeholder="Min ₹" className="h-9 w-24 rounded-full border border-hairline bg-surface-2 px-3.5 text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
-        <span className="text-muted">–</span>
+        <span className="text-muted">-</span>
         <input name="max" defaultValue={max} inputMode="numeric" placeholder="Max ₹" className="h-9 w-24 rounded-full border border-hairline bg-surface-2 px-3.5 text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-hairline px-3.5 py-1.5 text-ink">
           <input type="checkbox" name="stock" value="1" defaultChecked={stock === "1"} className="accent-ink" />

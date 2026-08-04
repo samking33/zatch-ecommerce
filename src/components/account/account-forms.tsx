@@ -103,7 +103,7 @@ function EditProfile({ user }: { user: SessionUser | null }) {
           <Field label="Email" value={f.email} on={set("email")} type="email" />
           {pendingEmail ? (
             <p className="mt-1 text-[12px] font-medium text-live">
-              {pendingEmail} awaiting verification — check your inbox for the code.
+              {pendingEmail} awaiting verification - check your inbox for the code.
             </p>
           ) : emailVerified === false && f.email ? (
             <p className="mt-1 text-[12px] text-muted">Email not verified yet.</p>

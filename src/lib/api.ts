@@ -16,7 +16,7 @@ type Opts = {
 
 /**
  * Single wrapper over the zatch-main REST API (`/api/v1`). Handles reads and
- * mutations, attaches the JWT when given, and never throws — returns null so
+ * mutations, attaches the JWT when given, and never throws - returns null so
  * pages degrade to placeholder data instead of 500-ing when the backend is
  * down. ponytail: one helper, no per-endpoint client classes.
  */
@@ -28,7 +28,7 @@ const DEFAULT_TOKEN = process.env.ZATCH_API_TOKEN;
 const META_KEYS = new Set(["success", "message", "code", "status", "error"]);
 
 // Pagination/meta fields the backend mixes into list envelopes alongside the
-// actual payload key — ignored when guessing which key holds the data.
+// actual payload key - ignored when guessing which key holds the data.
 const PAGING_KEYS = new Set([
   "page", "limit", "total", "count", "hasMore", "hasNext", "hasPrev",
   "pagination", "totalCount", "totalPages", "currentPage", "unreadCount",
@@ -44,7 +44,7 @@ function unwrap<T>(json: unknown, pick?: string): T {
       (k) => !META_KEYS.has(k) && !PAGING_KEYS.has(k),
     );
     if (payloadKeys.length === 1) return obj[payloadKeys[0]] as T;
-    // Multiple candidates (e.g. { orders, bargains }) — prefer the first array.
+    // Multiple candidates (e.g. { orders, bargains }) - prefer the first array.
     const arrayKey = payloadKeys.find((k) => Array.isArray(obj[k]));
     if (arrayKey) return obj[arrayKey] as T;
   }
@@ -68,7 +68,7 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
         : { cache: "no-store" as RequestCache }),
     });
     const json = await res.json().catch(() => null);
-    // 409 carries useful context (e.g. an existing bargain) — hand it back so
+    // 409 carries useful context (e.g. an existing bargain) - hand it back so
     // callers can show it instead of a generic failure.
     if (!res.ok) return res.status === 409 ? (json as T) : null;
     if (json && typeof json === "object" && "success" in json && json.success === false) {
@@ -89,7 +89,7 @@ const qs = (o?: Record<string, string | number | undefined>) => {
   return p ? `?${p}` : "";
 };
 
-// ─── Auth & OTP (/user, /otp, /twilio-sms, /email) ──────────────────────────
+// --- Auth & OTP (/user, /otp, /twilio-sms, /email) ---
 export const auth = {
   register: (b: unknown) => api("/user/register", { method: "POST", body: b }),
   login: (b: unknown) => api("/user/login", { method: "POST", body: b }),
@@ -116,7 +116,7 @@ export const auth = {
     api("/user/forgot-password/verify-and-reset", { method: "POST", body: b }),
 };
 
-// ─── User & profiles (/user) ────────────────────────────────────────────────
+// --- User & profiles (/user) ---
 export const users = {
   profile: (t: string) => api("/user/profile", { token: t, pick: "user" }),
   updateProfile: (b: unknown, t: string) =>
@@ -138,7 +138,7 @@ export const users = {
   review: (b: unknown, t: string) => api("/user/review", { method: "POST", body: b, token: t }),
 };
 
-// ─── Seller onboarding & status (/user/seller) ──────────────────────────────
+// --- Seller onboarding & status (/user/seller) ---
 export type SellerBenefits = {
   header?: { title?: string; images?: string[] };
   features?: { icon?: string; iconBg?: string; title?: string; description?: string }[];
@@ -167,7 +167,7 @@ export const seller = {
     api("/user/record-sale", { method: "POST", body: b, token: t }),
 };
 
-// ─── Products (/product) ────────────────────────────────────────────────────
+// --- Products (/product) ---
 export const products = {
   list: (o?: Record<string, string | number>) => api<Product[]>(`/product/products${qs(o)}`),
   topPicks: () => api<Product[]>("/product/top-picks"),
@@ -199,7 +199,7 @@ export const products = {
     api(`/product/${id}/set-top-pick`, { method: "POST", body: b, token: t }),
 };
 
-// ─── Categories & search (/category, /search) ───────────────────────────────
+// --- Categories & search (/category, /search) ---
 export const categories = {
   list: () => api<Category[]>("/category", { pick: "categories" }),
   subcategories: (id: string) => api(`/category/${id}/subcategories`, { pick: "subCategories" }),
@@ -209,14 +209,14 @@ export const search = {
   popular: () => api<unknown[]>("/search/popular", { pick: "popularSearches" }),
 };
 
-// ─── Trending (/trending) ───────────────────────────────────────────────────
+// --- Trending (/trending) ---
 export const trending = {
   products: () => api<Product[]>("/trending/trending"),
   bits: () => api<Bit[]>("/trending/trending/bits"),
   live: () => api<LiveSession[]>("/trending/trending/live"),
 };
 
-// ─── Cart (/cart) ───────────────────────────────────────────────────────────
+// --- Cart (/cart) ---
 export const cart = {
   get: (t: string) => api("/cart", { token: t, pick: "cart" }),
   update: (b: unknown, t: string) => api("/cart/update", { method: "POST", body: b, token: t }),
@@ -227,7 +227,7 @@ export const cart = {
     api(`/cart/${bargainId}/add-bargain`, { method: "POST", token: t }),
 };
 
-// ─── Coupons (/coupons) ─────────────────────────────────────────────────────
+// --- Coupons (/coupons) ---
 export const coupons = {
   myCoupons: (t: string) => api("/coupons/my-coupons", { token: t }),
   apply: (b: unknown, t: string) => api("/coupons/apply", { method: "POST", body: b, token: t }),
@@ -244,9 +244,9 @@ export const coupons = {
   remove: (id: string, t: string) => api(`/coupons/${id}`, { method: "DELETE", token: t }),
 };
 
-// ─── Checkout & payments (/checkout) ────────────────────────────────────────
+// --- Checkout & payments (/checkout) ---
 export const checkout = {
-  // Dry-run pricing for the checkout screen — resolves bargain prices,
+  // Dry-run pricing for the checkout screen - resolves bargain prices,
   // coupons, shipping and tax without creating an order.
   initiate: (b: unknown, t: string) => api("/checkout/initiate", { method: "POST", body: b, token: t, raw: true }),
   razorpayInitiate: (b: unknown, t: string) =>
@@ -255,7 +255,7 @@ export const checkout = {
     api("/checkout/payment/razorpay/verify", { method: "POST", body: b, token: t }),
 };
 
-// ─── Orders (/orders) ───────────────────────────────────────────────────────
+// --- Orders (/orders) ---
 export const orders = {
   myOrders: (t: string) => api("/orders/my-orders", { token: t }),
   get: (id: string, t: string) => api(`/orders/${id}`, { token: t }),
@@ -279,7 +279,7 @@ export const orders = {
     api(`/orders/${id}/seller-cancel`, { method: "POST", body: b, token: t }),
 };
 
-// ─── Bargains (/bargains) — the core negotiation flow ───────────────────────
+// --- Bargains (/bargains) - the core negotiation flow ---
 export const bargains = {
   create: (b: unknown, t: string) => api("/bargains/create", { method: "POST", body: b, token: t }),
   get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain" }),
@@ -299,7 +299,7 @@ export const bargains = {
     api(`/bargains/${id}/counter`, { method: "POST", body: b, token: t }),
 };
 
-// ─── Addresses (/address) & IFSC (/ifsc) ────────────────────────────────────
+// --- Addresses (/address) & IFSC (/ifsc) ---
 export const address = {
   list: (t: string) => api("/address", { token: t }),
   save: (b: unknown, t: string) => api("/address/save", { method: "POST", body: b, token: t }),
@@ -311,7 +311,7 @@ export const address = {
 };
 export const ifsc = { lookup: (code: string) => api(`/ifsc${qs({ ifsc: code })}`) };
 
-// ─── Live (/live) ───────────────────────────────────────────────────────────
+// --- Live (/live) ---
 export const live = {
   sessions: () => api<LiveSession[]>("/live/sessions"),
   details: (sessionId: string, t?: string) =>
@@ -340,7 +340,7 @@ export const live = {
   ) => api(`/live/session/${sessionId}/action`, { method: "PATCH", body: b, token: t, raw: true }),
 };
 
-// ─── Bits — short shopping videos (/bits) ───────────────────────────────────
+// --- Bits - short shopping videos (/bits) ---
 export const bits = {
   list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits" }),
   get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bit" }),
@@ -357,10 +357,10 @@ export const bits = {
     api(`/bits/${id}/action`, { method: "PATCH", body: b, token: t, raw: true }),
 };
 
-// ─── Notifications & preferences ────────────────────────────────────────────
+// --- Notifications & preferences ---
 export const notifications = {
   list: (t: string) => api("/notifications", { token: t }),
-  // Envelope carries an unreadCount alongside the list — used for the nav badge.
+  // Envelope carries an unreadCount alongside the list - used for the nav badge.
   unreadCount: (t: string) => api<{ unreadCount?: number }>("/notifications", { token: t, raw: true }),
   markRead: (id: string, t: string) => api(`/notifications/${id}/read`, { method: "PUT", token: t }),
   markAllRead: (t: string) => api("/notifications/read-all", { method: "PUT", token: t }),
@@ -373,7 +373,7 @@ export const preferences = {
   update: (b: unknown, t: string) => api("/preference/update", { method: "PUT", body: b, token: t }),
 };
 
-// ─── Seller payments (/payments) ────────────────────────────────────────────
+// --- Seller payments (/payments) ---
 export const payments = {
   summary: (t: string) => api("/payments/summary", { token: t }),
   due: (t: string) => api("/payments/due", { token: t }),
@@ -382,7 +382,7 @@ export const payments = {
   payout: (payoutId: string, t: string) => api(`/payments/payout/${payoutId}`, { token: t, raw: true }),
 };
 
-// ─── Support & legal ────────────────────────────────────────────────────────
+// --- Support & legal ---
 export const content = {
   // backend exposes support as GET (query params), not POST
   support: (o?: Record<string, string>) => api(`/contact/support${qs(o)}`),
@@ -400,5 +400,7 @@ export const catalog = {
   categories: () => categories.list(),
   trending: (t?: string) => api<Product[]>("/trending/trending", { token: t, pick: "products" }),
   liveSessions: (t?: string) => api<LiveSession[]>("/live/sessions", { token: t, pick: "sessions" }),
-  bits: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits" }),
+  // Home shows the whole feed, so new uploads flow in below the existing ones.
+  bits: (t?: string, limit = 100) =>
+    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits" }),
 };

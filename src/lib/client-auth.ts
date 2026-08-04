@@ -98,11 +98,11 @@ export async function register(input: {
   email?: string;
 }): Promise<SessionUser> {
   await post("/user/register", input);
-  // Registration succeeded — sign in to establish the session.
+  // Registration succeeded - sign in to establish the session.
   return login({ phone: input.phone, countryCode: input.countryCode, password: input.password });
 }
 
-// OTP login — the mobile app's primary sign-in. Send a code to the phone,
+// OTP login - the mobile app's primary sign-in. Send a code to the phone,
 // verify it, then log in with method:"otp" (no password required).
 export const otp = {
   send: (phone: string, countryCode: string) =>

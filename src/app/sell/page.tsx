@@ -7,7 +7,7 @@ export const metadata = { title: "Sell on Zatch" };
 
 const perks = [
   { icon: Radio, title: "Go live in a tap", body: "Stream to buyers, demo products, and close deals in real time." },
-  { icon: Tag, title: "Set your bargain rules", body: "Auto-accept thresholds and a price floor — you stay in control." },
+  { icon: Tag, title: "Set your bargain rules", body: "Auto-accept thresholds and a price floor - you stay in control." },
   { icon: Wallet, title: "Fast payouts", body: "Track settlements and get paid to your bank on schedule." },
 ];
 

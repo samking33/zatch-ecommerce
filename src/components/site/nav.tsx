@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Search, Heart, ShoppingBag, Store, Bell } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
+import { CategoryMenu, CategoryStrip } from "./category-menu";
 import { useAuth } from "@/components/auth/auth-provider";
 import { cart as cartApi, notifications as notifApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
@@ -28,7 +29,7 @@ export function Nav() {
     const loadUnread = () =>
       notifApi.unreadCount(t).then((r) => setUnread((r as { unreadCount?: number })?.unreadCount ?? 0));
     loadUnread();
-    // A new notification arrives over the socket — bump the badge live.
+    // A new notification arrives over the socket - bump the badge live.
     return onEvent("new_notification", loadUnread);
   }, [user]);
 
@@ -41,6 +42,7 @@ export function Nav() {
       />
       <nav className="card mx-auto flex max-w-[1400px] items-center gap-3 rounded-[1.5rem] px-3 py-2.5 backdrop-blur-xl sm:px-4">
         <Logo className="shrink-0 pl-1" />
+        <CategoryMenu />
 
         <form
           action="/search"
@@ -97,6 +99,7 @@ export function Nav() {
           </Link>
         </div>
       </nav>
+      <CategoryStrip />
     </header>
   );
 }

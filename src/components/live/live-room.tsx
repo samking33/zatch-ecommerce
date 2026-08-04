@@ -32,7 +32,7 @@ export function LiveRoom({
   const feed = useRef<HTMLDivElement>(null);
   const localId = useRef(0);
 
-  // Seed history once, then take live updates over the socket — same events
+  // Seed history once, then take live updates over the socket - same events
   // the mobile app listens to (newComment / likeUpdated / viewersUpdated).
   useEffect(() => {
     let stop = false;

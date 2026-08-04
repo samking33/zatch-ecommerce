@@ -28,7 +28,7 @@ export default async function MyCouponsPage() {
     return <PageShell><div className="pt-6"><SignInRequired what="your coupons" /></div></PageShell>;
   }
 
-  // /coupons/my-coupons currently 500s on the backend — degrade gracefully
+  // /coupons/my-coupons currently 500s on the backend - degrade gracefully
   // rather than blowing up the page.
   const list = ((await couponsApi.myCoupons(t)) as Coupon[] | null) ?? [];
 

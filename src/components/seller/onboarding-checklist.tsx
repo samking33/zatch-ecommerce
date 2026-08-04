@@ -22,7 +22,7 @@ export function OnboardingChecklist({
   if (items.length === 0) return null;
 
   const pct = completion?.percentage ?? 0;
-  if (pct >= 100) return null; // fully set up — get out of the seller's way
+  if (pct >= 100) return null; // fully set up - get out of the seller's way
 
   return (
     <div className="card mb-4 rounded-[1.75rem] p-6">

@@ -15,7 +15,7 @@ export default function AboutPage() {
       <PageHeader
         eyebrow="Our story"
         title="Commerce should feel like a conversation"
-        sub="Zatch brings the energy of a real bazaar online — live sellers, short video, and prices you negotiate yourself."
+        sub="Zatch brings the energy of a real bazaar online - live sellers, short video, and prices you negotiate yourself."
       />
       <div className="grid gap-4 md:grid-cols-4">
         {stats.map(([n, l]) => (
@@ -32,7 +32,7 @@ export default function AboutPage() {
         </p>
         <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-soft">
           We started Zatch because online stores flattened everything that made
-          shopping human — the demo, the haggle, the trust between buyer and
+          shopping human - the demo, the haggle, the trust between buyer and
           seller. Live bargaining puts all of that back, at internet scale.
         </p>
       </div>

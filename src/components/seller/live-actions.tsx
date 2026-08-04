@@ -7,7 +7,7 @@ import { live as liveApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 /** Seller controls for a scheduled/live session:
- *  End (live) · Reschedule · Cancel — PATCH /live/session/:id/action. */
+ *  End (live) · Reschedule · Cancel - PATCH /live/session/:id/action. */
 export function LiveActions({ sessionId, status }: { sessionId: string; status?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);

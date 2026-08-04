@@ -9,7 +9,7 @@ import { getToken } from "@/lib/client-auth";
 import { compact } from "@/lib/utils";
 import type { Product, ProductComment, ProductReview } from "@/lib/types";
 
-/** Like / save / share row — mirrors the mobile product screen's actions. */
+/** Like / save / share row - mirrors the mobile product screen's actions. */
 export function ProductActions({ product }: { product: Product }) {
   const router = useRouter();
   const [liked, setLiked] = useState(!!product.isLiked);

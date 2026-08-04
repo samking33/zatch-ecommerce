@@ -41,7 +41,7 @@ export function ProductView({ product }: { product: Product }) {
 
   const [size, setSize] = useState<string | undefined>(sizes[0]);
 
-  // Per-variant availability — backend sends isOutOfStock/stock on each combo.
+  // Per-variant availability - backend sends isOutOfStock/stock on each combo.
   const soldOut = (v?: Variant) => !!v && (v.isOutOfStock === true || v.stock === 0);
   const colorSoldOut = (c: string) =>
     variants.filter((v) => v.color === c).every((v) => soldOut(v));

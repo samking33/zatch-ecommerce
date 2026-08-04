@@ -10,7 +10,7 @@ type Row = { productId: string; name: string; autoAcceptDiscount: number; maximu
 
 /** Real 3-step live wizard (liveController.scheduleLiveSessionStep):
  *  1 draft + products, 2 per-product bargain settings, 3 title/time → queued.
- *  Step 3 is what actually schedules it — steps 1-2 alone leave a hidden draft. */
+ *  Step 3 is what actually schedules it - steps 1-2 alone leave a hidden draft. */
 export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);

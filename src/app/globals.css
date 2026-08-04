@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
-/* ─────────────────────────────────────────────────────────────
-   Zatch storefront — "editorial commerce" light bento system.
+/* ---
+   Zatch storefront - "editorial commerce" light bento system.
    Palette: warm sage-grey canvas, near-white glass surfaces,
    rich ink, Zatch lime (#CAFE38) as the single accent, a live-red
    used only for broadcast indicators.
-   ───────────────────────────────────────────────────────────── */
+   --- */
 @theme {
   --font-display: var(--font-inter-tight), "Inter Tight", sans-serif;
   --font-sans: var(--font-inter), "Inter", sans-serif;
@@ -74,7 +74,7 @@
 }
 
 @layer components {
-  /* Glassy card — the bento building block */
+  /* Glassy card - the bento building block */
   .card {
     background: var(--color-surface);
     border: 1px solid var(--color-hairline);
@@ -93,7 +93,7 @@
     box-shadow: 0 34px 60px -30px rgba(18, 20, 14, 0.38);
   }
 
-  /* Lime pill — the primary CTA */
+  /* Lime pill - the primary CTA */
   .pill-lime {
     background: var(--color-lime);
     color: var(--color-lime-ink);
@@ -141,6 +141,16 @@
 @keyframes float-y {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-14px); }
+}
+
+/* Hero feed columns: the list is rendered twice, so -50% loops seamlessly. */
+@keyframes marquee-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes marquee-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -11,7 +11,7 @@ export default async function SellerRegisterPage() {
 
   return (
     <SellerShell>
-      <SellerHeader title="Become a seller" sub="Three steps to start selling — shop details, pickup address, and bank info for payouts." />
+      <SellerHeader title="Become a seller" sub="Three steps to start selling - shop details, pickup address, and bank info for payouts." />
       <SellerRegister />
     </SellerShell>
   );

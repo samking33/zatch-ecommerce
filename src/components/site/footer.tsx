@@ -41,7 +41,7 @@ export function Footer() {
             <Logo />
             <p className="mt-4 text-[15px] leading-relaxed text-muted">
               India&apos;s first live bargain marketplace. Watch, negotiate, and
-              own it — in real time.
+              own it - in real time.
             </p>
           </div>
           {groups.map((g) => (

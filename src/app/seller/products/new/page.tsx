@@ -20,7 +20,7 @@ export default async function NewProductPage() {
 
   return (
     <SellerShell>
-      <SellerHeader title="Add product" sub="Three quick steps — basics, colours, images." />
+      <SellerHeader title="Add product" sub="Three quick steps - basics, colours, images." />
       <CreateProduct categories={cats} />
     </SellerShell>
   );

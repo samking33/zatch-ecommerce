@@ -61,7 +61,7 @@ export default async function SearchPage({
           </h2>
           {pop.length === 0 ? (
             <div className="card grid place-items-center rounded-[2rem] px-6 py-12 text-center">
-              <p className="text-muted">Nothing trending yet — try searching for anything.</p>
+              <p className="text-muted">Nothing trending yet - try searching for anything.</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

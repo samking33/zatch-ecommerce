@@ -72,7 +72,7 @@ export default function CheckoutPage() {
 
   const items = cart?.items ?? [];
 
-  // Server-side price preview (bargains, coupon, shipping, tax) — recomputed
+  // Server-side price preview (bargains, coupon, shipping, tax) - recomputed
   // whenever the chosen address changes, since shipping can depend on it.
   const [preview, setPreview] = useState<Preview | null>(null);
   useEffect(() => {

@@ -128,7 +128,7 @@ export function SellerRegister() {
         </div>
       )}
 
-      {/* Step 4 — accepting T&C is what actually submits the application. */}
+      {/* Step 4 - accepting T&C is what actually submits the application. */}
       {step === 4 && (
         <div className="grid gap-4">
           <p className="text-[15px] text-muted">

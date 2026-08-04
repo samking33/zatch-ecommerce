@@ -39,7 +39,7 @@ export function BuyerBargainActions({
     const ok = await bargainsApi.acceptCounter(bargainId, t);
     if (ok) await cartApi.addBargain(bargainId, t);
     setBusy(null);
-    if (ok) { setDone("Accepted — added to cart"); router.refresh(); }
+    if (ok) { setDone("Accepted - added to cart"); router.refresh(); }
   }
 
   async function reject() {
