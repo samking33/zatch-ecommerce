@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Radio, Tag, Wallet, ArrowUpRight } from "lucide-react";
 import { PageShell } from "@/components/site/page-shell";
 import { ProductOrb } from "@/components/ui/product-orb";
+import { serverToken } from "@/lib/session";
+import { sellerGate } from "@/lib/seller-gate";
 
 export const metadata = { title: "Sell on Zatch" };
 
@@ -11,7 +13,25 @@ const perks = [
   { icon: Wallet, title: "Fast payouts", body: "Track settlements and get paid to your bank on schedule." },
 ];
 
-export default function SellPage() {
+// Show the onboarding CTA only to people who are not already sellers. An
+// approved seller sees a link into their console; a pending applicant sees a
+// review notice instead of being sent back through registration.
+async function sellerState(): Promise<"guest" | "buyer" | "pending" | "seller"> {
+  const token = await serverToken();
+  if (!token) return "guest";
+  try {
+    const { approved, status } = await sellerGate(token);
+    if (approved) return "seller";
+    if (status === "pending" || status === "submitted" || status === "under_review") return "pending";
+    return "buyer";
+  } catch {
+    return "buyer";
+  }
+}
+
+export default async function SellPage() {
+  const state = await sellerState();
+
   return (
     <PageShell>
       <section className="card relative mt-6 overflow-hidden rounded-[2rem] p-8 sm:p-12">
@@ -30,15 +50,35 @@ export default function SellPage() {
             Zatch handles payments, delivery, and payouts.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/seller/register" className="pill-lime inline-flex items-center gap-3 rounded-full py-3.5 pl-6 pr-3.5 text-[15px] font-semibold">
-              Become a seller
-              <span className="btn-ink grid h-8 w-8 place-items-center rounded-full">
-                <ArrowUpRight className="h-4 w-4" />
-              </span>
-            </Link>
-            <Link href="/seller/dashboard" className="rounded-full border border-hairline px-6 py-3.5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-2">
-              Seller dashboard
-            </Link>
+            {state === "seller" ? (
+              <>
+                <Link href="/seller/dashboard" className="pill-lime inline-flex items-center gap-3 rounded-full py-3.5 pl-6 pr-3.5 text-[15px] font-semibold">
+                  Go to seller dashboard
+                  <span className="btn-ink grid h-8 w-8 place-items-center rounded-full">
+                    <ArrowUpRight className="h-4 w-4" />
+                  </span>
+                </Link>
+                <Link href="/seller/live" className="rounded-full border border-hairline px-6 py-3.5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-2">
+                  Go live
+                </Link>
+              </>
+            ) : state === "pending" ? (
+              <>
+                <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-6 py-3.5 text-[15px] font-medium text-ink">
+                  Application under review
+                </span>
+                <Link href="/seller/dashboard" className="rounded-full border border-hairline px-6 py-3.5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-2">
+                  Seller dashboard
+                </Link>
+              </>
+            ) : (
+              <Link href="/seller/register" className="pill-lime inline-flex items-center gap-3 rounded-full py-3.5 pl-6 pr-3.5 text-[15px] font-semibold">
+                Become a seller
+                <span className="btn-ink grid h-8 w-8 place-items-center rounded-full">
+                  <ArrowUpRight className="h-4 w-4" />
+                </span>
+              </Link>
+            )}
           </div>
         </div>
       </section>

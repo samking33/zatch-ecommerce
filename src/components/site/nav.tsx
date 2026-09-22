@@ -38,7 +38,7 @@ export function Nav() {
       {/* frosted backdrop that masks content scrolling under the floating pill */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-[#dbf29a]/85 via-[#dbf29a]/55 to-transparent backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black,black_60%,transparent)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-canvas/90 via-canvas/60 to-transparent backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black,black_60%,transparent)]"
       />
       <nav className="card mx-auto flex max-w-[1400px] items-center gap-3 rounded-[1.5rem] px-3 py-2.5 backdrop-blur-xl sm:px-4">
         <Logo className="shrink-0 pl-1" />

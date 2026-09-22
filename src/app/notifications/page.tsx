@@ -31,8 +31,42 @@ const TYPE_ICON: Record<string, LucideIcon> = {
 };
 
 // Notification types the backend pairs with an in-app destination.
+// The backend's actionUrl values are mobile-app deep links (e.g. /seller/orders/<id>,
+// /profile, /seller/kyc) whose paths do not all exist as web routes. Translate the
+// ones that diverge to their web equivalent before navigating, so a tapped
+// notification never lands on a 404.
+function translateActionUrl(url: string): string | undefined {
+  // exact-path deep links
+  const exact: Record<string, string> = {
+    "/profile": "/account",
+    "/settings/security": "/account",
+    "/seller/kyc": "/seller/settings",
+    "/seller/payments": "/seller/payouts",
+  };
+  if (exact[url]) return exact[url];
+
+  // /<mobile>/<id> -> /<web>/<id>
+  const seg = url.split("/").filter(Boolean); // e.g. ["seller","orders","<id>"]
+  const id = seg[seg.length - 1];
+  if (url.startsWith("/seller/orders/")) return `/orders/${id}`;        // web has no /seller/orders/[id]
+  if (url.startsWith("/seller/live/summary/")) return "/seller/live";
+  if (url.startsWith("/seller/live/")) return "/seller/live";
+  if (url.startsWith("/checkout/")) return "/bargains";                 // id is a bargainId; no /checkout/[id] on web
+  if (url.startsWith("/live/")) return "/live";                          // web routes live by channelName, not id
+  if (url.startsWith("/profile/")) return `/seller/${id}`;
+
+  // paths that already exist on the web as-is
+  const okPrefixes = ["/orders", "/bargains", "/product", "/cart", "/seller/dashboard", "/seller/payouts"];
+  if (okPrefixes.some((p) => url === p || url.startsWith(p + "/"))) return url;
+
+  return undefined; // unknown deep link -> let the type-based fallback decide
+}
+
 function hrefFor(n: { type?: string; actionUrl?: string }): string | undefined {
-  if (n.actionUrl?.startsWith("/")) return n.actionUrl;
+  if (n.actionUrl?.startsWith("/")) {
+    const mapped = translateActionUrl(n.actionUrl);
+    if (mapped) return mapped;
+  }
   const t = n.type ?? "";
   if (t.startsWith("bargain_")) return "/bargains";
   if (t.startsWith("order_") || t.startsWith("return_") || t.startsWith("refund_")) return "/orders";
