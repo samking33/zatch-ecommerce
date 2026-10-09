@@ -7,8 +7,8 @@ import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
-import { cart as cartApi } from "@/lib/api";
-import { getToken } from "@/lib/client-auth";
+import { cart as cartApi, apiError } from "@/lib/api";
+import { getToken, setAppliedCoupon } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
 
 type CartItem = {
@@ -107,17 +107,21 @@ export default function CartPage() {
 
   async function applyCoupon() {
     if (!token || !coupon.trim()) return;
-    const res = await cartApi.applyCoupon({ code: coupon.trim().toUpperCase() }, token);
-    if (res) {
-      setCart((await cartApi.get(token)) as Cart);
-      setCouponMsg({ ok: true, text: "Coupon applied" });
-    } else {
-      setCouponMsg({ ok: false, text: "Invalid or expired coupon" });
+    const code = coupon.trim().toUpperCase();
+    const res = await cartApi.applyCoupon({ code }, token);
+    const failure = apiError(res, "Couldn't apply the coupon. Try again.");
+    if (failure) {
+      setCouponMsg({ ok: false, text: failure });
+      return;
     }
+    setAppliedCoupon(code);
+    setCart((await cartApi.get(token)) as Cart);
+    setCouponMsg({ ok: true, text: "Coupon applied" });
   }
   async function removeCoupon() {
     if (!token) return;
     await cartApi.removeCoupon(token);
+    setAppliedCoupon(undefined);
     setCart((await cartApi.get(token)) as Cart);
     setCoupon("");
     setCouponMsg(null);

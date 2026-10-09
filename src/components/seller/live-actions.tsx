@@ -20,8 +20,10 @@ export function LiveActions({ sessionId, status }: { sessionId: string; status?:
     const t = getToken();
     if (!t || !window.confirm("End this live stream? Viewers will be disconnected.")) return;
     setBusy("end");
-    await liveApi.end(sessionId, t);
+    setErr(null);
+    const res = await liveApi.end(sessionId, t);
     setBusy(null);
+    if (!res) { setErr("Couldn't end the live. Try again."); return; }
     router.refresh();
   }
 
@@ -62,7 +64,8 @@ export function LiveActions({ sessionId, status }: { sessionId: string; status?:
   }
 
   return (
-    <div className="flex shrink-0 gap-1.5">
+    <div className="flex shrink-0 flex-col items-end gap-1">
+    <div className="flex gap-1.5">
       {isLive ? (
         <button onClick={end} disabled={busy === "end"} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3 py-2 text-[13px] font-medium text-live hover:bg-live/5 disabled:opacity-60">
           {busy === "end" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />} End
@@ -77,6 +80,8 @@ export function LiveActions({ sessionId, status }: { sessionId: string; status?:
           </button>
         </>
       )}
+    </div>
+    {err && <p role="alert" className="text-right text-[12px] font-medium text-live">{err}</p>}
     </div>
   );
 }

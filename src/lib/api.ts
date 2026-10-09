@@ -87,6 +87,13 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
   }
 }
 
+/** For calls made with keepError: the reason the server rejected the request, or null if it accepted it. */
+export function apiError(res: unknown, fallback: string): string | null {
+  if (res === null || res === undefined) return fallback;
+  const r = res as { success?: boolean; message?: string };
+  return r.success === false ? r.message ?? fallback : null;
+}
+
 const qs = (o?: Record<string, string | number | undefined>) => {
   if (!o) return "";
   const p = Object.entries(o)
@@ -102,7 +109,7 @@ export const auth = {
   login: (b: unknown) => api("/user/login", { method: "POST", body: b }),
   logout: (t: string) => api("/user/logout", { method: "POST", token: t }),
   changePassword: (b: unknown, t: string) =>
-    api("/user/change-password", { method: "PUT", body: b, token: t }),
+    api("/user/change-password", { method: "PUT", body: b, token: t, keepError: true }),
   deleteAccount: (t: string) =>
     api("/user/delete-account", { method: "DELETE", token: t }),
   // OTP (phone + email combined, or individually)
@@ -125,7 +132,7 @@ export const auth = {
 
 // --- User & profiles (/user) ---
 export const users = {
-  profile: (t: string) => api("/user/profile", { token: t, pick: "user" }),
+  profile: (t: string) => api("/user/profile", { token: t, pick: "user", revalidate: 0 }),
   // Returns the full envelope (even on 4xx) so callers can handle the
   // "verify email OTP" response when the email is being changed.
   updateProfile: (b: unknown, t: string) =>
@@ -173,7 +180,7 @@ export const seller = {
   status: (t: string) =>
     api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true, revalidate: 0 }),
   terms: () => api("/user/seller/terms-and-conditions"),
-  profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t, raw: true }),
+  profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t, raw: true, revalidate: 0 }),
   benefits: (t: string) => api<SellerBenefits>("/user/seller/benefits", { token: t, pick: "data" }),
   recordSale: (b: unknown, t: string) =>
     api("/user/record-sale", { method: "POST", body: b, token: t }),
@@ -185,7 +192,7 @@ export const products = {
   list: (o?: Record<string, string | number>) => api<Product[]>(`/product/products${qs(o)}`, { version: "v2" }),
   topPicks: () => api<Product[]>("/product/top-picks", { version: "v2" }),
   // Backend search param is `query` (not `q`).
-  search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products", version: "v2" }),
+  search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
   searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ query: q })}`, { token: t, pick: "products", revalidate: 0 }),
   filter: (o: Record<string, string | number | undefined>, t?: string) =>
     api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products", version: "v2" }),
@@ -208,7 +215,7 @@ export const products = {
   review: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/review`, { method: "POST", body: b, token: t }),
   setBargainSettings: (id: string, b: unknown, t: string) =>
-    api(`/product/${id}/bargain-settings`, { method: "POST", body: b, token: t }),
+    api(`/product/${id}/bargain-settings`, { method: "POST", body: b, token: t, keepError: true }),
   setGlobalBargain: (b: unknown, t: string) =>
     api("/product/global-bargain-settings", { method: "POST", body: b, token: t }),
   setTopPick: (id: string, b: unknown, t: string) =>
@@ -234,10 +241,10 @@ export const trending = {
 
 // --- Cart (/cart) ---
 export const cart = {
-  get: (t: string) => api("/cart", { token: t, pick: "cart" }),
+  get: (t: string) => api("/cart", { token: t, pick: "cart", revalidate: 0 }),
   update: (b: unknown, t: string) => api("/cart/update", { method: "POST", body: b, token: t }),
   remove: (b: unknown, t: string) => api("/cart/remove", { method: "POST", body: b, token: t }),
-  applyCoupon: (b: unknown, t: string) => api("/cart/coupon", { method: "POST", body: b, token: t }),
+  applyCoupon: (b: unknown, t: string) => api("/cart/coupon", { method: "POST", body: b, token: t, keepError: true }),
   removeCoupon: (t: string) => api("/cart/coupon", { method: "DELETE", token: t }),
   addBargain: (bargainId: string, t: string) =>
     api(`/cart/${bargainId}/add-bargain`, { method: "POST", token: t }),
@@ -245,17 +252,17 @@ export const cart = {
 
 // --- Coupons (/coupons) ---
 export const coupons = {
-  myCoupons: (t: string) => api("/coupons/my-coupons", { token: t }),
+  myCoupons: (t: string) => api("/coupons/my-coupons", { token: t, revalidate: 0 }),
   apply: (b: unknown, t: string) => api("/coupons/apply", { method: "POST", body: b, token: t }),
   markUsed: (b: unknown, t: string) => api("/coupons/mark-used", { method: "POST", body: b, token: t }),
   trackView: (b: unknown) => api("/coupons/track-view", { method: "POST", body: b }),
   // seller-side
-  list: (t: string) => api("/coupons/list", { token: t }),
+  list: (t: string) => api("/coupons/list", { token: t, revalidate: 0 }),
   dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true, revalidate: 0 }),
-  get: (id: string, t: string) => api(`/coupons/${id}`, { token: t }),
-  create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t }),
+  get: (id: string, t: string) => api(`/coupons/${id}`, { token: t, revalidate: 0 }),
+  create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t, keepError: true }),
   update: (id: string, b: unknown, t: string) =>
-    api(`/coupons/${id}`, { method: "PUT", body: b, token: t }),
+    api(`/coupons/${id}`, { method: "PUT", body: b, token: t, keepError: true }),
   toggle: (id: string, t: string) => api(`/coupons/${id}/toggle`, { method: "POST", token: t }),
   remove: (id: string, t: string) => api(`/coupons/${id}`, { method: "DELETE", token: t }),
 };
@@ -264,21 +271,21 @@ export const coupons = {
 export const checkout = {
   // Dry-run pricing for the checkout screen - resolves bargain prices,
   // coupons, shipping and tax without creating an order.
-  initiate: (b: unknown, t: string) => api("/checkout/initiate", { method: "POST", body: b, token: t, raw: true }),
+  initiate: (b: unknown, t: string) => api("/checkout/initiate", { method: "POST", body: b, token: t, raw: true, keepError: true }),
   razorpayInitiate: (b: unknown, t: string) =>
-    api("/checkout/payment/razorpay/initiate", { method: "POST", body: b, token: t }),
+    api("/checkout/payment/razorpay/initiate", { method: "POST", body: b, token: t, keepError: true }),
   razorpayVerify: (b: unknown, t: string) =>
-    api("/checkout/payment/razorpay/verify", { method: "POST", body: b, token: t }),
+    api("/checkout/payment/razorpay/verify", { method: "POST", body: b, token: t, keepError: true }),
 };
 
 // --- Orders (/orders) ---
 export const orders = {
-  myOrders: (t: string) => api("/orders/my-orders", { token: t }),
-  get: (id: string, t: string) => api(`/orders/${id}`, { token: t }),
+  myOrders: (t: string) => api("/orders/my-orders", { token: t, revalidate: 0 }),
+  get: (id: string, t: string) => api(`/orders/${id}`, { token: t, revalidate: 0 }),
   create: (b: unknown, t: string) => api("/orders/create", { method: "POST", body: b, token: t }),
   createDirect: (b: unknown, t: string) => api("/orders/create-direct", { method: "POST", body: b, token: t }),
   verifyPayment: (b: unknown, t: string) => api("/orders/verify-payment", { method: "POST", body: b, token: t }),
-  cancel: (id: string, b: unknown, t: string) => api(`/orders/${id}/cancel`, { method: "POST", body: b, token: t }),
+  cancel: (id: string, b: unknown, t: string) => api(`/orders/${id}/cancel`, { method: "POST", body: b, token: t, keepError: true }),
   review: (id: string, b: unknown, t: string) => api(`/orders/${id}/review`, { method: "POST", body: b, token: t }),
   generateInvoice: (id: string, t: string) => api(`/orders/${id}/generate-invoice`, { method: "POST", token: t, raw: true }),
   invoiceUrl: (fileName: string) => `${BASE}/api/v1/orders/invoice/download/${fileName}`,
@@ -288,11 +295,11 @@ export const orders = {
   sellerOrdersRaw: (t: string, o?: Record<string, string | undefined>) =>
     api(`/orders/seller/orders${qs(o)}`, { token: t, raw: true, revalidate: 0 }),
   sellerDashboard: (t: string) => api("/orders/seller/dashboard", { token: t, raw: true, revalidate: 0 }),
-  groupedBySeller: (t: string) => api("/orders/grouped-by-seller", { token: t }),
+  groupedBySeller: (t: string) => api("/orders/grouped-by-seller", { token: t, revalidate: 0 }),
   updateStatus: (id: string, b: unknown, t: string) =>
-    api(`/orders/seller/orders/${id}/update-status`, { method: "POST", body: b, token: t }),
+    api(`/orders/seller/orders/${id}/update-status`, { method: "POST", body: b, token: t, keepError: true }),
   sellerCancel: (id: string, b: unknown, t: string) =>
-    api(`/orders/${id}/seller-cancel`, { method: "POST", body: b, token: t }),
+    api(`/orders/${id}/seller-cancel`, { method: "POST", body: b, token: t, keepError: true }),
 };
 
 // --- Bargains (/bargains) - the core negotiation flow ---
@@ -311,7 +318,7 @@ export const bargains = {
   // low", "Bargaining not enabled"...). Callers must check `success === false`.
   create: (b: unknown, t: string) =>
     api("/bargains/create", { method: "POST", body: b, token: t, keepError: true }),
-  get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain" }),
+  get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain", revalidate: 0 }),
   // Tab names are not stored statuses: fetching all avoids filtering them out
   // before the backend formats their effective (including expired) status.
   myBargains: (t: string) =>
@@ -321,7 +328,7 @@ export const bargains = {
   acceptCounter: (id: string, t: string) => api(`/bargains/${id}/accept-counter`, { method: "POST", token: t }),
   rejectCounter: (id: string, t: string) => api(`/bargains/${id}/reject-counter`, { method: "POST", token: t }),
   // seller-side
-  sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t, pick: "bargains" }),
+  sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t, pick: "bargains", revalidate: 0 }),
   sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t, raw: true, revalidate: 0 }),
   accept: (id: string, t: string) => api(`/bargains/${id}/accept`, { method: "POST", token: t }),
   reject: (id: string, t: string) => api(`/bargains/${id}/reject`, { method: "POST", token: t }),
@@ -331,9 +338,9 @@ export const bargains = {
 
 // --- Addresses (/address) & IFSC (/ifsc) ---
 export const address = {
-  list: (t: string) => api("/address", { token: t }),
-  save: (b: unknown, t: string) => api("/address/save", { method: "POST", body: b, token: t }),
-  update: (id: string, b: unknown, t: string) => api(`/address/${id}`, { method: "PUT", body: b, token: t }),
+  list: (t: string) => api("/address", { token: t, revalidate: 0 }),
+  save: (b: unknown, t: string) => api("/address/save", { method: "POST", body: b, token: t, keepError: true }),
+  update: (id: string, b: unknown, t: string) => api(`/address/${id}`, { method: "PUT", body: b, token: t, keepError: true }),
   remove: (id: string, t: string) => api(`/address/${id}`, { method: "DELETE", token: t }),
   geocode: (lat: number, lng: number, t?: string) =>
     api<{ formatted?: string; line1?: string; city?: string; state?: string; pincode?: string }>(
@@ -373,8 +380,9 @@ export const live = {
 // --- Bits - short shopping videos (/bits) ---
 export const bits = {
   // Public reads via v2 (optionalAuth) so the feed shows without login.
-  list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits", version: "v2" }),
-  get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bit", version: "v2" }),
+  list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits", version: "v2", revalidate: t ? 0 : 60 }),
+  // The single-bit endpoint wraps the bit as `bitsDetails` (the list endpoint uses `bits`).
+  get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bitsDetails", version: "v2", revalidate: t ? 0 : 60 }),
   dashboard: (t: string) => api("/bits/dashboard", { token: t, raw: true, revalidate: 0 }),
   uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true, revalidate: 0 }),
   upload: (b: unknown, t: string) => api("/bits/upload", { method: "POST", body: b, token: t }),
@@ -390,7 +398,7 @@ export const bits = {
 
 // --- Notifications & preferences ---
 export const notifications = {
-  list: (t: string) => api("/notifications", { token: t }),
+  list: (t: string) => api("/notifications", { token: t, revalidate: 0 }),
   // Envelope carries an unreadCount alongside the list - used for the nav badge.
   unreadCount: (t: string) => api<{ unreadCount?: number }>("/notifications", { token: t, raw: true, revalidate: 0 }),
   markRead: (id: string, t: string) => api(`/notifications/${id}/read`, { method: "PUT", token: t }),
@@ -398,7 +406,7 @@ export const notifications = {
   remove: (id: string, t: string) => api(`/notifications/${id}`, { method: "DELETE", token: t }),
 };
 export const preferences = {
-  get: (t: string) => api("/preference", { token: t }),
+  get: (t: string) => api("/preference", { token: t, revalidate: 0 }),
   categories: () => api("/preference/categories"),
   save: (b: unknown, t: string) => api("/preference/save", { method: "POST", body: b, token: t }),
   update: (b: unknown, t: string) => api("/preference/update", { method: "PUT", body: b, token: t }),
@@ -406,10 +414,10 @@ export const preferences = {
 
 // --- Seller payments (/payments) ---
 export const payments = {
-  summary: (t: string) => api("/payments/summary", { token: t }),
-  due: (t: string) => api("/payments/due", { token: t }),
-  done: (t: string) => api("/payments/done", { token: t }),
-  adjustments: (t: string) => api("/payments/adjustments", { token: t }),
+  summary: (t: string) => api("/payments/summary", { token: t, revalidate: 0 }),
+  due: (t: string) => api("/payments/due", { token: t, revalidate: 0 }),
+  done: (t: string) => api("/payments/done", { token: t, revalidate: 0 }),
+  adjustments: (t: string) => api("/payments/adjustments", { token: t, revalidate: 0 }),
   payout: (payoutId: string, t: string) => api(`/payments/payout/${payoutId}`, { token: t, raw: true, revalidate: 0 }),
 };
 
@@ -428,13 +436,13 @@ export const content = {
 // visitors see products and bits without any token. The token is still passed
 // when present so a signed-in user gets personalised fields (liked/saved).
 export const catalog = {
-  topPicks: (t?: string) => api<Product[]>("/product/top-picks", { token: t, pick: "products", version: "v2" }),
-  products: (q = "", t?: string) => api<Product[]>(`/product/products${q}`, { token: t, pick: "products", version: "v2" }),
-  product: (id: string, t?: string) => api<Product>(`/product/${id}`, { token: t, pick: "product", version: "v2" }),
+  topPicks: (t?: string) => api<Product[]>("/product/top-picks", { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
+  products: (q = "", t?: string) => api<Product[]>(`/product/products${q}`, { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
+  product: (id: string, t?: string) => api<Product>(`/product/${id}`, { token: t, pick: "product", version: "v2", revalidate: t ? 0 : 60 }),
   categories: () => categories.list(),
   trending: (t?: string) => api<Product[]>("/trending/trending", { token: t, pick: "products", revalidate: 0 }),
   liveSessions: (t?: string) => api<LiveSession[]>("/live/sessions", { token: t, pick: "sessions" }),
   // Home shows the whole feed, so new uploads flow in below the existing ones.
   bits: (t?: string, limit = 100) =>
-    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits", version: "v2" }),
+    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits", version: "v2", revalidate: t ? 0 : 60 }),
 };

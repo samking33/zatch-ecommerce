@@ -8,8 +8,9 @@ import type { Category } from "@/lib/types";
 
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 
-// Real 3-step create matching the backend: step 1 (basics → productId),
-// step 2 (colors), step 3 (multipart images + sizes).
+// Real 4-step create matching the backend: step 1 (basics → productId),
+// step 2 (colors), step 3 (multipart images + sizes), step 4 (stock per variant).
+// Step 4 is what creates the variants and makes the product active.
 export function CreateProduct({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -27,6 +28,9 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   const [sizes, setSizes] = useState<string[]>([]);
   const [sizeInput, setSizeInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  // Extra images per colour (keyed by lower-cased colour) and stock per variant row.
+  const [colorFiles, setColorFiles] = useState<Record<string, File[]>>({});
+  const [stock, setStock] = useState<Record<string, string>>({});
 
   // The backend uppercases sizes, so compare case-insensitively ("s" and "S" are one size).
   const hasSize = (v: string) => sizes.some((x) => x.toLowerCase() === v.toLowerCase());
@@ -35,17 +39,19 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     if (s && !hasSize(s)) setSizes([...sizes, s]);
   };
 
+  // The backend lower-cases colours and upper-cases sizes, so key everything the same way.
+  const colorKey = (c: string) => c.trim().toLowerCase();
+
   const cat = categories.find((c) => c.slug === s1.category);
   const subs = (cat?.subCategories ?? []) as { name: string; slug: string }[];
 
   async function postJson(body: unknown) {
     const t = getToken();
-    const res = await fetch("/api/v1/product/create", {
+    return fetch("/api/v1/product/create", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
       body: JSON.stringify(body),
-    });
-    return res.json().catch(() => null);
+    }).then((r) => r.json()).catch(() => null);
   }
 
   async function submitStep1(e: React.FormEvent) {
@@ -59,9 +65,17 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
       totalStock: Number(s1.totalStock || 0), hasColor: s1.hasColor, hasSize: s1.hasSize,
       bargainSettings: { autoAcceptDiscount: Number(s1.autoAcceptDiscount), maximumDiscount: Number(s1.maximumDiscount) },
     });
+    if (!res?.success || !res.productId) {
+      setBusy(false);
+      setError(res?.message ?? "Couldn't save. Check the fields.");
+      return;
+    }
+    setProductId(res.productId);
+    if (s1.hasColor) { setBusy(false); setStep(2); return; }
+    // The server only lets step 3 run after step 2, so a product without colours still records an empty step 2.
+    const skip = await postJson({ step: "2", productId: res.productId, colors: [] });
     setBusy(false);
-    if (res?.success && res.productId) { setProductId(res.productId); setStep(s1.hasColor ? 2 : 3); }
-    else setError(res?.message ?? "Couldn't save. Check the fields.");
+    if (skip?.success) setStep(3); else setError(skip?.message ?? "Couldn't save. Check the fields.");
   }
 
   async function submitStep2() {
@@ -77,24 +91,47 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     const fd = new FormData();
     fd.append("step", "3");
     fd.append("productId", productId ?? "");
-    sizes.forEach((s) => fd.append("sizes", s));
+    if (s1.hasSize) fd.append("sizes", JSON.stringify(sizes));
     files.forEach((f) => fd.append("images", f));
+    // Colour images go under variantImages[colour][DEFAULT]; the server reuses them for every size of that colour.
+    if (s1.hasColor) colors.forEach((c) => (colorFiles[colorKey(c)] ?? []).forEach((f) => fd.append(`variantImages[${colorKey(c)}][DEFAULT]`, f)));
     const res = await fetch("/api/v1/product/create", { method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd })
       .then((r) => r.json()).catch(() => null);
     setBusy(false);
+    if (res?.success) setStep(4); else setError(res?.message ?? "Couldn't upload images.");
+  }
+
+  // One stock row per variant the product has.
+  const rows: { key: string; label: string; color?: string; size?: string }[] =
+    s1.hasColor && s1.hasSize ? colors.flatMap((c) => sizes.map((sz) => ({ key: `${colorKey(c)}|${sz.toUpperCase()}`, label: `${c} / ${sz}`, color: colorKey(c), size: sz })))
+    : s1.hasColor ? colors.map((c) => ({ key: colorKey(c), label: c, color: colorKey(c) }))
+    : s1.hasSize ? sizes.map((sz) => ({ key: sz.toUpperCase(), label: sz, size: sz }))
+    : [{ key: "all", label: "Units in stock" }];
+  // A product with no variants has a single row, which starts at the stock entered in step 1.
+  const stockOf = (key: string) => stock[key] ?? (!s1.hasColor && !s1.hasSize ? s1.totalStock : "");
+  const allocated = rows.reduce((n, r) => n + (Number(stockOf(r.key)) || 0), 0);
+  const declared = Number(s1.totalStock || 0);
+
+  async function submitStep4() {
+    setBusy(true); setError(null);
+    const variantStock = rows
+      .filter((r) => Number(stockOf(r.key)) > 0)
+      .map((r) => ({ color: r.color, size: r.size, stock: Number(stockOf(r.key)) }));
+    const res = await postJson({ step: "4", productId, variantStock });
+    setBusy(false);
     if (res?.success) router.push("/seller/products");
-    else setError(res?.message ?? "Couldn't upload images.");
+    else setError(res?.message ?? "Couldn't save the stock.");
   }
 
   return (
     <div className="card mx-auto max-w-2xl rounded-[2rem] p-6 sm:p-8">
       {/* stepper */}
       <div className="mb-6 flex items-center gap-2">
-        {["Basics", "Colours", "Images"].map((label, i) => (
+        {["Basics", "Colours", "Images", "Stock"].map((label, i) => (
           <div key={label} className="flex flex-1 items-center gap-2">
             <span className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-semibold ${i + 1 <= step ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>{i + 1}</span>
-            <span className={`text-sm font-medium ${i + 1 === step ? "text-ink" : "text-muted"}`}>{label}</span>
-            {i < 2 && <span className={`h-0.5 flex-1 rounded ${i + 1 < step ? "bg-lime" : "bg-hairline"}`} />}
+            <span className={`hidden text-sm font-medium sm:inline ${i + 1 === step ? "text-ink" : "text-muted"}`}>{label}</span>
+            {i < 3 && <span className={`h-0.5 flex-1 rounded ${i + 1 < step ? "bg-lime" : "bg-hairline"}`} />}
           </div>
         ))}
       </div>
@@ -137,7 +174,7 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           <p className="text-[15px] text-muted">Add the colours this product comes in.</p>
           <div className="mt-3 flex gap-2">
             <input value={colorInput} onChange={(e) => setColorInput(e.target.value)} placeholder="e.g. Black" className="h-11 flex-1 rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
-            <button onClick={() => { if (colorInput.trim()) { setColors([...colors, colorInput.trim()]); setColorInput(""); } }} className="btn-ink rounded-full px-5 text-sm font-semibold">Add</button>
+            <button onClick={() => { const c = colorInput.trim(); if (c && !colors.some((x) => colorKey(x) === colorKey(c))) setColors([...colors, c]); setColorInput(""); }} className="btn-ink rounded-full px-5 text-sm font-semibold">Add</button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {colors.map((c, i) => (
@@ -149,7 +186,7 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           {error && <p className="mt-3 text-sm font-medium text-live">{error}</p>}
           <div className="mt-6 flex gap-3">
             <Back onClick={() => setStep(1)} />
-            <button onClick={submitStep2} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
+            <button onClick={submitStep2} disabled={busy || colors.length === 0} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
             </button>
           </div>
@@ -174,16 +211,60 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
               </div>
             </div>
           )}
-          <p className="text-[15px] text-muted">Product images</p>
+          <p className="text-[15px] text-muted">{s1.hasColor ? "Main product images" : "Product images"}</p>
           <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-hairline bg-surface-2 py-10 text-muted hover:border-ink">
             <Upload className="h-6 w-6" />
             <span className="text-sm font-medium">{files.length ? `${files.length} image(s) selected` : "Click to choose images"}</span>
             <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
           </label>
-          {error && <p className="mt-3 text-sm font-medium text-live">{error}</p>}
+          {s1.hasColor && colors.map((c) => {
+            const picked = colorFiles[colorKey(c)] ?? [];
+            return (
+              <div key={c} className="mt-5">
+                <p className="text-[15px] text-muted">Images for {c}</p>
+                <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-hairline bg-surface-2 py-6 text-muted hover:border-ink">
+                  <Upload className="h-5 w-5" />
+                  <span className="text-sm font-medium">{picked.length ? `${picked.length} image(s) selected` : "Click to choose images"}</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => setColorFiles({ ...colorFiles, [colorKey(c)]: Array.from(e.target.files ?? []) })} />
+                </label>
+              </div>
+            );
+          })}
+          {error && <p role="alert" className="mt-3 text-sm font-medium text-live">{error}</p>}
           <div className="mt-6 flex gap-3">
             <Back onClick={() => setStep(s1.hasColor ? 2 : 1)} />
-            <button onClick={submitStep3} disabled={busy || files.length === 0} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-60">
+            <button
+              onClick={submitStep3}
+              disabled={busy || files.length === 0 || (s1.hasSize && sizes.length === 0) || (s1.hasColor && colors.some((c) => (colorFiles[colorKey(c)] ?? []).length === 0))}
+              className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-60"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div>
+          <p className="text-[15px] text-muted">How many units of each are in stock? The total can&apos;t be more than the {declared} you entered.</p>
+          <div className="mt-3 space-y-2">
+            {rows.map((r) => (
+              <label key={r.key} className="flex items-center gap-3 rounded-xl bg-surface-2 px-4 py-2.5">
+                <span className="flex-1 text-[15px] text-ink">{r.label}</span>
+                <input
+                  type="number" min={0} inputMode="numeric" value={stockOf(r.key)}
+                  onChange={(e) => setStock({ ...stock, [r.key]: e.target.value })}
+                  aria-label={`Stock for ${r.label}`}
+                  className="h-10 w-24 rounded-xl border border-hairline bg-surface px-3 text-right text-[15px] text-ink focus:border-ink focus:outline-none"
+                />
+              </label>
+            ))}
+          </div>
+          <p className={`mt-3 text-sm font-medium ${allocated > declared ? "text-live" : "text-muted"}`}>{allocated} of {declared} units assigned</p>
+          {error && <p role="alert" className="mt-3 text-sm font-medium text-live">{error}</p>}
+          <div className="mt-6 flex gap-3">
+            <Back onClick={() => setStep(3)} />
+            <button onClick={submitStep4} disabled={busy || allocated === 0 || allocated > declared} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-60">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Publish product
             </button>
           </div>

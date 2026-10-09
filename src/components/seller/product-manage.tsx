@@ -5,12 +5,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tag, Loader2, Check, Sparkles, Trash2 } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
-import { products as productsApi } from "@/lib/api";
+import { products as productsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
-const STATUSES = ["active", "inactive", "draft", "out_of_stock"];
+// The status endpoint only accepts these two; other states (draft, out of stock) are set by the server.
+const STATUSES = ["active", "inactive"];
 
 export function ProductManage({ product }: { product: Product & { status?: string } }) {
   const router = useRouter();
@@ -25,19 +26,23 @@ export function ProductManage({ product }: { product: Product & { status?: strin
     const t = getToken();
     if (!t) return;
     const next = !topPick;
+    setError(null);
     setTopPick(next);
     const res = await productsApi.setTopPick(product._id, { isTopPick: next }, t);
-    if (!res) setTopPick(!next);
+    if (!res) { setTopPick(!next); setError("Couldn't update top pick. Only Zatch admins can feature products."); }
     else router.refresh();
   }
 
   async function changeStatus(next: string) {
     const t = getToken();
     if (!t) return;
+    const before = status;
     setBusy(true);
+    setError(null);
     setStatus(next);
-    await productsApi.updateStatus(product._id, { status: next }, t);
+    const res = await productsApi.updateStatus(product._id, { status: next }, t);
     setBusy(false);
+    if (!res) { setStatus(before); setError("Couldn't change the status. Try again."); return; }
     router.refresh();
   }
 
@@ -71,6 +76,7 @@ export function ProductManage({ product }: { product: Product & { status?: strin
           onChange={(e) => changeStatus(e.target.value)}
           className="h-9 rounded-full border border-hairline bg-surface-2 px-3 text-[13px] font-medium capitalize text-ink focus:border-ink focus:outline-none disabled:opacity-70"
         >
+          {!STATUSES.includes(status) && <option value={status} disabled>{status.replace(/_/g, " ")}</option>}
           {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
         </select>
         <button
@@ -105,12 +111,16 @@ function BargainSettings({ productId, initial, onClose }: { productId: string; i
   const [auto, setAuto] = useState(initial?.autoAcceptDiscount ?? 10);
   const [max, setMax] = useState(initial?.maximumDiscount ?? 30);
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     const t = getToken();
     if (!t) return;
     setState("saving");
-    await productsApi.setBargainSettings(productId, { autoAcceptDiscount: auto, maximumDiscount: max }, t);
+    setError(null);
+    const res = await productsApi.setBargainSettings(productId, { autoAcceptDiscount: auto, maximumDiscount: max }, t);
+    const failure = apiError(res, "Couldn't save the bargain settings. Try again.");
+    if (failure) { setError(failure); setState("idle"); return; }
     setState("saved");
     setTimeout(onClose, 800);
   }
@@ -129,6 +139,7 @@ function BargainSettings({ productId, initial, onClose }: { productId: string; i
         {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "saved" ? <Check className="h-4 w-4" /> : null}
         {state === "saved" ? "Saved" : "Save"}
       </button>
+      {error && <p role="alert" className="text-sm font-medium text-live sm:col-span-3">{error}</p>}
     </div>
   );
 }

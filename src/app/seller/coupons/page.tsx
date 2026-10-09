@@ -5,13 +5,14 @@ import { Plus, Trash2, Loader2, Check, Ticket, Pencil } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
-import { coupons as couponsApi, seller as sellerApi } from "@/lib/api";
+import { coupons as couponsApi, seller as sellerApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; isActive?: boolean; active?: boolean; isExpired?: boolean; status?: string; daysRemaining?: number };
+type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; startDate?: string; endDate?: string; isActive?: boolean; active?: boolean; isExpired?: boolean; status?: string; daysRemaining?: number };
 type Dash = {
   performanceSummary?: { orders?: number; gmv?: number; views?: number; period?: string };
   overview?: { totalCoupons?: number; activeCoupons?: number; expiredCoupons?: number };
+  coupons?: { all?: Coupon[] };
 };
 
 export default function SellerCouponsPage() {
@@ -21,6 +22,7 @@ export default function SellerCouponsPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [seller, setSeller] = useState<{ approved: boolean; status: string; display?: import("@/lib/api").SellerStatusDisplay } | null>(null);
 
   useEffect(() => {
@@ -31,22 +33,33 @@ export default function SellerCouponsPage() {
       const status = (s?.sellerStatus ?? "buyer").toLowerCase();
       const approved = ["approved", "active"].includes(status);
       setSeller({ approved, status, display: s?.statusDisplay });
-      if (approved) {
-        couponsApi.list(t).then((c) => setList((c as Coupon[]) ?? []));
-        couponsApi.dashboard(t).then((d) => setDash(d as Dash));
-      }
+      if (approved) load(t);
     });
   }, []);
 
+  // The dashboard is the seller's own coupons (paused and expired included);
+  // /coupons/list is the public buyer-facing listing across all sellers.
+  async function load(t: string) {
+    const d = (await couponsApi.dashboard(t)) as Dash | null;
+    setDash(d);
+    setList(d?.coupons?.all ?? []);
+  }
+
   async function toggle(id: string) {
     if (!token) return;
+    setNotice(null);
     setList((l) => l.map((c) => (c._id === id ? { ...c, isActive: !(c.isActive ?? c.active) } : c)));
-    await couponsApi.toggle(id, token);
+    const res = await couponsApi.toggle(id, token);
+    if (!res) setNotice("Couldn't change the coupon. Try again.");
+    load(token);
   }
   async function remove(id: string) {
     if (!token) return;
+    setNotice(null);
     setList((l) => l.filter((c) => c._id !== id));
-    await couponsApi.remove(id, token);
+    const res = await couponsApi.remove(id, token);
+    if (!res) setNotice("Couldn't delete the coupon. Try again.");
+    load(token);
   }
 
   return (
@@ -79,7 +92,9 @@ export default function SellerCouponsPage() {
             </div>
           )}
 
-          {adding && token && <CouponForm token={token} onSaved={(c) => { setList((l) => [c, ...l]); setAdding(false); }} />}
+          {notice && <p role="alert" className="mb-3 text-sm font-medium text-live">{notice}</p>}
+
+          {adding && token && <CouponForm token={token} onSaved={() => { load(token); setAdding(false); }} />}
 
           {list.length === 0 && !adding ? (
             <EmptyState title="No coupons yet" sub="Create a discount code to drive more orders." />
@@ -93,10 +108,7 @@ export default function SellerCouponsPage() {
                       key={c._id}
                       token={token}
                       initial={c}
-                      onSaved={(saved) => {
-                        setList((l) => l.map((x) => (x._id === c._id ? { ...x, ...saved } : x)));
-                        setEditing(null);
-                      }}
+                      onSaved={() => { load(token); setEditing(null); }}
                     />
                   );
                 }
@@ -132,7 +144,9 @@ export default function SellerCouponsPage() {
   );
 }
 
-function CouponForm({ token, onSaved, initial }: { token: string; onSaved: (c: Coupon) => void; initial?: Coupon }) {
+function CouponForm({ token, onSaved, initial }: { token: string; onSaved: () => void; initial?: Coupon }) {
+  // yyyy-mm-dd in IST, which is what the date input and the server's day boundaries use
+  const initialEnd = initial?.endDate ? new Date(initial.endDate).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : "";
   const [f, setF] = useState({
     name: initial?.name ?? "",
     code: initial?.code ?? "",
@@ -140,29 +154,31 @@ function CouponForm({ token, onSaved, initial }: { token: string; onSaved: (c: C
     discountValue: initial?.discountValue != null ? String(initial.discountValue) : "",
     maxDiscount: "",
     minSpend: initial?.minSpend != null ? String(initial.minSpend) : "",
+    endDate: initialEnd,
   });
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setErr(null);
     setSaving(true);
+    const code = f.code.toUpperCase();
     const body = {
-      name: f.name || f.code, code: f.code.toUpperCase(), discountType: f.discountType,
+      name: f.name || code, discountType: f.discountType,
       discountValue: Number(f.discountValue), maxDiscount: f.maxDiscount ? Number(f.maxDiscount) : undefined,
       minSpend: f.minSpend ? Number(f.minSpend) : undefined,
-      startDate: new Date().toISOString(),
+      // valid through the end of that day, IST; an unchanged date is left as the server has it
+      ...(f.endDate !== initialEnd ? { endDate: new Date(`${f.endDate}T23:59:59+05:30`).toISOString() } : {}),
+      // The server rejects any `code` once a coupon has been used, even an unchanged one.
+      ...(initial ? (code !== initial.code ? { code } : {}) : { code, startDate: new Date().toISOString() }),
     };
-    const res = initial
-      ? ((await couponsApi.update(initial._id, body, token)) as { coupon?: Coupon } | Coupon | null)
-      : ((await couponsApi.create(body, token)) as { coupon?: Coupon } | Coupon | null);
+    const res = initial ? await couponsApi.update(initial._id, body, token) : await couponsApi.create(body, token);
     setSaving(false);
-    const saved = (res as { coupon?: Coupon })?.coupon ?? (res as Coupon);
-    onSaved(
-      saved && (saved as Coupon)._id
-        ? (saved as Coupon)
-        : ({ _id: initial?._id ?? crypto.randomUUID(), ...body, isActive: true } as Coupon),
-    );
+    const failure = apiError(res, "Couldn't save the coupon. Try again.");
+    if (failure) return setErr(failure);
+    onSaved();
   }
 
   return (
@@ -177,6 +193,8 @@ function CouponForm({ token, onSaved, initial }: { token: string; onSaved: (c: C
       </label>
       <F label={f.discountType === "percentage" ? "Discount %" : "Discount ₹"} v={f.discountValue} on={set("discountValue")} type="number" required />
       <F label="Min spend ₹ (optional)" v={f.minSpend} on={set("minSpend")} type="number" />
+      <F label="Valid until" v={f.endDate} on={set("endDate")} type="date" required />
+      {err && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{err}</p>}
       <button disabled={saving} className="btn-ink sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
         {initial ? "Save changes" : "Create coupon"}

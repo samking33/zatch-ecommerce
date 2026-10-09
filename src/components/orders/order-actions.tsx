@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Star, Loader2, FileText, XCircle, MapPin, Phone, Eye, Undo2, type LucideIcon,
 } from "lucide-react";
-import { orders as ordersApi } from "@/lib/api";
+import { orders as ordersApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 export type ServerAction = {
@@ -65,9 +65,11 @@ export function OrderActions({
         const reason = window.prompt("Reason for cancellation?");
         if (reason === null) return;
         setBusy(a.action);
+        setMsg(null);
         const res = await ordersApi.cancel(orderId, { reason: reason || "Changed my mind" }, token);
         setBusy(null);
-        res ? router.refresh() : setMsg("Couldn't cancel this order.");
+        const failure = apiError(res, "Couldn't cancel this order.");
+        if (failure) setMsg(failure); else router.refresh();
         return;
       }
       case "download_invoice": {

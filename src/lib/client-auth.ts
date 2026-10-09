@@ -24,6 +24,16 @@ export function getToken(): string | undefined {
   return m ? decodeURIComponent(m[1]) : undefined;
 }
 
+// The cart stores the applied coupon as an id only, but checkout needs the code,
+// so the cart page remembers it here.
+const COUPON_KEY = "zatch_coupon";
+export function getAppliedCoupon(): string | undefined {
+  try { return localStorage.getItem(COUPON_KEY) ?? undefined; } catch { return undefined; }
+}
+export function setAppliedCoupon(code: string | undefined) {
+  try { if (code) localStorage.setItem(COUPON_KEY, code); else localStorage.removeItem(COUPON_KEY); } catch { /* storage blocked */ }
+}
+
 export function getUser(): SessionUser | null {
   if (typeof window === "undefined") return null;
   try {

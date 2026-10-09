@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check, XCircle } from "lucide-react";
-import { orders as ordersApi } from "@/lib/api";
+import { orders as ordersApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 // Forward-only fulfillment steps a seller advances through.
@@ -26,11 +26,13 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
     // Backend requires tracking.awb + tracking.courier to mark an order shipped.
     if (next === "shipped" && !tracking) { setShipOpen(true); return; }
     setBusy(true);
+    setErr(null);
     setValue(next);
     const res = await ordersApi.updateStatus(orderId, { status: next, ...(tracking ? { tracking } : {}) }, t);
     setBusy(false);
-    if (res) { setSaved(true); setShipOpen(false); router.refresh(); }
-    else { setValue(status ?? "pending"); setErr("Couldn't update. Check the details."); }
+    const failure = apiError(res, "Couldn't update. Check the details.");
+    if (!failure) { setSaved(true); setShipOpen(false); router.refresh(); }
+    else { setValue(status ?? "pending"); setErr(failure); }
   }
 
   async function sellerCancel() {
@@ -39,9 +41,12 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
     const reason = window.prompt("Why are you cancelling this order?");
     if (reason === null) return;
     setBusy(true);
+    setErr(null);
     const res = await ordersApi.sellerCancel(orderId, { reason: reason || "Seller cancelled" }, t);
     setBusy(false);
-    if (res) { setValue("cancelled"); router.refresh(); }
+    const failure = apiError(res, "Couldn't cancel this order. Try again.");
+    if (failure) setErr(failure);
+    else { setValue("cancelled"); router.refresh(); }
   }
 
   return (

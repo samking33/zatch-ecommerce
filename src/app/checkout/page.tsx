@@ -7,31 +7,26 @@ import { MapPin, Lock, Plus, Loader2, Check } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
-import { cart as cartApi, address as addressApi, checkout as checkoutApi, api } from "@/lib/api";
-import { getToken } from "@/lib/client-auth";
+import { cart as cartApi, address as addressApi, checkout as checkoutApi, apiError } from "@/lib/api";
+import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
 
-type Addr = { _id: string; label?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
-type CItem = {
-  productId?: string;
-  product?: { _id?: string } | string | null;
-  variant?: { color?: string; size?: string };
-  color?: string;
-  size?: string;
-  bargainId?: string;
-};
-type Cart = { items?: CItem[]; total?: number; subtotal?: number };
+type Addr = { _id: string; label?: string; type?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
+type CItem = { _id?: string };
+type Cart = { items?: CItem[]; total?: number; subtotal?: number; coupon?: unknown };
 type Money = { subtotal?: number; discount?: number; shipping?: number; tax?: number; total?: number };
-type Preview = { summary?: Money; pricing?: Money };
+type Preview = { checkout?: { pricing?: Money }; success?: boolean; message?: string };
+type Init = {
+  razorpayOrderId?: string; amount?: number; keyId?: string; currency?: string;
+  checkoutData?: unknown; success?: boolean; message?: string;
+};
 
-// One place that builds the item payload both preview and pay use.
-function itemPayload(items: CItem[]) {
-  return items.map((it) => ({
-    productId: it.productId ?? (typeof it.product === "object" ? it.product?._id : it.product),
-    variantColor: it.variant?.color ?? it.color,
-    variantSize: it.variant?.size ?? it.size,
-    bargainId: it.bargainId,
-  }));
+// Cart checkout, the same flow the mobile app uses: the server prices the saved
+// cart lines itself (quantity, bargain price) and clears them once paid. The
+// coupon code is only sent while the cart still has a coupon applied.
+function cartPayload(cart: Cart | null, addressId: string | undefined) {
+  const couponCode = cart?.coupon ? getAppliedCoupon() : undefined;
+  return { addressId, selectedItemIds: (cart?.items ?? []).map((it) => it._id).filter(Boolean), couponCode };
 }
 
 function loadRazorpay(): Promise<boolean> {
@@ -78,13 +73,14 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!token || items.length === 0) return;
     checkoutApi
-      .initiate({ addressId: selected || undefined, items: itemPayload(items) }, token)
+      .initiate(cartPayload(cart, selected || undefined), token)
       .then((p) => setPreview((p as Preview) ?? null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selected, items.length]);
 
-  const sum = preview?.summary ?? preview?.pricing ?? {};
+  const sum = preview?.checkout?.pricing ?? {};
   const total = sum.total ?? cart?.total ?? cart?.subtotal ?? 0;
+  const previewError = apiError(preview, "");
 
   async function pay() {
     setError(null);
@@ -93,16 +89,12 @@ export default function CheckoutPage() {
     if (items.length === 0) return setError("Your cart is empty.");
 
     setPaying(true);
-    const checkoutData = { addressId: selected, items: itemPayload(items) };
+    const init = (await checkoutApi.razorpayInitiate({ checkoutData: cartPayload(cart, selected) }, token)) as Init | null;
 
-    const init = (await api<{ razorpayOrderId: string; amount: number; keyId: string; currency?: string }>(
-      "/checkout/payment/razorpay/initiate",
-      { method: "POST", body: { checkoutData }, token },
-    )) as { razorpayOrderId: string; amount: number; keyId: string; currency?: string } | null;
-
-    if (!init?.razorpayOrderId || !init?.keyId) {
+    const initError = apiError(init, "Couldn't start payment. Please try again.");
+    if (initError || !init?.razorpayOrderId || !init?.keyId) {
       setPaying(false);
-      return setError("Couldn't start payment. Please try again.");
+      return setError(initError ?? "Couldn't start payment. Please try again.");
     }
 
     const ok = await loadRazorpay();
@@ -121,10 +113,20 @@ export default function CheckoutPage() {
       description: "Order payment",
       theme: { color: "#cafe38" },
       handler: async (resp: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-        const verified = await checkoutApi.razorpayVerify(resp, token);
+        // The server wants camelCase ids plus the same checkoutData it returned from initiate.
+        const verified = await checkoutApi.razorpayVerify(
+          {
+            razorpayOrderId: resp.razorpay_order_id,
+            razorpayPaymentId: resp.razorpay_payment_id,
+            razorpaySignature: resp.razorpay_signature,
+            checkoutData: init.checkoutData,
+          },
+          token,
+        );
         setPaying(false);
-        if (verified) router.push("/orders");
-        else setError("Payment verification failed. If money was deducted, contact support.");
+        const failure = apiError(verified, "Payment verification failed.");
+        if (failure) setError(`${failure} If money was deducted, contact support.`);
+        else { setAppliedCoupon(undefined); router.push("/orders"); }
       },
       modal: { ondismiss: () => setPaying(false) },
     });
@@ -206,7 +208,7 @@ export default function CheckoutPage() {
                   <PRow label="Total" value={inr(total)} strong />
                 </div>
               </dl>
-              {error && <p className="mt-3 rounded-xl bg-live/10 px-3.5 py-2.5 text-sm font-medium text-live">{error}</p>}
+              {(error || previewError) && <p role="alert" className="mt-3 rounded-xl bg-live/10 px-3.5 py-2.5 text-sm font-medium text-live">{error ?? previewError}</p>}
               <button
                 onClick={pay}
                 disabled={paying || items.length === 0}
@@ -226,28 +228,40 @@ export default function CheckoutPage() {
 }
 
 function AddressForm({ onSaved, token }: { onSaved: (a: Addr) => void; token: string }) {
+  // The backend stores the address kind as both `label` and `type` (Home | Office | Others).
   const [f, setF] = useState({ label: "Home", line1: "", city: "", state: "", pincode: "", phone: "" });
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setErr(null);
+    if (!/^\d{6}$/.test(f.pincode.trim())) return setErr("Enter a 6-digit pincode.");
     setSaving(true);
-    const res = (await addressApi.save(f, token)) as { _id?: string; address?: Addr } | Addr | null;
+    const res = await addressApi.save({ ...f, type: f.label }, token);
     setSaving(false);
-    const saved = (res as { address?: Addr })?.address ?? (res as Addr);
-    if (saved && (saved as Addr)._id) onSaved(saved as Addr);
-    else onSaved({ _id: crypto.randomUUID(), ...f });
+    // The helper unwraps `{ success, address }` to the address itself.
+    const saved = ((res as { address?: Addr } | null)?.address ?? res) as Addr | null;
+    const failure = apiError(res, "Couldn't save the address. Try again.");
+    if (failure || !saved?._id) return setErr(failure ?? "Couldn't save the address. Try again.");
+    onSaved(saved);
   }
 
   return (
     <form onSubmit={save} className="mt-4 grid gap-3 rounded-2xl bg-surface-2 p-4 sm:grid-cols-2">
-      <Field label="Label" v={f.label} on={set("label")} />
+      <label className="block">
+        <span className="text-[12px] font-medium text-muted">Type</span>
+        <select value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
+          {["Home", "Office", "Others"].map((x) => <option key={x} value={x}>{x}</option>)}
+        </select>
+      </label>
       <Field label="Phone" v={f.phone} on={set("phone")} />
       <Field label="Address" v={f.line1} on={set("line1")} full />
       <Field label="City" v={f.city} on={set("city")} />
       <Field label="State" v={f.state} on={set("state")} />
       <Field label="Pincode" v={f.pincode} on={set("pincode")} />
+      {err && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{err}</p>}
       <button disabled={saving} className="btn-ink sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save address
       </button>

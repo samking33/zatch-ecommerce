@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check, ChevronDown, Trash2 } from "lucide-react";
-import { users, auth } from "@/lib/api";
+import { users, auth, apiError } from "@/lib/api";
 import { getToken, type SessionUser } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
@@ -187,7 +187,8 @@ function ChangePassword() {
     if (!t) return;
     setState("saving");
     const res = await auth.changePassword({ newPassword: pw, confirmPassword: pw2 }, t);
-    if (res) { setState("saved"); setPw(""); setPw2(""); } else setState("error");
+    const failure = apiError(res, "Couldn't update your password. Try again.");
+    if (failure) { setState("error"); setErr(failure); } else { setState("saved"); setPw(""); setPw2(""); }
   }
 
   return (

@@ -21,13 +21,18 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!video) { setError("Choose a video to upload."); return; }
+    if (video.size > 50 * 1024 * 1024) { setError("The video must be under 50 MB."); return; }
+    // Bits with no tagged product never appear in the buyer feed.
+    if (tagged.length === 0) { setError(myProducts.length === 0 ? "Create a product first, then tag it in your Bit." : "Tag at least one product so buyers can see your Bit."); return; }
     setBusy(true); setError(null);
     const t = getToken();
     const fd = new FormData();
     fd.append("title", f.title);
     fd.append("description", f.description);
-    if (f.hashtags) fd.append("hashtags", f.hashtags);
-    tagged.forEach((id) => fd.append("products", id));
+    // The server reads hashtags as a comma list and products as a JSON list of { productId }.
+    const tags = f.hashtags.split(/[\s,]+/).filter(Boolean).join(",");
+    if (tags) fd.append("hashtags", tags);
+    fd.append("products", JSON.stringify(tagged.map((productId) => ({ productId }))));
     fd.append("video", video);
     if (thumb) fd.append("thumbnail", thumb);
     const res = await fetch("/api/v1/bits/upload", {
@@ -81,7 +86,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
 
         {myProducts.length > 0 && (
           <div>
-            <p className="text-[12px] font-medium text-muted">Tag products (shoppable)</p>
+            <p className="text-[12px] font-medium text-muted">Tag products (required)</p>
             <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
               {myProducts.map((p) => {
                 const on = tagged.includes(p._id);

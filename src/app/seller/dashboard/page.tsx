@@ -8,11 +8,13 @@ import { ProductMedia } from "@/components/ui/product-media";
 import { orders as ordersApi, bargains as bargainsApi, payments as paymentsApi, products as productsApi, seller as sellerApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
+import { inr } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
 export const metadata = { title: "Seller dashboard" };
 
-type Perf = { totalRevenue?: string; totalOrders?: number; pendingOrders?: number; readyToShip?: number; productViews?: number };
+type Perf = { productViews?: number };
+type OrderStats = { totalRevenue?: number; totalOrders?: number; pendingOrders?: number };
 type OrdersDash = { performanceSummary?: Perf; topCards?: { totalProducts?: number; totalProductViews?: number } };
 type BargainDash = { stats?: { totalBargains?: number; pendingBargains?: number; activeCount?: number } };
 type PaySummary = { totalRevenueFormatted?: string; netRevenueFormatted?: string; pendingFormatted?: string };
@@ -21,7 +23,17 @@ type Completion = {
   checklist?: { label: string; completed?: boolean; action?: string; route?: string; info?: string }[];
 };
 
-export default async function SellerDashboardPage() {
+// Revenue and orders come from the same all-time-by-default stats the mobile app shows.
+const PERIODS = [
+  { key: "", label: "All time" },
+  { key: "week", label: "This week" },
+  { key: "month", label: "This month" },
+  { key: "year", label: "This year" },
+];
+
+export default async function SellerDashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period: requested } = await searchParams;
+  const period = PERIODS.find((p) => p.key && p.key === requested) ?? PERIODS[0];
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your seller dashboard" /></div></SellerShell>;
 
@@ -31,8 +43,9 @@ export default async function SellerDashboardPage() {
     return <SellerShell><BecomeSeller status={gate.status} display={gate.display} benefits={benefits} /></SellerShell>;
   }
 
-  const [oDash, bDash, pay, myProducts, completion] = await Promise.all([
+  const [oDash, oList, bDash, pay, myProducts, completion] = await Promise.all([
     ordersApi.sellerDashboard(t) as Promise<OrdersDash | null>,
+    ordersApi.sellerOrdersRaw(t, { timeRange: period.key || undefined, limit: "1" }) as Promise<{ stats?: OrderStats } | null>,
     bargainsApi.sellerDashboard(t) as Promise<BargainDash | null>,
     paymentsApi.summary(t) as Promise<PaySummary | null>,
     productsApi.myProducts(t) as Promise<Product[] | null>,
@@ -40,12 +53,13 @@ export default async function SellerDashboardPage() {
   ]);
 
   const perf = oDash?.performanceSummary ?? {};
+  const orderStats = oList?.stats ?? {};
   const stats = bDash?.stats ?? {};
   const products = myProducts ?? [];
 
   const kpis = [
-    { icon: TrendingUp, label: "Revenue", value: perf.totalRevenue ?? pay?.totalRevenueFormatted ?? "₹0" },
-    { icon: Package, label: "Orders", value: String(perf.totalOrders ?? 0), sub: `${perf.pendingOrders ?? 0} pending` },
+    { icon: TrendingUp, label: "Revenue", value: inr(orderStats.totalRevenue ?? 0) },
+    { icon: Package, label: "Orders", value: String(orderStats.totalOrders ?? 0), sub: `${orderStats.pendingOrders ?? 0} pending` },
     { icon: Tag, label: "Bargains", value: String(stats.totalBargains ?? 0), sub: `${stats.pendingBargains ?? 0} to reply` },
     { icon: Wallet, label: "Payout due", value: pay?.pendingFormatted ?? "₹0" },
     { icon: Eye, label: "Views", value: String(perf.productViews ?? oDash?.topCards?.totalProductViews ?? 0) },
@@ -65,6 +79,19 @@ export default async function SellerDashboardPage() {
       />
 
       <OnboardingChecklist completion={completion?.completion} checklist={completion?.checklist} />
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="text-muted">Revenue &amp; orders</span>
+        {PERIODS.map((p) => (
+          <Link
+            key={p.key}
+            href={p.key ? `/seller/dashboard?period=${p.key}` : "/seller/dashboard"}
+            className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${p.key === period.key ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"}`}
+          >
+            {p.label}
+          </Link>
+        ))}
+      </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {kpis.map((k) => (

@@ -138,6 +138,7 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
   const [comments, setComments] = useState<BitComment[]>(bit.comments ?? []);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [commentError, setCommentError] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [shared, setShared] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -186,13 +187,14 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
     e.preventDefault();
     const t = requireAuth(); if (!t || !text.trim()) return;
     const body = text.trim();
-    setText(""); setSending(true);
+    setText(""); setSending(true); setCommentError(false);
     const res = (await bitsApi.comment(bit._id, { text: body }, t)) as
       | { comment?: BitComment; comments?: BitComment[] } | null;
     setSending(false);
     if (res?.comments) setComments(res.comments);
-    else if (res?.comment) setComments((c) => [...c, res.comment!]);
-    else setComments((c) => [...c, { _id: `local-${Date.now()}`, text: body, user: { _id: "me", username: "You" } }]);
+    // The server returns the new comment without the author, so label it as the viewer's own.
+    else if (res?.comment) setComments((c) => [...c, { ...res.comment!, user: res.comment!.user ?? { _id: "me", username: "You" } }]);
+    else { setText(body); setCommentError(true); }
   }
 
   const products = bit.products ?? [];
@@ -246,7 +248,8 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
         </div>
       </div>
 
-      <aside className="hidden w-[22rem] shrink-0 flex-col overflow-hidden rounded-[1.75rem] bg-surface md:flex">
+      {/* Products stay desktop-only; comments open as a sheet over the video on phones. */}
+      <aside className={`${showComments ? "flex" : "hidden md:flex"} w-[22rem] shrink-0 flex-col overflow-hidden rounded-[1.75rem] bg-surface max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[60%] max-md:w-auto`}>
         {showComments ? (
           <>
             <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
@@ -266,6 +269,7 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
                 </div>
               ))}
             </div>
+            {commentError && <p role="alert" className="px-5 pb-1 text-[13px] font-medium text-live">Couldn&apos;t post your comment. Try again.</p>}
             <form onSubmit={sendComment} className="flex items-center gap-2 border-t border-hairline p-3">
               <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a comment" className="h-10 flex-1 rounded-full border border-hairline bg-surface-2 px-4 text-[14px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
               <button type="submit" disabled={sending || !text.trim()} aria-label="Send" className="btn-ink grid h-10 w-10 shrink-0 place-items-center rounded-full disabled:opacity-50">

@@ -6,7 +6,7 @@ import { MapPin, Plus, Trash2, Loader2, Check, Pencil } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
-import { address as addressApi } from "@/lib/api";
+import { address as addressApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 type Addr = { _id: string; label?: string; type?: string; isDefault?: boolean; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
@@ -27,8 +27,10 @@ export default function AddressesPage() {
 
   async function remove(id: string) {
     if (!token) return;
+    const before = list;
     setList((l) => l.filter((a) => a._id !== id));
-    await addressApi.remove(id, token);
+    const res = await addressApi.remove(id, token);
+    if (!res) setList(before);
   }
 
   return (
@@ -104,6 +106,8 @@ export default function AddressesPage() {
   );
 }
 
+const ADDRESS_TYPES = ["Home", "Office", "Others"];
+
 function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: Addr) => void; initial?: Addr }) {
   const [f, setF] = useState({
     label: initial?.label ?? "Home",
@@ -115,6 +119,7 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
   });
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   // Browser geolocation -> backend reverse-geocode -> autofill.
@@ -140,13 +145,18 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setErr(null);
+    if (!/^\d{6}$/.test(f.pincode.trim())) return setErr("Enter a 6-digit pincode.");
     setSaving(true);
-    const res = initial
-      ? ((await addressApi.update(initial._id, f, token)) as { address?: Addr } | Addr | null)
-      : ((await addressApi.save(f, token)) as { address?: Addr } | Addr | null);
+    // `type` must be Home | Office | Others; older addresses may carry a free-text label.
+    const body = { ...f, type: ADDRESS_TYPES.includes(f.label) ? f.label : initial?.type ?? "Others" };
+    const res = initial ? await addressApi.update(initial._id, body, token) : await addressApi.save(body, token);
     setSaving(false);
-    const saved = (res as { address?: Addr })?.address ?? (res as Addr);
-    onSaved(saved && (saved as Addr)._id ? (saved as Addr) : { _id: initial?._id ?? crypto.randomUUID(), ...f });
+    // The helper unwraps `{ success, address }` to the address itself.
+    const saved = ((res as { address?: Addr } | null)?.address ?? res) as Addr | null;
+    const failure = apiError(res, "Couldn't save the address. Try again.");
+    if (failure || !saved?._id) return setErr(failure ?? "Couldn't save the address. Try again.");
+    onSaved(saved);
   }
 
   return (
@@ -154,7 +164,7 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
       <label className="block">
         <span className="text-[12px] font-medium text-muted">Type</span>
         <select value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
-          {["Home", "Office", "Others"].map((x) => <option key={x} value={x}>{x}</option>)}
+          {ADDRESS_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}
         </select>
       </label>
       <F label="Phone" v={f.phone} on={set("phone")} />
@@ -162,6 +172,7 @@ function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: 
       <F label="City" v={f.city} on={set("city")} />
       <F label="State" v={f.state} on={set("state")} />
       <F label="Pincode" v={f.pincode} on={set("pincode")} />
+      {err && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{err}</p>}
       <button
         type="button"
         onClick={useMyLocation}

@@ -108,20 +108,26 @@ export default function NotificationsPage() {
 
   async function markRead(id: string) {
     if (!token) return;
+    const before = list;
     setList((l) => l.map((n) => (n._id === id ? { ...n, isRead: true, read: true } : n)));
-    await notifApi.markRead(id, token);
+    const res = await notifApi.markRead(id, token);
+    if (!res) setList(before);
   }
 
   async function markAll() {
     if (!token) return;
+    const before = list;
     setList((l) => l.map((n) => ({ ...n, isRead: true, read: true })));
-    await notifApi.markAllRead(token);
+    const res = await notifApi.markAllRead(token);
+    if (!res) setList(before);
   }
 
   async function remove(id: string) {
     if (!token) return;
+    const before = list;
     setList((l) => l.filter((n) => n._id !== id));
-    await notifApi.remove(id, token);
+    const res = await notifApi.remove(id, token);
+    if (!res) setList(before);
   }
 
   return (

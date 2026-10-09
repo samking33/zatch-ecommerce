@@ -11,14 +11,17 @@ export function BitActions({ bitId, isActive = true }: { bitId: string; isActive
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   async function run(action: "Activate" | "Deactivate" | "Delete") {
     const t = getToken();
     if (!t) return;
     if (action === "Delete" && !window.confirm("Delete this Bit? This can't be undone.")) return;
     setBusy(action);
-    await bitsApi.action(bitId, { action }, t);
+    setErr(null);
+    const res = await bitsApi.action(bitId, { action }, t);
     setBusy(null);
+    if (!res) { setErr(`Couldn't ${action.toLowerCase()} this Bit. Try again.`); return; }
     setOpen(false);
     router.refresh();
   }
@@ -40,6 +43,7 @@ export function BitActions({ bitId, isActive = true }: { bitId: string; isActive
             <Item onClick={() => run("Activate")} icon={Eye} label="Activate" />
           )}
           <Item onClick={() => run("Delete")} icon={Trash2} label="Delete" danger />
+          {err && <p role="alert" className="px-3 py-2 text-[12px] font-medium text-live">{err}</p>}
         </div>
       )}
     </div>
