@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
-import { login, loginWithOtp, otp as otpApi } from "@/lib/client-auth";
+import { login, loginWithOtp, otp as otpApi, isSellerStatus } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
 // Only two sign-in methods actually work for a logged-out user: password, and
@@ -33,7 +33,8 @@ export default function LoginPage() {
 
   function done(user: Awaited<ReturnType<typeof login>>) {
     setUser(user);
-    router.push("/account");
+    // Sellers land on their console; everyone else on their account.
+    router.push(isSellerStatus(user.sellerStatus) ? "/seller/dashboard" : "/account");
     router.refresh(); // re-run server components with the new session cookie
   }
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check, ChevronDown, Trash2 } from "lucide-react";
 import { users, auth, apiError } from "@/lib/api";
-import { getToken, type SessionUser } from "@/lib/client-auth";
+import { getToken, USERNAME_MAX, type SessionUser } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export function AccountForms({ user }: { user: SessionUser | null }) {
@@ -120,7 +120,7 @@ function EditProfile({ user }: { user: SessionUser | null }) {
   return (
     <Section title="Edit profile">
       <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
-        <Field label="Username" value={f.username} on={set("username")} />
+        <Field label="Username" value={f.username} on={set("username")} maxLength={USERNAME_MAX} />
         <div className="block">
           <Field
             label="Email"
@@ -206,11 +206,11 @@ function ChangePassword() {
   );
 }
 
-function Field({ label, value, on, type = "text" }: { label: string; value: string; on: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string }) {
+function Field({ label, value, on, type = "text", maxLength }: { label: string; value: string; on: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; maxLength?: number }) {
   return (
     <label className="block">
       <span className="text-[12px] font-medium text-muted">{label}</span>
-      <input type={type} value={value} onChange={on} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+      <input type={type} maxLength={maxLength} value={value} onChange={on} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
     </label>
   );
 }

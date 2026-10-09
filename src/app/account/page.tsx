@@ -59,7 +59,7 @@ export default async function AccountPage() {
               {initial}
             </span>
             <div className="min-w-0">
-              <p className="font-display text-lg font-semibold text-ink">{user?.username}</p>
+              <p className="break-words font-display text-lg font-semibold text-ink">{user?.username}</p>
               {user?.phone && (
                 <p className="text-sm text-muted">
                   {(user.countryCode as string) ?? ""} {user.phone}

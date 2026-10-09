@@ -34,6 +34,11 @@ export function setAppliedCoupon(code: string | undefined) {
   try { if (code) localStorage.setItem(COUPON_KEY, code); else localStorage.removeItem(COUPON_KEY); } catch { /* storage blocked */ }
 }
 
+export const USERNAME_MAX = 15;
+
+/** Approved sellers are "approved" or "active"; everyone else is a buyer or an applicant. */
+export const isSellerStatus = (s: unknown) => ["approved", "active"].includes(String(s ?? "").toLowerCase());
+
 export function getUser(): SessionUser | null {
   if (typeof window === "undefined") return null;
   try {

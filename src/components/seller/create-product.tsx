@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
@@ -33,13 +33,26 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   // Extra images per colour (keyed by lower-cased colour) and stock per variant row.
   const [colorFiles, setColorFiles] = useState<Record<string, File[]>>({});
   const [stock, setStock] = useState<Record<string, string>>({});
+  const [published, setPublished] = useState(false);
+
+  // Until step 4 succeeds the product is only a draft that buyers can't see, so warn before the tab is closed.
+  useEffect(() => {
+    if (!productId || published) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [productId, published]);
 
   // The backend uppercases sizes, so compare case-insensitively ("s" and "S" are one size).
-  const hasSize = (v: string) => sizes.some((x) => x.toLowerCase() === v.toLowerCase());
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const hasSize = (v: string) => sizes.some((x) => same(x, v));
+  // Updater form, so quick successive taps never overwrite each other.
   const addSize = (v: string) => {
     const s = v.trim();
-    if (s && !hasSize(s)) setSizes([...sizes, s]);
+    if (s) setSizes((cur) => (cur.some((x) => same(x, s)) ? cur : [...cur, s]));
   };
+  const toggleSize = (v: string) =>
+    setSizes((cur) => (cur.some((x) => same(x, v)) ? cur.filter((x) => !same(x, v)) : [...cur, v]));
 
   // The backend lower-cases colours and upper-cases sizes, so key everything the same way.
   const colorKey = (c: string) => c.trim().toLowerCase();
@@ -56,8 +69,28 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     }).then((r) => r.json()).catch(() => null);
   }
 
+  // The backend quietly clamps a too-high discounted price down to the price, so catch it here.
+  function step1Problem(): string | null {
+    const price = Number(s1.price);
+    const stock = Number(s1.totalStock);
+    const auto = Number(s1.autoAcceptDiscount);
+    const max = Number(s1.maximumDiscount);
+    if (!(price > 0)) return "Enter a price above 0.";
+    if (s1.discountedPrice !== "") {
+      const d = Number(s1.discountedPrice);
+      if (!(d > 0)) return "The discounted price must be above 0.";
+      if (d >= price) return "The discounted price must be lower than the price.";
+    }
+    if (!Number.isInteger(stock) || stock < 1) return "Total stock must be a whole number, 1 or more.";
+    if (![auto, max].every((n) => Number.isFinite(n) && n >= 0 && n <= 100)) return "Bargain percentages must be between 0 and 100.";
+    if (auto > max) return "Auto-accept discount can't be higher than the max bargain discount.";
+    return null;
+  }
+
   async function submitStep1(e: React.FormEvent) {
     e.preventDefault();
+    const problem = step1Problem();
+    if (problem) { setError(problem); return; }
     setBusy(true); setError(null);
     const res = await postJson({
       step: "1", productId,
@@ -121,8 +154,9 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
       .map((r) => ({ color: r.color, size: r.size, stock: Number(stockOf(r.key)) }));
     const res = await postJson({ step: "4", productId, variantStock });
     setBusy(false);
-    if (res?.success) router.push("/seller/products");
-    else setError(res?.message ?? "Couldn't save the stock.");
+    if (res?.success) { setPublished(true); router.push("/seller/products"); }
+    // e.g. "Total variant stock exceeds declared stock" or "No valid variants created" + the reason
+    else setError([res?.message, res?.details].filter(Boolean).join(". ") || "Couldn't save the stock.");
   }
 
   return (
@@ -155,12 +189,12 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           </label>
           <Field label="Product name" value={s1.name} on={(v) => setS1({ ...s1, name: v })} full required />
           <Field label="Description" value={s1.description} on={(v) => setS1({ ...s1, description: v })} full />
-          <Field label="Price (₹)" value={s1.price} on={(v) => setS1({ ...s1, price: v })} type="number" required />
-          <Field label="Discounted price (₹)" value={s1.discountedPrice} on={(v) => setS1({ ...s1, discountedPrice: v })} type="number" />
-          <Field label="Total stock" value={s1.totalStock} on={(v) => setS1({ ...s1, totalStock: v })} type="number" />
-          <Field label="Auto-accept discount %" value={s1.autoAcceptDiscount} on={(v) => setS1({ ...s1, autoAcceptDiscount: v })} type="number" />
-          <Field label="Max bargain discount %" value={s1.maximumDiscount} on={(v) => setS1({ ...s1, maximumDiscount: v })} type="number" />
-          {error && <p className="text-sm font-medium text-live sm:col-span-2">{error}</p>}
+          <Field label="Price (₹)" value={s1.price} on={(v) => setS1({ ...s1, price: v })} type="number" min={1} required />
+          <Field label="Discounted price (₹, optional)" value={s1.discountedPrice} on={(v) => setS1({ ...s1, discountedPrice: v })} type="number" min={1} />
+          <Field label="Total stock" value={s1.totalStock} on={(v) => setS1({ ...s1, totalStock: v })} type="number" min={1} required />
+          <Field label="Auto-accept discount %" value={s1.autoAcceptDiscount} on={(v) => setS1({ ...s1, autoAcceptDiscount: v })} type="number" min={0} max={100} />
+          <Field label="Max bargain discount %" value={s1.maximumDiscount} on={(v) => setS1({ ...s1, maximumDiscount: v })} type="number" min={0} max={100} />
+          {error && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{error}</p>}
           <div className="sm:col-span-2">
             <Next busy={busy}>Continue</Next>
           </div>
@@ -181,7 +215,7 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
               </span>
             ))}
           </div>
-          {error && <p className="mt-3 text-sm font-medium text-live">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-sm font-medium text-live">{error}</p>}
           <div className="mt-6 flex gap-3">
             <Back onClick={() => setStep(1)} />
             <button onClick={submitStep2} disabled={busy || colors.length === 0} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
@@ -196,10 +230,19 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           {s1.hasSize && (
             <div className="mb-5">
               <p className="text-[15px] text-muted">Sizes</p>
-              <select value="" onChange={(e) => addSize(e.target.value)} aria-label="Pick a standard size" className="mt-2 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
-                <option value="">Pick a size</option>
-                {SIZE_OPTIONS.map((o) => <option key={o} value={o} disabled={hasSize(o)}>{o}</option>)}
-              </select>
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Pick sizes">
+                {SIZE_OPTIONS.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => toggleSize(o)}
+                    aria-pressed={hasSize(o)}
+                    className={`min-w-[3rem] rounded-xl border px-3.5 py-2.5 text-sm font-medium transition ${hasSize(o) ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"}`}
+                  >
+                    {o}
+                  </button>
+                ))}
+              </div>
               <div className="mt-2 flex gap-2">
                 <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} placeholder="Or type your own, e.g. 28" className="h-11 flex-1 rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
                 <button onClick={() => { addSize(sizeInput); setSizeInput(""); }} className="btn-ink rounded-full px-5 text-sm font-semibold">Add</button>
@@ -272,11 +315,11 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   );
 }
 
-function Field({ label, value, on, type = "text", full, required }: { label: string; value: string; on: (v: string) => void; type?: string; full?: boolean; required?: boolean }) {
+function Field({ label, value, on, type = "text", full, required, min, max }: { label: string; value: string; on: (v: string) => void; type?: string; full?: boolean; required?: boolean; min?: number; max?: number }) {
   return (
     <label className={`block ${full ? "sm:col-span-2" : ""}`}>
       <span className="text-[12px] font-medium text-muted">{label}</span>
-      <input type={type} required={required} value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+      <input type={type} required={required} min={min} max={max} value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
     </label>
   );
 }

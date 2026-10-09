@@ -29,7 +29,7 @@ export function PageHeader({
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="mt-2 font-display text-[clamp(2rem,4vw,3.2rem)] font-semibold text-ink">
+      <h1 className="mt-2 break-words font-display text-[clamp(2rem,4vw,3.2rem)] font-semibold text-ink">
         {title}
       </h1>
       {sub ? <p className="mt-2 max-w-xl text-[15px] text-muted">{sub}</p> : null}

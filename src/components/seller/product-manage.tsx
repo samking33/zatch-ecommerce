@@ -21,6 +21,8 @@ export function ProductManage({ product, canTopPick = false }: { product: Produc
   const [topPick, setTopPick] = useState(!!product.isTopPick);
   const [error, setError] = useState<string | null>(null);
   const price = product.discountedPrice ?? product.price;
+  // Without variants (colour/size/stock rows) buyers cannot add the product to a cart, so it must not go live.
+  const incomplete = (product.variants ?? []).length === 0;
 
   async function toggleTopPick() {
     const t = getToken();
@@ -73,11 +75,12 @@ export function ProductManage({ product, canTopPick = false }: { product: Produc
         <select
           value={status}
           disabled={busy}
+          title={incomplete ? "Add stock details first: delete this product and add it again." : undefined}
           onChange={(e) => changeStatus(e.target.value)}
           className="h-9 rounded-full border border-hairline bg-surface-2 px-3 text-[13px] font-medium capitalize text-ink focus:border-ink focus:outline-none disabled:opacity-70"
         >
           {!STATUSES.includes(status) && <option value={status} disabled>{status.replace(/_/g, " ")}</option>}
-          {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+          {STATUSES.map((s) => <option key={s} value={s} disabled={incomplete && s === "active"}>{s.replace(/_/g, " ")}</option>)}
         </select>
         {canTopPick && <button
           onClick={toggleTopPick}
@@ -101,6 +104,7 @@ export function ProductManage({ product, canTopPick = false }: { product: Produc
           <Trash2 className="h-3.5 w-3.5" /> Delete
         </button>
       </div>
+      {incomplete && <p className="mt-2 text-sm font-medium text-live">Missing colour, size and stock details, so buyers can&apos;t add this to their cart. Delete it and add it again to finish.</p>}
       {error && <p role="alert" className="mt-2 text-sm font-medium text-live">{error}</p>}
       {bargainOpen && <BargainSettings productId={product._id} initial={product.bargainSettings} onClose={() => setBargainOpen(false)} />}
     </div>

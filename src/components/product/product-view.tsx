@@ -50,9 +50,9 @@ export function ProductView({ product }: { product: Product }) {
   const selected = variants.find(
     (v) => (color ? v.color === color : true) && (size ? v.size === size : true),
   );
-  const outOfStock = variants.length > 0
-    ? soldOut(selected)
-    : product.totalStock === 0;
+  // A product with no variants can never be added to a cart (the server matches a variant), so it is unavailable.
+  const unavailable = variants.length === 0;
+  const outOfStock = unavailable || soldOut(selected);
 
   // All browsable images: product gallery + every variant image, de-duped.
   const gallery = useMemo<ProductImage[]>(() => {
@@ -223,7 +223,7 @@ export function ProductView({ product }: { product: Product }) {
             ) : (
               <button onClick={addToCart} disabled={status === "adding" || outOfStock} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
                 {status === "adding" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ShoppingBag className="h-[18px] w-[18px]" />}
-                {outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
+                {unavailable ? "Not available yet" : outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
               </button>
             )}
             {status === "error" && <p role="alert" className="mt-2 text-sm font-medium text-live">{cartError}</p>}

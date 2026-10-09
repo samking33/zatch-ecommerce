@@ -1,16 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Search, Heart, ShoppingBag, Store, Bell } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { CategoryMenu, CategoryStrip } from "./category-menu";
 import { useAuth } from "@/components/auth/auth-provider";
-import { cart as cartApi, notifications as notifApi } from "@/lib/api";
-import { getToken } from "@/lib/client-auth";
+import { cart as cartApi, notifications as notifApi, seller as sellerApi } from "@/lib/api";
+import { getToken, isSellerStatus } from "@/lib/client-auth";
 import { onEvent } from "@/lib/socket";
 
+// The category strip is for browsing. Account, cart, checkout, seller and legal pages stay uncluttered.
+const BROWSE_EXACT = ["/", "/shop", "/trending", "/bits", "/live", "/sellers", "/search"];
+const BROWSE_PREFIX = ["/category/", "/product/"];
+
 export function Nav() {
+  const pathname = usePathname();
+  const showStrip = BROWSE_EXACT.includes(pathname) || BROWSE_PREFIX.some((p) => pathname.startsWith(p));
   const [q, setQ] = useState("");
   const { user } = useAuth();
   const label = user?.username || (user ? "Account" : "Sign in");
@@ -19,9 +26,12 @@ export function Nav() {
   // Real cart count + unread notifications for the badges (0 → no badge).
   const [cartCount, setCartCount] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [isSeller, setIsSeller] = useState(false);
   useEffect(() => {
     const t = getToken();
-    if (!t) { setCartCount(0); setUnread(0); return; }
+    if (!t) { setCartCount(0); setUnread(0); setIsSeller(false); return; }
+    // Read live, so someone approved after they signed in still gets their dashboard link.
+    sellerApi.status(t).then((s) => setIsSeller(isSellerStatus(s?.sellerStatus)));
     cartApi.get(t).then((c) => {
       const cart = c as { totalItems?: number; items?: unknown[] } | null;
       setCartCount(cart?.totalItems ?? cart?.items?.length ?? 0);
@@ -68,11 +78,11 @@ export function Nav() {
         </form>
 
         <Link
-          href="/sell"
+          href={isSeller ? "/seller/dashboard" : "/sell"}
           className="ml-auto hidden items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface transition-opacity hover:opacity-90 sm:flex md:ml-0"
         >
           <Store className="h-4 w-4" />
-          Sell
+          {isSeller ? "Dashboard" : "Sell"}
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:ml-0">
@@ -80,6 +90,11 @@ export function Nav() {
           <IconButton href="/search" label="Search" className="md:hidden">
             <Search className="h-[18px] w-[18px]" />
           </IconButton>
+          {isSeller && (
+            <IconButton href="/seller/dashboard" label="Seller dashboard" className="sm:hidden">
+              <Store className="h-[18px] w-[18px]" />
+            </IconButton>
+          )}
           <IconButton href="/notifications" label="Notifications" badge={unread || undefined} className="hidden sm:grid">
             <Bell className="h-[18px] w-[18px]" />
           </IconButton>
@@ -103,7 +118,7 @@ export function Nav() {
           </Link>
         </div>
       </nav>
-      <CategoryStrip />
+      {showStrip && <CategoryStrip />}
     </header>
   );
 }

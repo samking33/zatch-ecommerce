@@ -107,7 +107,7 @@ export function CategoryStrip() {
   return (
     <nav
       aria-label="Categories"
-      className="mx-auto mt-2 flex max-w-[1400px] gap-1 overflow-x-auto px-2 pb-1 text-[14px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mx-auto mt-2 flex max-w-[1400px] gap-1 overflow-x-auto rounded-full bg-canvas/90 px-2 py-1 text-[14px] backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <Link href="/live" className="shrink-0 rounded-full px-3 py-1.5 font-medium text-ink transition-colors hover:bg-surface-2">
         Live

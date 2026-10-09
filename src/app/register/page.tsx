@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
-import { register } from "@/lib/client-auth";
+import { register, USERNAME_MAX } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export default function RegisterPage() {
@@ -59,7 +59,7 @@ export default function RegisterPage() {
           <p className="mt-1 text-[15px] text-muted">It takes a few seconds.</p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <Field label="Username" value={f.username} onChange={set("username")} required />
+            <Field label="Username" value={f.username} onChange={set("username")} required maxLength={USERNAME_MAX} />
             <Field label="Email (optional)" type="email" value={f.email} onChange={set("email")} />
             <label className="block">
               <span className="text-[13px] font-medium text-muted">Phone number</span>
@@ -89,11 +89,11 @@ export default function RegisterPage() {
   );
 }
 
-function Field({ label, value, onChange, type = "text", required }: { label: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; required?: boolean }) {
+function Field({ label, value, onChange, type = "text", required, maxLength }: { label: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; required?: boolean; maxLength?: number }) {
   return (
     <label className="block">
       <span className="text-[13px] font-medium text-muted">{label}</span>
-      <input type={type} required={required} value={value} onChange={onChange} className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
+      <input type={type} required={required} maxLength={maxLength} value={value} onChange={onChange} className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
     </label>
   );
 }
