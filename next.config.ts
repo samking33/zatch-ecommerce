@@ -37,7 +37,8 @@ const nextConfig: NextConfig = {
   // Proxy API calls to the Express backend so the browser talks same-origin
   // and the JWT flows without CORS gymnastics. Destination host is fixed.
   async rewrites() {
-    return [{ source: "/api/v1/:path*", destination: `${API}/api/v1/:path*` }];
+    // Proxy both API versions so browser calls stay same-origin (no CORS).
+    return [{ source: "/api/:path*", destination: `${API}/api/:path*` }];
   },
 };
 

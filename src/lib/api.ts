@@ -55,8 +55,13 @@ function unwrap<T>(json: unknown, pick?: string): T {
 export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
   const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick, raw, version = "v1" } = opts;
   const isRead = method === "GET";
+  // In the browser, go through the same-origin /api proxy (Next rewrite) so
+  // requests never cross origins - the backend's CORS allowlist doesn't include
+  // this frontend, which otherwise blocks every client-side mutation. On the
+  // server there's no proxy, so call the backend directly.
+  const origin = typeof window === "undefined" ? BASE : "";
   try {
-    const res = await fetch(`${BASE}/api/${version}${path}`, {
+    const res = await fetch(`${origin}/api/${version}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
