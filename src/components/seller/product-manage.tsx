@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag, Loader2, Check, Sparkles } from "lucide-react";
+import { Tag, Loader2, Check, Sparkles, Trash2 } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { products as productsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
@@ -18,6 +18,7 @@ export function ProductManage({ product }: { product: Product & { status?: strin
   const [busy, setBusy] = useState(false);
   const [bargainOpen, setBargainOpen] = useState(false);
   const [topPick, setTopPick] = useState(!!product.isTopPick);
+  const [error, setError] = useState<string | null>(null);
   const price = product.discountedPrice ?? product.price;
 
   async function toggleTopPick() {
@@ -40,15 +41,29 @@ export function ProductManage({ product }: { product: Product & { status?: strin
     router.refresh();
   }
 
+  async function remove() {
+    if (!window.confirm(`Delete "${product.name}"? This can't be undone.`)) return;
+    const t = getToken();
+    if (!t) return;
+    setBusy(true);
+    setError(null);
+    const res = await productsApi.remove(product._id, t);
+    if (res) router.refresh();
+    else { setBusy(false); setError("Couldn't delete this product. Try again."); }
+  }
+
   return (
     <div className="card rounded-[1.5rem] p-3">
-      <div className="flex items-center gap-4">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
-          <ProductMedia src={product.images?.[0]?.url} alt={product.name} sizes="64px" className="h-full w-full" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{product.name}</p>
-          <p className="mt-0.5 text-sm text-muted">{inr(price)} · {product.totalStock ?? 0} in stock</p>
+      {/* Wraps on small screens so the controls drop below the name instead of overflowing. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-1 basis-56 items-center gap-4">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
+            <ProductMedia src={product.images?.[0]?.url} alt={product.name} sizes="64px" className="h-full w-full" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{product.name}</p>
+            <p className="mt-0.5 text-sm text-muted">{inr(price)} · {product.totalStock ?? 0} in stock</p>
+          </div>
         </div>
         <select
           value={status}
@@ -71,7 +86,16 @@ export function ProductManage({ product }: { product: Product & { status?: strin
           <Tag className="h-3.5 w-3.5" /> Bargain
         </button>
         <Link href={`/product/${product._id}`} className="text-[13px] font-medium text-muted hover:text-ink">View</Link>
+        <button
+          onClick={remove}
+          disabled={busy}
+          aria-label={`Delete ${product.name}`}
+          className="inline-flex items-center gap-1.5 rounded-full border border-live px-3.5 py-2 text-[13px] font-medium text-live transition-colors hover:bg-live/5 disabled:opacity-60"
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Delete
+        </button>
       </div>
+      {error && <p role="alert" className="mt-2 text-sm font-medium text-live">{error}</p>}
       {bargainOpen && <BargainSettings productId={product._id} initial={product.bargainSettings} onClose={() => setBargainOpen(false)} />}
     </div>
   );

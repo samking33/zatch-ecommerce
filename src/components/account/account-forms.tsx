@@ -75,8 +75,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function EditProfile({ user }: { user: SessionUser | null }) {
-  // Changing an email parks it in pendingEmail until an OTP verifies it.
-  const pendingEmail = user?.pendingEmail as string | undefined;
   const emailVerified = user?.isEmailVerified as boolean | undefined;
   const [f, setF] = useState({
     username: (user?.username as string) ?? "",
@@ -84,6 +82,11 @@ function EditProfile({ user }: { user: SessionUser | null }) {
     gender: (user?.gender as string) ?? "",
   });
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // When the email changes, the backend emails a code and asks us to verify it
+  // before the change applies. Collect that code here.
+  const [otpRequired, setOtpRequired] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   async function save(e: React.FormEvent) {
@@ -91,8 +94,26 @@ function EditProfile({ user }: { user: SessionUser | null }) {
     const t = getToken();
     if (!t) return;
     setState("saving");
-    const res = await users.updateProfile(f, t);
-    setState(res ? "saved" : "error");
+    setMsg(null);
+    const body = otpRequired && otp ? { ...f, otp: otp.trim() } : f;
+    const res = await users.updateProfile(body, t);
+
+    if (!res) { setState("error"); return; }
+    // Email changed: backend sent a code, wants us to verify it.
+    if (res.action === "verify-email-otp") {
+      setOtpRequired(true);
+      setMsg(res.message ?? "We emailed a code to your new address. Enter it to confirm.");
+      setState("idle");
+      return;
+    }
+    if (res.success) {
+      setState("saved");
+      setOtpRequired(false);
+      setOtp("");
+    } else {
+      setState("error");
+      setMsg(res.message ?? null);
+    }
   }
 
   return (
@@ -100,12 +121,17 @@ function EditProfile({ user }: { user: SessionUser | null }) {
       <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
         <Field label="Username" value={f.username} on={set("username")} />
         <div className="block">
-          <Field label="Email" value={f.email} on={set("email")} type="email" />
-          {pendingEmail ? (
-            <p className="mt-1 text-[12px] font-medium text-live">
-              {pendingEmail} awaiting verification - check your inbox for the code.
-            </p>
-          ) : emailVerified === false && f.email ? (
+          <Field
+            label="Email"
+            value={f.email}
+            on={(e) => {
+              set("email")(e);
+              // A code only proves the address it was sent to - ask for a new one.
+              if (otpRequired) { setOtpRequired(false); setOtp(""); setMsg(null); }
+            }}
+            type="email"
+          />
+          {otpRequired ? null : emailVerified === false && f.email ? (
             <p className="mt-1 text-[12px] text-muted">Email not verified yet.</p>
           ) : null}
         </div>
@@ -118,8 +144,29 @@ function EditProfile({ user }: { user: SessionUser | null }) {
             <option value="other">Other</option>
           </select>
         </label>
+
+        {otpRequired && (
+          <div className="sm:col-span-2">
+            <Field
+              label={`Verification code (sent to ${f.email})`}
+              value={otp}
+              on={(e) => setOtp(e.target.value)}
+            />
+          </div>
+        )}
+
+        {msg && (
+          <p role={state === "error" ? "alert" : "status"} className={`text-[13px] font-medium sm:col-span-2 ${state === "error" ? "text-live" : "text-muted"}`}>
+            {msg}
+          </p>
+        )}
+
         <div className="sm:col-span-2">
-          <SaveButton state={state} label="Save changes" savedLabel="Saved" />
+          <SaveButton
+            state={state}
+            label={otpRequired ? "Verify & save" : "Save changes"}
+            savedLabel="Saved"
+          />
         </div>
       </form>
     </Section>

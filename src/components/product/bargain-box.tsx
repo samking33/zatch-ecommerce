@@ -33,8 +33,12 @@ export function BargainBox({
   maxDiscount?: number;
 }) {
   const router = useRouter();
-  const floor = Math.round(listPrice * (1 - maxDiscount / 100));
-  const start = Math.round(listPrice * (1 - autoAcceptDiscount / 100));
+  // The backend rejects offers below price*(1-max/100) and at/above the list price,
+  // so the slider runs from that value rounded up to one rupee under the list price.
+  const floor = Math.ceil(listPrice * (1 - maxDiscount / 100));
+  const top = listPrice - 1;
+  // Sellers can set auto-accept outside that range; keep the default inside it.
+  const start = Math.min(top, Math.max(floor, Math.round(listPrice * (1 - autoAcceptDiscount / 100))));
   const [offer, setOffer] = useState(start);
   const [phase, setPhase] = useState<Phase>("idle");
   const [counter, setCounter] = useState(0);
@@ -78,6 +82,13 @@ export function BargainBox({
       setPhase("idle");
       setExisting(res.existingBargain);
       setError(res.tip ?? res.message ?? "You already have an active offer on this product.");
+      return;
+    }
+    // The backend rejected the offer (too low, bargaining off, variant out of
+    // stock...). Show its reason instead of treating the body as a sent offer.
+    if (res.success === false) {
+      setPhase("idle");
+      setError(res.message ?? "Couldn't send your offer. Try again.");
       return;
     }
     setBargainId(res._id ?? null);
@@ -152,7 +163,7 @@ export function BargainBox({
             <input
               type="range"
               min={floor}
-              max={listPrice}
+              max={top}
               step={10}
               value={offer}
               onChange={(e) => setOffer(Number(e.target.value))}

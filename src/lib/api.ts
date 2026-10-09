@@ -13,6 +13,7 @@ type Opts = {
   pick?: string; // envelope key holding the payload, e.g. "products"
   raw?: boolean; // return the whole JSON envelope, no unwrap (dashboards)
   version?: "v1" | "v2"; // v2 = public (optionalAuth) catalogue reads, no token needed
+  keepError?: boolean; // return the parsed body even on 4xx (e.g. OTP-required flows)
 };
 
 /**
@@ -53,7 +54,7 @@ function unwrap<T>(json: unknown, pick?: string): T {
 }
 
 export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
-  const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick, raw, version = "v1" } = opts;
+  const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick, raw, version = "v1", keepError } = opts;
   const isRead = method === "GET";
   // In the browser, go through the same-origin /api proxy (Next rewrite) so
   // requests never cross origins - the backend's CORS allowlist doesn't include
@@ -74,9 +75,9 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
         : { cache: "no-store" as RequestCache }),
     });
     const json = await res.json().catch(() => null);
-    // 409 carries useful context (e.g. an existing bargain) - hand it back so
-    // callers can show it instead of a generic failure.
-    if (!res.ok) return res.status === 409 ? (json as T) : null;
+    // keepError: callers that need the body on a 4xx (e.g. "verify email OTP"
+    // responses) opt in. 409 always carries useful context (existing bargain).
+    if (!res.ok) return keepError || res.status === 409 ? (json as T) : null;
     if (json && typeof json === "object" && "success" in json && json.success === false) {
       return null;
     }
@@ -125,8 +126,13 @@ export const auth = {
 // --- User & profiles (/user) ---
 export const users = {
   profile: (t: string) => api("/user/profile", { token: t, pick: "user" }),
+  // Returns the full envelope (even on 4xx) so callers can handle the
+  // "verify email OTP" response when the email is being changed.
   updateProfile: (b: unknown, t: string) =>
-    api("/user/profile-update", { method: "PUT", body: b, token: t }),
+    api<{ success?: boolean; message?: string; action?: string; user?: unknown }>(
+      "/user/profile-update",
+      { method: "PUT", body: b, token: t, raw: true, keepError: true },
+    ),
   publicProfile: (userId: string, t?: string) => api(`/user/profile/${userId}`, { token: t, pick: "user" }),
   shareProfile: (userId: string) => api(`/user/share-profile/${userId}`),
   // sortBy: content (default) | rating | products | reels | sales
@@ -165,7 +171,7 @@ export const seller = {
   approve: (b: unknown, t: string) =>
     api("/user/seller/approve", { method: "POST", body: b, token: t }),
   status: (t: string) =>
-    api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true }),
+    api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true, revalidate: 0 }),
   terms: () => api("/user/seller/terms-and-conditions"),
   profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t, raw: true }),
   benefits: (t: string) => api<SellerBenefits>("/user/seller/benefits", { token: t, pick: "data" }),
@@ -180,16 +186,19 @@ export const products = {
   topPicks: () => api<Product[]>("/product/top-picks", { version: "v2" }),
   // Backend search param is `query` (not `q`).
   search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products", version: "v2" }),
-  searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ query: q })}`, { token: t, pick: "products" }),
+  searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ query: q })}`, { token: t, pick: "products", revalidate: 0 }),
   filter: (o: Record<string, string | number | undefined>, t?: string) =>
     api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products", version: "v2" }),
   get: (id: string) => api<Product>(`/product/${id}`, { pick: "product", version: "v2" }),
-  myProducts: (t: string) => api<Product[]>("/product/seller/my-products", { token: t, pick: "products" }),
+  myProducts: (t: string) => api<Product[]>("/product/seller/my-products", { token: t, pick: "products", revalidate: 0 }),
   create: (b: unknown, t: string) => api("/product/create", { method: "POST", body: b, token: t }),
   createV2: (b: unknown, t: string) => api("/product/create-v2", { method: "POST", body: b, token: t }),
   uploadTokens: (t: string) => api("/product/upload-tokens", { method: "POST", token: t }),
   updateStatus: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/status`, { method: "PUT", body: b, token: t }),
+  // Permanent: removes the product and its images. The server checks ownership.
+  remove: (id: string, t: string) =>
+    api(`/product/${id}/action`, { method: "POST", body: { action: "delete" }, token: t }),
   like: (id: string, t: string) => api(`/product/${id}/like`, { method: "POST", token: t }),
   save: (id: string, t: string) => api(`/product/${id}/save`, { method: "POST", token: t }),
   view: (id: string) => api(`/product/${id}/view`, { method: "POST" }),
@@ -212,7 +221,7 @@ export const categories = {
   subcategories: (id: string) => api(`/category/${id}/subcategories`, { pick: "subCategories" }),
 };
 export const search = {
-  query: (q: string, t?: string) => api<Product[]>(`/search/search${qs({ query: q })}`, { token: t, pick: "products" }),
+  query: (q: string, t?: string) => api<Product[]>(`/search/search${qs({ query: q })}`, { token: t, pick: "products", revalidate: 0 }),
   popular: () => api<unknown[]>("/search/popular", { pick: "popularSearches" }),
 };
 
@@ -242,7 +251,7 @@ export const coupons = {
   trackView: (b: unknown) => api("/coupons/track-view", { method: "POST", body: b }),
   // seller-side
   list: (t: string) => api("/coupons/list", { token: t }),
-  dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true }),
+  dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true, revalidate: 0 }),
   get: (id: string, t: string) => api(`/coupons/${id}`, { token: t }),
   create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t }),
   update: (id: string, b: unknown, t: string) =>
@@ -277,8 +286,8 @@ export const orders = {
   sellerOrders: (t: string, o?: Record<string, string | undefined>) =>
     api(`/orders/seller/orders${qs(o)}`, { token: t, pick: "orders" }),
   sellerOrdersRaw: (t: string, o?: Record<string, string | undefined>) =>
-    api(`/orders/seller/orders${qs(o)}`, { token: t, raw: true }),
-  sellerDashboard: (t: string) => api("/orders/seller/dashboard", { token: t, raw: true }),
+    api(`/orders/seller/orders${qs(o)}`, { token: t, raw: true, revalidate: 0 }),
+  sellerDashboard: (t: string) => api("/orders/seller/dashboard", { token: t, raw: true, revalidate: 0 }),
   groupedBySeller: (t: string) => api("/orders/grouped-by-seller", { token: t }),
   updateStatus: (id: string, b: unknown, t: string) =>
     api(`/orders/seller/orders/${id}/update-status`, { method: "POST", body: b, token: t }),
@@ -298,7 +307,10 @@ export type BuyerBargain = {
 };
 
 export const bargains = {
-  create: (b: unknown, t: string) => api("/bargains/create", { method: "POST", body: b, token: t }),
+  // keepError: a rejected offer comes back as a 400 with the reason ("Offer too
+  // low", "Bargaining not enabled"...). Callers must check `success === false`.
+  create: (b: unknown, t: string) =>
+    api("/bargains/create", { method: "POST", body: b, token: t, keepError: true }),
   get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain" }),
   // Tab names are not stored statuses: fetching all avoids filtering them out
   // before the backend formats their effective (including expired) status.
@@ -310,7 +322,7 @@ export const bargains = {
   rejectCounter: (id: string, t: string) => api(`/bargains/${id}/reject-counter`, { method: "POST", token: t }),
   // seller-side
   sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t, pick: "bargains" }),
-  sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t, raw: true }),
+  sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t, raw: true, revalidate: 0 }),
   accept: (id: string, t: string) => api(`/bargains/${id}/accept`, { method: "POST", token: t }),
   reject: (id: string, t: string) => api(`/bargains/${id}/reject`, { method: "POST", token: t }),
   counter: (id: string, b: unknown, t: string) =>
@@ -333,7 +345,7 @@ export const ifsc = { lookup: (code: string) => api(`/ifsc${qs({ ifsc: code })}`
 export const live = {
   sessions: () => api<LiveSession[]>("/live/sessions"),
   details: (sessionId: string, t?: string) =>
-    api<{ session?: LiveSession } & LiveSession>(`/live/session/${sessionId}/details`, { token: t, raw: true }),
+    api<{ session?: LiveSession } & LiveSession>(`/live/session/${sessionId}/details`, { token: t, raw: true, revalidate: 0 }),
   comments: (sessionId: string) => api(`/live/session/${sessionId}/comments`),
   token: (b: unknown, t: string) => api("/live/token", { method: "POST", body: b, token: t, raw: true }),
   refreshToken: (b: unknown, t: string) => api("/live/refresh-token", { method: "POST", body: b, token: t, raw: true }),
@@ -347,7 +359,7 @@ export const live = {
   heartbeat: (sessionId: string, t: string) => api(`/live/session/${sessionId}/heartbeat`, { method: "POST", token: t }),
   share: (sessionId: string) => api(`/live/session/${sessionId}/share`, { raw: true }),
   // seller-side
-  dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true }),
+  dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true, revalidate: 0 }),
   schedule: (b: unknown, t: string) => api("/live/schedule", { method: "POST", body: b, token: t }),
   end: (sessionId: string, t: string) => api(`/live/session/${sessionId}/end`, { method: "PATCH", token: t }),
   // Seller-side: edit | cancel | reschedule
@@ -363,8 +375,8 @@ export const bits = {
   // Public reads via v2 (optionalAuth) so the feed shows without login.
   list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits", version: "v2" }),
   get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bit", version: "v2" }),
-  dashboard: (t: string) => api("/bits/dashboard", { token: t, raw: true }),
-  uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true }),
+  dashboard: (t: string) => api("/bits/dashboard", { token: t, raw: true, revalidate: 0 }),
+  uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true, revalidate: 0 }),
   upload: (b: unknown, t: string) => api("/bits/upload", { method: "POST", body: b, token: t }),
   toggleLike: (id: string, t: string) => api(`/bits/${id}/toggleLike`, { method: "POST", token: t, raw: true }),
   save: (id: string, t: string) => api(`/bits/${id}/save`, { method: "POST", token: t, raw: true }),
@@ -380,7 +392,7 @@ export const bits = {
 export const notifications = {
   list: (t: string) => api("/notifications", { token: t }),
   // Envelope carries an unreadCount alongside the list - used for the nav badge.
-  unreadCount: (t: string) => api<{ unreadCount?: number }>("/notifications", { token: t, raw: true }),
+  unreadCount: (t: string) => api<{ unreadCount?: number }>("/notifications", { token: t, raw: true, revalidate: 0 }),
   markRead: (id: string, t: string) => api(`/notifications/${id}/read`, { method: "PUT", token: t }),
   markAllRead: (t: string) => api("/notifications/read-all", { method: "PUT", token: t }),
   remove: (id: string, t: string) => api(`/notifications/${id}`, { method: "DELETE", token: t }),
@@ -398,7 +410,7 @@ export const payments = {
   due: (t: string) => api("/payments/due", { token: t }),
   done: (t: string) => api("/payments/done", { token: t }),
   adjustments: (t: string) => api("/payments/adjustments", { token: t }),
-  payout: (payoutId: string, t: string) => api(`/payments/payout/${payoutId}`, { token: t, raw: true }),
+  payout: (payoutId: string, t: string) => api(`/payments/payout/${payoutId}`, { token: t, raw: true, revalidate: 0 }),
 };
 
 // --- Support & legal ---
@@ -420,7 +432,7 @@ export const catalog = {
   products: (q = "", t?: string) => api<Product[]>(`/product/products${q}`, { token: t, pick: "products", version: "v2" }),
   product: (id: string, t?: string) => api<Product>(`/product/${id}`, { token: t, pick: "product", version: "v2" }),
   categories: () => categories.list(),
-  trending: (t?: string) => api<Product[]>("/trending/trending", { token: t, pick: "products" }),
+  trending: (t?: string) => api<Product[]>("/trending/trending", { token: t, pick: "products", revalidate: 0 }),
   liveSessions: (t?: string) => api<LiveSession[]>("/live/sessions", { token: t, pick: "sessions" }),
   // Home shows the whole feed, so new uploads flow in below the existing ones.
   bits: (t?: string, limit = 100) =>

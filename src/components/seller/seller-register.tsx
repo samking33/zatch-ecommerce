@@ -24,7 +24,7 @@ export function SellerRegister() {
 
   const [shop, setShop] = useState({ businessName: "", gstin: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
-  const [addr, setAddr] = useState({ pickupAddress: "", pinCode: "", state: "", shippingMethod: "self" });
+  const [addr, setAddr] = useState({ pickupAddress: "", pinCode: "", state: "", shippingMethod: "self_ship" });
   const [tc, setTc] = useState(false);
   const [bank, setBank] = useState({ accountHolderName: "", accountNumber: "", ifscCode: "", bankName: "", upiId: "" });
 
@@ -36,7 +36,8 @@ export function SellerRegister() {
     fd.append("step", "1");
     fd.append("businessName", shop.businessName);
     if (shop.gstin) fd.append("gstin", shop.gstin);
-    docs.forEach((d) => { fd.append("documents", d.file); fd.append("documentTypes", d.type); });
+    // "[]" makes the server read this as a list even with a single document.
+    docs.forEach((d) => { fd.append("documents", d.file); fd.append("documentTypes[]", d.type); });
     const res = await fetch("/api/v1/user/seller/register", { method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd })
       .then((r) => r.json()).catch(() => null);
     setBusy(false);

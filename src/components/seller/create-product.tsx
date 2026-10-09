@@ -6,6 +6,8 @@ import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
 import type { Category } from "@/lib/types";
 
+const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
+
 // Real 3-step create matching the backend: step 1 (basics → productId),
 // step 2 (colors), step 3 (multipart images + sizes).
 export function CreateProduct({ categories }: { categories: Category[] }) {
@@ -25,6 +27,13 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   const [sizes, setSizes] = useState<string[]>([]);
   const [sizeInput, setSizeInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+
+  // The backend uppercases sizes, so compare case-insensitively ("s" and "S" are one size).
+  const hasSize = (v: string) => sizes.some((x) => x.toLowerCase() === v.toLowerCase());
+  const addSize = (v: string) => {
+    const s = v.trim();
+    if (s && !hasSize(s)) setSizes([...sizes, s]);
+  };
 
   const cat = categories.find((c) => c.slug === s1.category);
   const subs = (cat?.subCategories ?? []) as { name: string; slug: string }[];
@@ -152,9 +161,13 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           {s1.hasSize && (
             <div className="mb-5">
               <p className="text-[15px] text-muted">Sizes</p>
+              <select value="" onChange={(e) => addSize(e.target.value)} aria-label="Pick a standard size" className="mt-2 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
+                <option value="">Pick a size</option>
+                {SIZE_OPTIONS.map((o) => <option key={o} value={o} disabled={hasSize(o)}>{o}</option>)}
+              </select>
               <div className="mt-2 flex gap-2">
-                <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} placeholder="e.g. M" className="h-11 flex-1 rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
-                <button onClick={() => { if (sizeInput.trim()) { setSizes([...sizes, sizeInput.trim()]); setSizeInput(""); } }} className="btn-ink rounded-full px-5 text-sm font-semibold">Add</button>
+                <input value={sizeInput} onChange={(e) => setSizeInput(e.target.value)} placeholder="Or type your own, e.g. 28" className="h-11 flex-1 rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+                <button onClick={() => { addSize(sizeInput); setSizeInput(""); }} className="btn-ink rounded-full px-5 text-sm font-semibold">Add</button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {sizes.map((s, i) => <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-sm text-ink">{s} <button onClick={() => setSizes(sizes.filter((_, j) => j !== i))}><X className="h-3.5 w-3.5" /></button></span>)}
