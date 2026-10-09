@@ -76,6 +76,10 @@ export function Nav() {
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:ml-0">
+          {/* The search bar above is md+ only; give smaller screens a way in. */}
+          <IconButton href="/search" label="Search" className="md:hidden">
+            <Search className="h-[18px] w-[18px]" />
+          </IconButton>
           <IconButton href="/notifications" label="Notifications" badge={unread || undefined} className="hidden sm:grid">
             <Bell className="h-[18px] w-[18px]" />
           </IconButton>

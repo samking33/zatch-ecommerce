@@ -10,6 +10,32 @@ import type { Product } from "@/lib/types";
 export const metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
 
+// The nav search bar is desktop-only, so this page carries its own box -
+// it's the only way to type a query on mobile. Plain GET form, no JS needed.
+function SearchBox({ q }: { q: string }) {
+  return (
+    <form action="/search" role="search" className="relative mb-8 flex items-center">
+      <SearchIcon className="pointer-events-none absolute left-5 h-[18px] w-[18px] text-muted" />
+      <input
+        name="q"
+        type="search"
+        defaultValue={q}
+        autoFocus={!q}
+        placeholder="Search products, sellers, live drops…"
+        aria-label="Search products"
+        className="h-14 w-full rounded-full border border-hairline bg-surface pl-12 pr-16 text-[16px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+      />
+      <button
+        type="submit"
+        aria-label="Search"
+        className="btn-ink absolute right-2 grid h-10 w-10 place-items-center rounded-full"
+      >
+        <SearchIcon className="h-4 w-4" />
+      </button>
+    </form>
+  );
+}
+
 type Popular = { query: string; searchCount?: number; type?: string; id?: string; name?: string; image?: string };
 type HistoryEntry = { query: string; createdAt?: string; _id?: string };
 
@@ -39,6 +65,7 @@ export default async function SearchPage({
     return (
       <PageShell>
         <PageHeader eyebrow="Search" title="Search Zatch" sub="Find products, sellers and live drops." />
+        <SearchBox q={q} />
 
         {hist.length > 0 && (
           <section className="mb-8">
@@ -96,6 +123,7 @@ export default async function SearchPage({
         title={`Results for “${q}”`}
         sub={`${items.length} product${items.length !== 1 ? "s" : ""} found`}
       />
+      <SearchBox q={q} />
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">
           <p className="font-display text-xl font-semibold text-ink">No matches</p>
