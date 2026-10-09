@@ -208,8 +208,8 @@ export const products = {
     api(`/product/${id}/action`, { method: "POST", body: { action: "delete" }, token: t }),
   like: (id: string, t: string) => api(`/product/${id}/like`, { method: "POST", token: t }),
   save: (id: string, t: string) => api(`/product/${id}/save`, { method: "POST", token: t }),
-  view: (id: string) => api(`/product/${id}/view`, { method: "POST" }),
-  share: (id: string) => api(`/product/${id}/share`, { method: "POST" }),
+  view: (id: string, t?: string) => api(`/product/${id}/view`, { method: "POST", token: t }),
+  share: (id: string, t?: string) => api(`/product/${id}/share`, { method: "POST", token: t }),
   comment: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/comment`, { method: "POST", body: b, token: t }),
   review: (id: string, b: unknown, t: string) =>
@@ -242,8 +242,8 @@ export const trending = {
 // --- Cart (/cart) ---
 export const cart = {
   get: (t: string) => api("/cart", { token: t, pick: "cart", revalidate: 0 }),
-  update: (b: unknown, t: string) => api("/cart/update", { method: "POST", body: b, token: t }),
-  remove: (b: unknown, t: string) => api("/cart/remove", { method: "POST", body: b, token: t }),
+  update: (b: unknown, t: string) => api("/cart/update", { method: "POST", body: b, token: t, keepError: true }),
+  remove: (b: unknown, t: string) => api("/cart/remove", { method: "POST", body: b, token: t, keepError: true }),
   applyCoupon: (b: unknown, t: string) => api("/cart/coupon", { method: "POST", body: b, token: t, keepError: true }),
   removeCoupon: (t: string) => api("/cart/coupon", { method: "DELETE", token: t }),
   addBargain: (bargainId: string, t: string) =>
@@ -309,7 +309,7 @@ export type BuyerBargain = {
   offeredPrice: number;
   currentPrice: number;
   counterOffer?: { price?: number | null; message?: string } | null;
-  product: { _id?: string; name: string; image: string; price: number };
+  product: { _id?: string; name: string; image: string; price: number; discountedPrice?: number | null };
   timeLeft?: { text?: string | null; isExpiringSoon?: boolean } | null;
 };
 
@@ -364,7 +364,7 @@ export const live = {
     api(`/live/session/${sessionId}/comment`, { method: "POST", body: b, token: t }),
   like: (sessionId: string, t: string) => api(`/live/session/${sessionId}/like`, { method: "POST", token: t }),
   heartbeat: (sessionId: string, t: string) => api(`/live/session/${sessionId}/heartbeat`, { method: "POST", token: t }),
-  share: (sessionId: string) => api(`/live/session/${sessionId}/share`, { raw: true }),
+  share: (sessionId: string, t?: string) => api(`/live/session/${sessionId}/share`, { token: t, raw: true }),
   // seller-side
   dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true, revalidate: 0 }),
   schedule: (b: unknown, t: string) => api("/live/schedule", { method: "POST", body: b, token: t }),
@@ -407,7 +407,7 @@ export const notifications = {
 };
 export const preferences = {
   get: (t: string) => api("/preference", { token: t, revalidate: 0 }),
-  categories: () => api("/preference/categories"),
+  categories: (t?: string) => api("/preference/categories", { token: t }),
   save: (b: unknown, t: string) => api("/preference/save", { method: "POST", body: b, token: t }),
   update: (b: unknown, t: string) => api("/preference/update", { method: "PUT", body: b, token: t }),
 };

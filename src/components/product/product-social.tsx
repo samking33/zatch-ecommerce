@@ -19,7 +19,7 @@ export function ProductActions({ product }: { product: Product }) {
 
   // Real view tracking, once per mount.
   useEffect(() => {
-    productsApi.view(product._id).catch(() => {});
+    productsApi.view(product._id, getToken()).catch(() => {});
   }, [product._id]);
 
   function auth(): string | null {
@@ -50,7 +50,7 @@ export function ProductActions({ product }: { product: Product }) {
       else await navigator.clipboard.writeText(url);
       setShared(true); setTimeout(() => setShared(false), 2000);
     } catch { /* dismissed */ }
-    productsApi.share(product._id).catch(() => {});
+    productsApi.share(product._id, getToken()).catch(() => {});
   }
 
   return (

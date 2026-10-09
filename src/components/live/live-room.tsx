@@ -86,7 +86,7 @@ export function LiveRoom({
   const [shared, setShared] = useState(false);
   async function share() {
     // Backend mints the canonical share link; fall back to this URL.
-    const res = (await liveApi.share(sessionId)) as { shareLink?: string; url?: string } | null;
+    const res = (await liveApi.share(sessionId, getToken())) as { shareLink?: string; url?: string } | null;
     const url = res?.shareLink ?? res?.url ?? window.location.href;
     try {
       if (navigator.share) await navigator.share({ title, url });

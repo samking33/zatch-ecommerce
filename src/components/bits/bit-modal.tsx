@@ -14,6 +14,11 @@ import { getToken } from "@/lib/client-auth";
 import { compact, inr } from "@/lib/utils";
 import type { Bit, BitComment } from "@/lib/types";
 
+type FreshComment = {
+  _id?: string; text: string; timestamp?: string;
+  user?: { _id: string; username?: string; profilePicture?: { url?: string }; profilePic?: { url?: string } };
+};
+
 function videoUrl(b: Bit) {
   if (!b.video) return undefined;
   return typeof b.video === "string" ? b.video : b.video.url;
@@ -145,6 +150,28 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
 
   useEffect(() => {
     bitsApi.view(bit._id, getToken()).catch(() => {});
+  }, [bit._id]);
+
+  // The feed the Bit came from can be minutes old (like count, your like, comments), so
+  // read this Bit again when it opens. Otherwise "like" can undo a like you already made.
+  useEffect(() => {
+    const t = getToken();
+    if (!t) return;
+    bitsApi.get(bit._id, t).then((fresh) => {
+      if (!fresh) return;
+      setLiked(!!fresh.isLiked);
+      setLikes(fresh.likeCount ?? 0);
+      setSaved(!!fresh.isSaved);
+      if (fresh.comments) {
+        // The single-Bit endpoint sends { user: { profilePicture }, timestamp } and no comment id.
+        setComments((fresh.comments as unknown as FreshComment[]).map((c, i) => ({
+          _id: c._id ?? `${i}-${c.timestamp ?? ""}`,
+          text: c.text,
+          createdAt: c.timestamp,
+          user: c.user && { _id: c.user._id, username: c.user.username, profilePic: c.user.profilePicture ?? c.user.profilePic },
+        })));
+      }
+    }).catch(() => {});
   }, [bit._id]);
 
   useEffect(() => {

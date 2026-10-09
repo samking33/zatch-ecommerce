@@ -8,7 +8,7 @@ import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw } from
 import { ProductMedia } from "@/components/ui/product-media";
 import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
-import { cart as cartApi } from "@/lib/api";
+import { cart as cartApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
 import type { Product, Variant, ProductImage } from "@/lib/types";
@@ -81,12 +81,15 @@ export function ProductView({ product }: { product: Product }) {
   }
 
   const [status, setStatus] = useState<"idle" | "adding" | "added" | "error">("idle");
+  const [cartError, setCartError] = useState<string | null>(null);
   async function addToCart() {
     const token = getToken();
     if (!token) { router.push("/login"); return; }
     setStatus("adding");
     const res = await cartApi.update({ productId: product._id, color, size, qty: 1 }, token);
-    setStatus(res ? "added" : "error");
+    const failure = apiError(res, "Couldn't add to cart. Try again.");
+    setCartError(failure);
+    setStatus(failure ? "error" : "added");
   }
 
   return (
@@ -223,7 +226,7 @@ export function ProductView({ product }: { product: Product }) {
                 {outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
               </button>
             )}
-            {status === "error" && <p className="mt-2 text-sm font-medium text-live">Couldn&apos;t add to cart. Try again.</p>}
+            {status === "error" && <p role="alert" className="mt-2 text-sm font-medium text-live">{cartError}</p>}
           </div>
 
           <ProductActions product={product} />

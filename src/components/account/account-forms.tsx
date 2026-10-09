@@ -79,7 +79,8 @@ function EditProfile({ user }: { user: SessionUser | null }) {
   const [f, setF] = useState({
     username: (user?.username as string) ?? "",
     email: (user?.email as string) ?? "",
-    gender: (user?.gender as string) ?? "",
+    // The server stores Male | Female | Other; normalise in case an older record differs in case.
+    gender: ((user?.gender as string) ?? "").replace(/^./, (c) => c.toUpperCase()).replace(/(?<=.)./g, (c) => c.toLowerCase()),
   });
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // When the email changes, the backend emails a code and asks us to verify it
@@ -139,9 +140,9 @@ function EditProfile({ user }: { user: SessionUser | null }) {
           <span className="text-[12px] font-medium text-muted">Gender</span>
           <select value={f.gender} onChange={set("gender")} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
             <option value="">Prefer not to say</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
           </select>
         </label>
 

@@ -23,7 +23,7 @@ export default function PreferencesPage() {
     const t = getToken();
     setToken(t); setReady(true);
     if (!t) { setLoading(false); return; }
-    Promise.all([prefApi.categories(), prefApi.get(t)]).then(([c, p]) => {
+    Promise.all([prefApi.categories(t), prefApi.get(t)]).then(([c, p]) => {
       setCats((c as Category[]) ?? []);
       setSelected(((p as Prefs)?.categories) ?? []);
       setLoading(false);

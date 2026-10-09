@@ -10,7 +10,7 @@ import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
 import { BuyerBargainActions } from "./buyer-bargain-actions";
 
-type Phase = "idle" | "waiting" | "countered" | "accepted";
+type Phase = "idle" | "waiting" | "sent" | "countered" | "accepted";
 
 /**
  * Real "make an offer": POST /bargains/create with the buyer's price. The
@@ -98,10 +98,12 @@ export function BargainBox({
     } else if (status === "countered" && res.counterOffer?.price) {
       setCounter(res.counterOffer.price);
       setPhase("countered");
+    } else if (res.counterOffer?.price) {
+      setCounter(res.counterOffer.price);
+      setPhase("countered");
     } else {
-      // pending - seller will respond; treat as sent
-      setCounter(res.counterOffer?.price ?? res.currentPrice ?? offer);
-      setPhase(res.counterOffer?.price ? "countered" : "accepted");
+      // pending: the seller has not replied yet, so there is nothing to add to the cart.
+      setPhase("sent");
     }
   }
 
@@ -127,7 +129,20 @@ export function BargainBox({
       </div>
 
       <AnimatePresence mode="wait">
-        {phase === "accepted" ? (
+        {phase === "sent" ? (
+          <motion.div key="sent" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-surface-2 p-4">
+            <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+              <Check className="h-4 w-4" /> Offer sent · seller notified
+            </p>
+            <p className="mt-1 font-display text-2xl font-semibold text-ink">
+              {inr(offer)} <span className="text-sm font-medium text-muted">· {pct}% off</span>
+            </p>
+            <p className="mt-1 text-[13px] text-muted">The seller will reply soon. You can add it to your cart once they accept.</p>
+            <Link href={bargainId ? `/bargains/${bargainId}` : "/bargains"} className="pill-lime mt-3 inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
+              View my offer
+            </Link>
+          </motion.div>
+        ) : phase === "accepted" ? (
           <motion.div key="accepted" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-lime p-4">
             <p className="inline-flex items-center gap-2 text-sm font-semibold text-lime-ink">
               <Check className="h-4 w-4" /> Offer sent{bargainId ? " · seller notified" : ""}

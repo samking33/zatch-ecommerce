@@ -112,7 +112,7 @@ export default async function BargainsPage({
                   <Link href={`/bargains/${b._id}`} className="line-clamp-1 font-display text-[15px] font-semibold text-ink hover:underline">
                     {b.product.name}
                   </Link>
-                  {b.product.price ? <p className="mt-0.5 text-sm text-muted">List {inr(b.product.price)}</p> : null}
+                  {(b.product.discountedPrice || b.product.price) ? <p className="mt-0.5 text-sm text-muted">List {inr(b.product.discountedPrice || b.product.price)}</p> : null}
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     {b.status && (
                       <span className={`inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold capitalize ${statusTone[status] ?? "bg-surface-2 text-ink"}`}>
@@ -138,7 +138,7 @@ export default async function BargainsPage({
                   <BuyerBargainActions
                     bargainId={b._id}
                     counterPrice={counter!}
-                    listPrice={b.product.price ?? counter!}
+                    listPrice={b.product.discountedPrice || b.product.price || counter!}
                   />
                 )}
               </div>

@@ -84,20 +84,27 @@ export default function CartPage() {
     };
   }
 
+  const [cartError, setCartError] = useState<string | null>(null);
+
   async function changeQty(it: CartItem, qty: number) {
     if (!token) return;
+    setCartError(null);
     setCart((c) =>
       c ? { ...c, items: c.items?.map((x) => (x === it ? { ...x, qty } : x)) } : c,
     );
-    await cartApi.update({ ...lineKeys(it), qty }, token);
+    // e.g. "Only 1 item(s) left in stock" - shown, then the cart is re-read so the quantity snaps back.
+    const res = await cartApi.update({ ...lineKeys(it), qty }, token);
+    setCartError(apiError(res, "Couldn't update your cart. Try again."));
     const fresh = await cartApi.get(token);
     setCart((fresh as Cart) ?? cart);
   }
 
   async function remove(it: CartItem) {
     if (!token) return;
+    setCartError(null);
     setCart((c) => (c ? { ...c, items: c.items?.filter((x) => x !== it) } : c));
-    await cartApi.remove(lineKeys(it), token);
+    const res = await cartApi.remove(lineKeys(it), token);
+    setCartError(apiError(res, "Couldn't remove the item. Try again."));
     const fresh = await cartApi.get(token);
     setCart((fresh as Cart) ?? { items: [] });
   }
@@ -164,6 +171,7 @@ export default function CartPage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
             <div className="flex flex-col gap-4">
+              {cartError && <p role="alert" className="rounded-xl bg-live/10 px-4 py-3 text-sm font-medium text-live">{cartError}</p>}
               {items.map((it, idx) => {
                 const qty = it.qty ?? 1;
                 return (
