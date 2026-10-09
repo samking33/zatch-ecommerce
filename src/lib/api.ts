@@ -12,6 +12,7 @@ type Opts = {
   revalidate?: number; // GET only; ignored for mutations
   pick?: string; // envelope key holding the payload, e.g. "products"
   raw?: boolean; // return the whole JSON envelope, no unwrap (dashboards)
+  version?: "v1" | "v2"; // v2 = public (optionalAuth) catalogue reads, no token needed
 };
 
 /**
@@ -52,10 +53,10 @@ function unwrap<T>(json: unknown, pick?: string): T {
 }
 
 export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
-  const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick, raw } = opts;
+  const { method = "GET", body, token = DEFAULT_TOKEN, headers = {}, revalidate = 60, pick, raw, version = "v1" } = opts;
   const isRead = method === "GET";
   try {
-    const res = await fetch(`${BASE}/api/v1${path}`, {
+    const res = await fetch(`${BASE}/api/${version}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -169,14 +170,15 @@ export const seller = {
 
 // --- Products (/product) ---
 export const products = {
-  list: (o?: Record<string, string | number>) => api<Product[]>(`/product/products${qs(o)}`),
-  topPicks: () => api<Product[]>("/product/top-picks"),
+  // Public catalogue reads use the v2 (optionalAuth) endpoints - no token required.
+  list: (o?: Record<string, string | number>) => api<Product[]>(`/product/products${qs(o)}`, { version: "v2" }),
+  topPicks: () => api<Product[]>("/product/top-picks", { version: "v2" }),
   // Backend search param is `query` (not `q`).
-  search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products" }),
+  search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products", version: "v2" }),
   searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ query: q })}`, { token: t, pick: "products" }),
   filter: (o: Record<string, string | number | undefined>, t?: string) =>
-    api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products" }),
-  get: (id: string) => api<Product>(`/product/${id}`, { pick: "product" }),
+    api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products", version: "v2" }),
+  get: (id: string) => api<Product>(`/product/${id}`, { pick: "product", version: "v2" }),
   myProducts: (t: string) => api<Product[]>("/product/seller/my-products", { token: t, pick: "products" }),
   create: (b: unknown, t: string) => api("/product/create", { method: "POST", body: b, token: t }),
   createV2: (b: unknown, t: string) => api("/product/create-v2", { method: "POST", body: b, token: t }),
@@ -342,8 +344,9 @@ export const live = {
 
 // --- Bits - short shopping videos (/bits) ---
 export const bits = {
-  list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits" }),
-  get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bit" }),
+  // Public reads via v2 (optionalAuth) so the feed shows without login.
+  list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits", version: "v2" }),
+  get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bit", version: "v2" }),
   dashboard: (t: string) => api("/bits/dashboard", { token: t, raw: true }),
   uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true }),
   upload: (b: unknown, t: string) => api("/bits/upload", { method: "POST", body: b, token: t }),
@@ -393,14 +396,17 @@ export const content = {
 // Namespace used by the server pages. All reads accept an optional JWT so a
 // logged-in session pulls live data; without one they use ZATCH_API_TOKEN (if
 // set) and otherwise fail → pages fall back to placeholder content.
+// Catalogue reads use the public v2 endpoints (optionalAuth), so logged-out
+// visitors see products and bits without any token. The token is still passed
+// when present so a signed-in user gets personalised fields (liked/saved).
 export const catalog = {
-  topPicks: (t?: string) => api<Product[]>("/product/top-picks", { token: t, pick: "products" }),
-  products: (q = "", t?: string) => api<Product[]>(`/product/products${q}`, { token: t, pick: "products" }),
-  product: (id: string, t?: string) => api<Product>(`/product/${id}`, { token: t, pick: "product" }),
+  topPicks: (t?: string) => api<Product[]>("/product/top-picks", { token: t, pick: "products", version: "v2" }),
+  products: (q = "", t?: string) => api<Product[]>(`/product/products${q}`, { token: t, pick: "products", version: "v2" }),
+  product: (id: string, t?: string) => api<Product>(`/product/${id}`, { token: t, pick: "product", version: "v2" }),
   categories: () => categories.list(),
   trending: (t?: string) => api<Product[]>("/trending/trending", { token: t, pick: "products" }),
   liveSessions: (t?: string) => api<LiveSession[]>("/live/sessions", { token: t, pick: "sessions" }),
   // Home shows the whole feed, so new uploads flow in below the existing ones.
   bits: (t?: string, limit = 100) =>
-    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits" }),
+    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits", version: "v2" }),
 };
