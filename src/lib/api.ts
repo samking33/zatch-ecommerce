@@ -282,12 +282,23 @@ export const orders = {
 };
 
 // --- Bargains (/bargains) - the core negotiation flow ---
+export type BuyerBargain = {
+  _id: string;
+  status: string;
+  offeredPrice: number;
+  currentPrice: number;
+  counterOffer?: { price?: number | null; message?: string } | null;
+  product: { _id?: string; name: string; image: string; price: number };
+  timeLeft?: { text?: string | null; isExpiringSoon?: boolean } | null;
+};
+
 export const bargains = {
   create: (b: unknown, t: string) => api("/bargains/create", { method: "POST", body: b, token: t }),
   get: (id: string, t: string) => api(`/bargains/${id}`, { token: t, pick: "bargain" }),
-  // status accepts the backend's tab pseudo-values: "active" | "history".
-  myBargains: (t: string, status?: string) =>
-    api(`/bargains/buyer/my-bargains${qs({ status })}`, { token: t }),
+  // Tab names are not stored statuses: fetching all avoids filtering them out
+  // before the backend formats their effective (including expired) status.
+  myBargains: (t: string) =>
+    api<BuyerBargain[]>("/bargains/buyer/my-bargains", { token: t, pick: "bargains", revalidate: 0 }),
   buyerCounter: (id: string, b: unknown, t: string) =>
     api(`/bargains/${id}/buyer-counter`, { method: "POST", body: b, token: t }),
   acceptCounter: (id: string, t: string) => api(`/bargains/${id}/accept-counter`, { method: "POST", token: t }),

@@ -12,19 +12,6 @@ import { inr } from "@/lib/utils";
 export const metadata = { title: "My bargains" };
 export const dynamic = "force-dynamic";
 
-type Bargain = {
-  _id: string;
-  status?: string;
-  originalPrice?: number;
-  offeredPrice?: number;
-  currentPrice?: number;
-  counterOffer?: { price?: number; message?: string };
-  productId?: string | { _id?: string };
-  productSnapshot?: { name?: string; image?: string };
-  // Backend computes a humanised countdown per bargain (48h clock).
-  timeLeft?: { text?: string | null; isExpiringSoon?: boolean };
-};
-
 const statusTone: Record<string, string> = {
   accepted: "bg-lime text-lime-ink",
   auto_accepted: "bg-lime text-lime-ink",
@@ -36,6 +23,8 @@ const statusTone: Record<string, string> = {
 
 // Statuses where the ball is in the buyer's court.
 const NEEDS_BUYER = ["countered", "seller_countered"];
+const ACTIVE = ["pending", "countered", "buyer_countered"];
+const HISTORY = ["accepted", "auto_accepted", "rejected", "expired"];
 
 const TABS = [
   { key: "active", label: "Active" },
@@ -56,9 +45,11 @@ export default async function BargainsPage({
     );
   }
 
-  const { tab = "active" } = await searchParams;
-  const data = (await bargainsApi.myBargains(t, tab)) as Bargain[] | null;
-  const list = Array.isArray(data) ? data : [];
+  const { tab: requestedTab } = await searchParams;
+  const tab = requestedTab === "history" ? "history" : "active";
+  const data = await bargainsApi.myBargains(t);
+  const statuses = tab === "history" ? HISTORY : ACTIVE;
+  const list = Array.isArray(data) ? data.filter((b) => statuses.includes(b.status)) : [];
   const waiting = list.filter((b) => NEEDS_BUYER.includes((b.status ?? "").toLowerCase())).length;
 
   return (
@@ -74,6 +65,7 @@ export default async function BargainsPage({
           <Link
             key={x.key}
             href={`/bargains?tab=${x.key}`}
+            aria-current={tab === x.key ? "page" : undefined}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               tab === x.key ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"
             }`}
@@ -83,13 +75,22 @@ export default async function BargainsPage({
         ))}
       </div>
 
-      {list.length === 0 ? (
+      {!Array.isArray(data) ? (
+        <div role="alert" className="card rounded-[2rem] px-6 py-10 text-center">
+          <h2 className="font-display text-2xl font-semibold text-ink">Couldn&apos;t load your bargains</h2>
+          <p className="mt-2 text-muted">Please try again. If this continues, sign in again.</p>
+          <form action="/bargains" className="mt-6">
+            <input type="hidden" name="tab" value={tab} />
+            <button className="pill-lime rounded-full px-6 py-3 text-sm font-semibold">Try again</button>
+          </form>
+        </div>
+      ) : list.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] px-6 py-20 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-full bg-lime text-lime-ink">
             <Tag className="h-5 w-5" />
           </span>
-          <h2 className="mt-4 font-display text-2xl font-semibold text-ink">No active offers</h2>
-          <p className="mt-2 text-muted">Find something you like and name your price.</p>
+          <h2 className="mt-4 font-display text-2xl font-semibold text-ink">{tab === "history" ? "No offer history" : "No active offers"}</h2>
+          <p className="mt-2 text-muted">{tab === "history" ? "Your accepted, declined and expired offers will appear here." : "Find something you like and name your price."}</p>
           <Link href="/shop" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">Browse products</Link>
         </div>
       ) : (
@@ -99,19 +100,19 @@ export default async function BargainsPage({
             const yours = b.offeredPrice ?? b.currentPrice ?? 0;
             const counter = b.counterOffer?.price ?? b.currentPrice;
             const needsYou = NEEDS_BUYER.includes(status) && !!counter;
-            const pid = typeof b.productId === "object" ? b.productId?._id : b.productId;
+            const pid = b.product._id;
 
             return (
               <div key={b._id} className="card flex flex-wrap items-center gap-4 rounded-[1.5rem] p-3">
                 <Link href={pid ? `/product/${pid}` : "/shop"} className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
-                  <ProductMedia src={b.productSnapshot?.image} alt={b.productSnapshot?.name ?? "Item"} sizes="80px" className="h-full w-full" />
+                  <ProductMedia src={b.product.image} alt={b.product.name} sizes="80px" className="h-full w-full" />
                 </Link>
 
                 <div className="min-w-0 flex-1">
                   <Link href={`/bargains/${b._id}`} className="line-clamp-1 font-display text-[15px] font-semibold text-ink hover:underline">
-                    {b.productSnapshot?.name ?? "Product"}
+                    {b.product.name}
                   </Link>
-                  {b.originalPrice ? <p className="mt-0.5 text-sm text-muted">List {inr(b.originalPrice)}</p> : null}
+                  {b.product.price ? <p className="mt-0.5 text-sm text-muted">List {inr(b.product.price)}</p> : null}
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     {b.status && (
                       <span className={`inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold capitalize ${statusTone[status] ?? "bg-surface-2 text-ink"}`}>
@@ -137,7 +138,7 @@ export default async function BargainsPage({
                   <BuyerBargainActions
                     bargainId={b._id}
                     counterPrice={counter!}
-                    listPrice={b.originalPrice ?? counter!}
+                    listPrice={b.product.price ?? counter!}
                   />
                 )}
               </div>
