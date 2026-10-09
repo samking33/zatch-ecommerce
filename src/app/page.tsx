@@ -29,11 +29,20 @@ export default async function HomePage() {
   const moreFeed = bitList.slice(20, 40);
   const rest = bitList.slice(40);
 
+  // Real imagery for the hero collage so it never shows a placeholder orb:
+  // live thumbnails first, then bit thumbnails, then product photos.
+  const heroMedia = [
+    ...sessions.map((s) => s.thumbnail?.url),
+    ...bitList.map((b) => b.thumbnail?.url),
+    ...products.flatMap((p) => p.images?.map((im) => im.url) ?? []),
+  ].filter((u): u is string => !!u);
+  const heroImages = Array.from(new Set(heroMedia)).slice(0, 4);
+
   return (
     <>
       <Nav />
       <main className="mx-auto max-w-[1400px] px-3 pb-16 pt-2 sm:px-5">
-        <HeroBanner liveCount={sessions.length} topProduct={products[0]} topBit={bitList[0]} />
+        <HeroBanner liveCount={sessions.length} topProduct={products[0]} topBit={bitList[0]} images={heroImages} />
 
         {feed.length > 0 && (
           <VideoRail

@@ -24,10 +24,12 @@ export function HeroBanner({
   liveCount = 0,
   topProduct,
   topBit,
+  images = [],
 }: {
   liveCount?: number;
   topProduct?: Product;
   topBit?: Bit;
+  images?: string[];
 }) {
   const slides: Slide[] = [
     {
@@ -99,16 +101,7 @@ export function HeroBanner({
           </Link>
         </div>
 
-        <div className="relative hidden aspect-[16/10] overflow-hidden rounded-2xl lg:block">
-          <ProductMedia
-            key={slide.key}
-            src={slide.image}
-            alt=""
-            tone={slide.key === "live" ? "coral" : "cobalt"}
-            sizes="45vw"
-            className="h-full w-full"
-          />
-        </div>
+        <HeroCollage images={images} slideImage={slide.image} slideKey={slide.key} />
       </div>
 
       {/* dots + transport, bottom right like the reference */}
@@ -133,6 +126,40 @@ export function HeroBanner({
         </div>
       </div>
     </section>
+  );
+}
+
+/** Right-side showcase: a grid of real product/live imagery, never a mock orb.
+ *  Falls back to the slide's own image, then the orb only if no media exists. */
+function HeroCollage({ images, slideImage, slideKey }: { images: string[]; slideImage?: string; slideKey: string }) {
+  // Lead with the slide's own image when it has one, then fill from the pool.
+  const pool = Array.from(new Set([slideImage, ...images].filter((u): u is string => !!u)));
+
+  if (pool.length === 0) {
+    return (
+      <div className="relative hidden aspect-[16/10] overflow-hidden rounded-2xl lg:block">
+        <ProductMedia src={undefined} alt="" tone={slideKey === "live" ? "coral" : "cobalt"} sizes="45vw" className="h-full w-full" />
+      </div>
+    );
+  }
+
+  // One large image when that's all we have; a 2x2 mosaic when we have more.
+  if (pool.length < 4) {
+    return (
+      <div className="relative hidden aspect-[16/10] overflow-hidden rounded-2xl lg:block">
+        <ProductMedia src={pool[0]} alt="" tone={slideKey === "live" ? "coral" : "cobalt"} sizes="45vw" className="h-full w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="hidden aspect-[16/10] grid-cols-2 grid-rows-2 gap-2 lg:grid">
+      {pool.slice(0, 4).map((src, n) => (
+        <div key={src + n} className="relative overflow-hidden rounded-xl">
+          <ProductMedia src={src} alt="" tone={slideKey === "live" ? "coral" : "cobalt"} sizes="23vw" className="h-full w-full" />
+        </div>
+      ))}
+    </div>
   );
 }
 
