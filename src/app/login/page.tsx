@@ -6,15 +6,17 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
-import { login, loginWithOtp, otp as otpApi, emailOtp, bothOtp } from "@/lib/client-auth";
+import { login, loginWithOtp, otp as otpApi } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
-type Mode = "password" | "otp" | "email" | "both";
+// Only two sign-in methods actually work for a logged-out user: password, and
+// SMS OTP. The email-OTP and combined-2FA endpoints are auth-gated on the
+// backend (they're post-login verification steps), so they can never complete
+// a login and were removed.
+type Mode = "password" | "otp";
 const MODES: { key: Mode; label: string }[] = [
   { key: "password", label: "Password" },
   { key: "otp", label: "SMS OTP" },
-  { key: "email", label: "Email OTP" },
-  { key: "both", label: "2FA" },
 ];
 
 export default function LoginPage() {
@@ -23,8 +25,6 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("password");
   const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState("");
-  const [emailCode, setEmailCode] = useState("");
-  const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -42,24 +42,19 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      const ph = phone.trim(), em = email.trim();
+      const ph = phone.trim();
       if (mode === "password") {
         done(await login({ phone: ph, countryCode, password }));
         return;
       }
-      // Step 1 of every OTP flow: send the code(s).
+      // SMS OTP: step 1 sends the code, step 2 verifies and signs in.
       if (!otpSent) {
-        if (mode === "otp") await otpApi.send(ph, countryCode);
-        else if (mode === "email") await emailOtp.send(em);
-        else await bothOtp.send(em, ph, countryCode);
+        await otpApi.send(ph, countryCode);
         setOtpSent(true);
         setBusy(false);
         return;
       }
-      // Step 2: verify, then exchange for a session.
-      if (mode === "otp") await otpApi.verify(ph, countryCode, code.trim());
-      else if (mode === "email") await emailOtp.verify(em, emailCode.trim());
-      else await bothOtp.verify({ email: em, phone: ph, countryCode, emailOtp: emailCode.trim(), phoneOtp: code.trim() });
+      await otpApi.verify(ph, countryCode, code.trim());
       done(await loginWithOtp({ phone: ph, countryCode }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
@@ -109,21 +104,7 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={onSubmit} className="mt-5 space-y-4">
-            {(mode === "email" || mode === "both") && (
-              <label className="block">
-                <span className="text-[13px] font-medium text-muted">Email</span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-                />
-              </label>
-            )}
-
-            <label className={mode === "email" ? "hidden" : "block"}>
+            <label className="block">
               <span className="text-[13px] font-medium text-muted">Phone number</span>
               <div className="mt-1.5 flex items-center rounded-2xl border border-hairline bg-surface-2 focus-within:border-ink">
                 <input
@@ -136,7 +117,7 @@ export default function LoginPage() {
                 <input
                   type="tel"
                   inputMode="numeric"
-                  required={mode !== "email"}
+                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="98765 43210"
@@ -158,34 +139,17 @@ export default function LoginPage() {
                 />
               </label>
             ) : otpSent ? (
-              <>
-                {mode !== "email" && (
-                  <label className="block">
-                    <span className="text-[13px] font-medium text-muted">Code sent to your phone</span>
-                    <input
-                      inputMode="numeric"
-                      required
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="6-digit code"
-                      className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-                    />
-                  </label>
-                )}
-                {(mode === "email" || mode === "both") && (
-                  <label className="block">
-                    <span className="text-[13px] font-medium text-muted">Code sent to your email</span>
-                    <input
-                      inputMode="numeric"
-                      required
-                      value={emailCode}
-                      onChange={(e) => setEmailCode(e.target.value)}
-                      placeholder="6-digit code"
-                      className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
-                    />
-                  </label>
-                )}
-              </>
+              <label className="block">
+                <span className="text-[13px] font-medium text-muted">Code sent to your phone</span>
+                <input
+                  inputMode="numeric"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="6-digit code"
+                  className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
+                />
+              </label>
             ) : null}
 
             {error && (
