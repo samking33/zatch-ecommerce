@@ -4,7 +4,7 @@ import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/selle
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductManage } from "@/components/seller/product-manage";
-import { products as productsApi } from "@/lib/api";
+import { products as productsApi, users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
 import type { Product } from "@/lib/types";
@@ -23,9 +23,13 @@ export default async function SellerProductsPage({
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
   const { q = "" } = await searchParams;
-  const list = ((q
-    ? await productsApi.searchMine(q, t)
-    : await productsApi.myProducts(t)) as (Product & { status?: string })[] | null) ?? [];
+  const [mine, me] = await Promise.all([
+    q ? productsApi.searchMine(q, t) : productsApi.myProducts(t),
+    users.profile(t),
+  ]);
+  const list = (mine as (Product & { status?: string })[] | null) ?? [];
+  // The server only lets admins feature a product as a top pick.
+  const canTopPick = (me as { isAdmin?: boolean } | null)?.isAdmin === true;
 
   return (
     <SellerShell>
@@ -57,7 +61,8 @@ export default async function SellerProductsPage({
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {list.map((p) => <ProductManage key={p._id} product={p} />)}
+          {/* Keyed by status so a row re-syncs when the server's value changes (e.g. edited in the app). */}
+          {list.map((p) => <ProductManage key={`${p._id}-${p.status}-${p.isTopPick}`} product={p} canTopPick={canTopPick} />)}
         </div>
       )}
     </SellerShell>

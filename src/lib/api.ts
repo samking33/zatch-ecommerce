@@ -414,7 +414,8 @@ export const preferences = {
 
 // --- Seller payments (/payments) ---
 export const payments = {
-  summary: (t: string) => api("/payments/summary", { token: t, revalidate: 0 }),
+  // timeFilter: This Week (default) | Last Week | This Month | This Quarter | This Year
+  summary: (t: string, timeFilter?: string) => api(`/payments/summary${qs({ timeFilter })}`, { token: t, pick: "summary", revalidate: 0 }),
   due: (t: string) => api("/payments/due", { token: t, revalidate: 0 }),
   done: (t: string) => api("/payments/done", { token: t, revalidate: 0 }),
   adjustments: (t: string) => api("/payments/adjustments", { token: t, revalidate: 0 }),

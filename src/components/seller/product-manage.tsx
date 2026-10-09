@@ -13,7 +13,7 @@ import type { Product } from "@/lib/types";
 // The status endpoint only accepts these two; other states (draft, out of stock) are set by the server.
 const STATUSES = ["active", "inactive"];
 
-export function ProductManage({ product }: { product: Product & { status?: string } }) {
+export function ProductManage({ product, canTopPick = false }: { product: Product & { status?: string }; canTopPick?: boolean }) {
   const router = useRouter();
   const [status, setStatus] = useState((product.status ?? "active").toLowerCase());
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ export function ProductManage({ product }: { product: Product & { status?: strin
     setError(null);
     setTopPick(next);
     const res = await productsApi.setTopPick(product._id, { isTopPick: next }, t);
-    if (!res) { setTopPick(!next); setError("Couldn't update top pick. Only Zatch admins can feature products."); }
+    if (!res) { setTopPick(!next); setError("Couldn't update top pick. Try again."); }
     else router.refresh();
   }
 
@@ -79,7 +79,7 @@ export function ProductManage({ product }: { product: Product & { status?: strin
           {!STATUSES.includes(status) && <option value={status} disabled>{status.replace(/_/g, " ")}</option>}
           {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
         </select>
-        <button
+        {canTopPick && <button
           onClick={toggleTopPick}
           title="Feature as a top pick"
           className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition-colors ${
@@ -87,7 +87,7 @@ export function ProductManage({ product }: { product: Product & { status?: strin
           }`}
         >
           <Sparkles className="h-3.5 w-3.5" /> Top pick
-        </button>
+        </button>}
         <button onClick={() => setBargainOpen((v) => !v)} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-surface-2">
           <Tag className="h-3.5 w-3.5" /> Bargain
         </button>

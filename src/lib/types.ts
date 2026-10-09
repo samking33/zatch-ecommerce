@@ -44,6 +44,7 @@ export interface Product {
   sellerId?: string | Seller;
   SKU?: string;
   isSold?: boolean;
+  myProduct?: boolean; // the signed-in viewer is this product's seller
   status?: string;
   orderAcceptingType?: string;
   shipping?: { estimatedDeliveryDays?: number; codAvailable?: boolean; returnPolicy?: string };

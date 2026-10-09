@@ -13,6 +13,17 @@ export function BecomeSeller({
   display?: SellerStatusDisplay;
   benefits?: SellerBenefits | null;
 }) {
+  if (status === "unavailable") {
+    return (
+      <div className="card mt-2 grid place-items-center rounded-[2rem] px-6 py-20 text-center">
+        <h1 className="font-display text-[clamp(1.6rem,4vw,2.2rem)] font-semibold text-ink">Couldn&apos;t check your seller status</h1>
+        <p className="mx-auto mt-3 max-w-md text-[15px] text-muted">
+          This is usually a short connection problem or an expired sign-in. Refresh the page, or sign in again if it keeps happening.
+        </p>
+        <Link href="/login" className="pill-lime mt-7 inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold">Sign in again</Link>
+      </div>
+    );
+  }
   const pending = status === "pending";
   const rejected = status === "rejected";
   const Icon = pending ? Clock : rejected ? XCircle : Store;

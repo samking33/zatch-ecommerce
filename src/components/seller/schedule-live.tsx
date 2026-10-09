@@ -39,17 +39,11 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
 
   async function step1(e: React.FormEvent) {
     e.preventDefault();
+    if (!thumb) { setError("Add a thumbnail for your live."); return; }
     if (picked.length === 0) { setError("Pick at least one product to sell."); return; }
     setBusy(true); setError(null);
-    const fd = new FormData();
-    fd.append("step", "1");
-    fd.append("title", f.title);
-    fd.append("description", f.description);
-    picked.forEach((p) => fd.append("products", p.productId));
-    picked.forEach((p) => fd.append("productSequence", p.productId));
-    if (f.scheduledStartTime) fd.append("scheduledStartTime", new Date(f.scheduledStartTime).toISOString());
-    if (thumb) fd.append("thumbnail", thumb);
-    const res = await post(fd);
+    // The server reads products as a list of { productId }. Passing the session id back reuses the draft if the seller came back to this step.
+    const res = await post({ step: "1", sessionId: sessionId ?? undefined, products: picked.map((p) => ({ productId: p.productId })) });
     setBusy(false);
     if (res?.success) { setSessionId(res.sessionId ?? res.session?._id ?? null); setStep(2); }
     else setError(res?.message ?? "Couldn't create the session.");
@@ -72,14 +66,16 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
 
   async function step3() {
     setBusy(true); setError(null);
-    const res = await post({
-      step: "3",
-      sessionId,
-      title: f.title,
-      description: f.description,
-      goLiveNow,
-      ...(goLiveNow ? {} : { scheduledStartTime: new Date(f.scheduledStartTime).toISOString() }),
-    });
+    // The server only saves the thumbnail from this final step, so it is sent here as a multipart form.
+    const fd = new FormData();
+    fd.append("step", "3");
+    fd.append("sessionId", sessionId ?? "");
+    fd.append("title", f.title);
+    fd.append("description", f.description);
+    fd.append("goLiveNow", String(goLiveNow));
+    if (!goLiveNow) fd.append("scheduledStartTime", new Date(f.scheduledStartTime).toISOString());
+    if (thumb) fd.append("thumbnail", thumb);
+    const res = await post(fd);
     setBusy(false);
     if (res?.success) { reset(); router.refresh(); }
     else if (res?.suggestedTime) {
@@ -140,7 +136,7 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
             <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={2} className="mt-1 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 py-2.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
           </label>
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-hairline bg-surface-2 px-4 py-3 text-sm text-muted hover:border-ink">
-            <Upload className="h-4 w-4" /> {thumb ? thumb.name : "Thumbnail (optional)"}
+            <Upload className="h-4 w-4" /> {thumb ? thumb.name : "Thumbnail (required)"}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => setThumb(e.target.files?.[0] ?? null)} />
           </label>
 

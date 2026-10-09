@@ -20,7 +20,9 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
 
   const [s1, setS1] = useState({
     category: categories[0]?.slug ?? "", subCategory: "", name: "", description: "",
-    price: "", discountedPrice: "", totalStock: "", hasColor: true, hasSize: false,
+    price: "", discountedPrice: "", totalStock: "",
+    // Colours and sizes are always collected; the backend needs them to build variants.
+    hasColor: true, hasSize: true,
     autoAcceptDiscount: "10", maximumDiscount: "30",
   });
   const [colors, setColors] = useState<string[]>([]);
@@ -156,10 +158,6 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           <Field label="Price (₹)" value={s1.price} on={(v) => setS1({ ...s1, price: v })} type="number" required />
           <Field label="Discounted price (₹)" value={s1.discountedPrice} on={(v) => setS1({ ...s1, discountedPrice: v })} type="number" />
           <Field label="Total stock" value={s1.totalStock} on={(v) => setS1({ ...s1, totalStock: v })} type="number" />
-          <div className="flex items-end gap-4">
-            <Toggle label="Has colours" on={s1.hasColor} set={(v) => setS1({ ...s1, hasColor: v })} />
-            <Toggle label="Has sizes" on={s1.hasSize} set={(v) => setS1({ ...s1, hasSize: v })} />
-          </div>
           <Field label="Auto-accept discount %" value={s1.autoAcceptDiscount} on={(v) => setS1({ ...s1, autoAcceptDiscount: v })} type="number" />
           <Field label="Max bargain discount %" value={s1.maximumDiscount} on={(v) => setS1({ ...s1, maximumDiscount: v })} type="number" />
           {error && <p className="text-sm font-medium text-live sm:col-span-2">{error}</p>}
@@ -280,16 +278,6 @@ function Field({ label, value, on, type = "text", full, required }: { label: str
       <span className="text-[12px] font-medium text-muted">{label}</span>
       <input type={type} required={required} value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
     </label>
-  );
-}
-function Toggle({ label, on, set }: { label: string; on: boolean; set: (v: boolean) => void }) {
-  return (
-    <button type="button" onClick={() => set(!on)} className="flex items-center gap-2 text-sm font-medium text-ink">
-      <span className={`grid h-6 w-10 items-center rounded-full p-0.5 transition-colors ${on ? "bg-lime" : "bg-hairline"}`}>
-        <span className={`h-5 w-5 rounded-full bg-surface transition-transform ${on ? "translate-x-4" : ""}`} />
-      </span>
-      {label}
-    </button>
   );
 }
 function Next({ busy, children }: { busy: boolean; children: React.ReactNode }) {

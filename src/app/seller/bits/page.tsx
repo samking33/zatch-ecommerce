@@ -13,7 +13,13 @@ import type { Bit, Product } from "@/lib/types";
 
 export const metadata = { title: "Seller · Bits" };
 
-type BitStats = { orders?: number; revenue?: number; isActive?: boolean };
+// The dashboard sends status as "Active" | "Inactive" and per-Bit sales under statsSummary / numberOfOrders.
+type BitStats = {
+  status?: string;
+  numberOfOrders?: number;
+  statsSummary?: { totalOrders?: number; revenue?: number };
+  comments?: unknown[];
+};
 type Dash = {
   performanceSummary?: { views?: number; revenue?: string; avgEngagement?: string };
   buyBits?: Bit[];
@@ -75,24 +81,24 @@ export default async function SellerBitsPage() {
                     <Play className="h-3 w-3 fill-current" />
                   </span>
                   <div className="absolute right-2 top-2">
-                    <BitActions bitId={b._id} isActive={(b as BitStats).isActive !== false} />
+                    <BitActions bitId={b._id} isActive={(b as BitStats).status?.toLowerCase() !== "inactive"} />
                   </div>
                   <div className="absolute inset-x-2 bottom-2">
                     <p className="line-clamp-1 text-[12px] font-semibold text-white">{b.title}</p>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-white/80">
                       <span className="inline-flex items-center gap-0.5"><Eye className="h-3 w-3" />{compact(b.viewCount ?? 0)}</span>
                       <span className="inline-flex items-center gap-0.5"><Heart className="h-3 w-3" />{compact(b.likeCount ?? 0)}</span>
-                      <span className="inline-flex items-center gap-0.5"><MessageCircle className="h-3 w-3" />{compact(b.commentCount ?? 0)}</span>
+                      <span className="inline-flex items-center gap-0.5"><MessageCircle className="h-3 w-3" />{compact(b.commentCount ?? (b as BitStats).comments?.length ?? 0)}</span>
                     </div>
                   </div>
                 </div>
                 {/* per-reel funnel the API attributes to this Bit */}
                 <div className="flex items-center justify-between px-1 pt-2 text-[11px] text-muted">
                   <span className="inline-flex items-center gap-1">
-                    <ShoppingBag className="h-3 w-3" />{(b as BitStats).orders ?? 0} orders
+                    <ShoppingBag className="h-3 w-3" />{(b as BitStats).numberOfOrders ?? (b as BitStats).statsSummary?.totalOrders ?? 0} orders
                   </span>
                   <span className="font-medium text-ink">
-                    ₹{((b as BitStats).revenue ?? 0).toLocaleString("en-IN")}
+                    ₹{((b as BitStats).statsSummary?.revenue ?? 0).toLocaleString("en-IN")}
                   </span>
                 </div>
               </div>

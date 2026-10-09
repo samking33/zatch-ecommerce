@@ -21,7 +21,7 @@ async function sellerState(): Promise<"guest" | "buyer" | "pending" | "seller"> 
   if (!token) return "guest";
   try {
     const { approved, status } = await sellerGate(token);
-    if (approved) return "seller";
+    if (approved || status === "unavailable") return "seller";
     if (status === "pending" || status === "submitted" || status === "under_review") return "pending";
     return "buyer";
   } catch {

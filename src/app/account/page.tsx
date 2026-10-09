@@ -31,7 +31,7 @@ export default async function AccountPage() {
   const initial = (user?.username?.[0] ?? "Z").toUpperCase();
 
   // Sellers get the dashboard; buyers get an invite to onboard.
-  const sellerLink: readonly [string, string, typeof Store] = gate.approved
+  const sellerLink: readonly [string, string, typeof Store] = gate.approved || gate.status === "unavailable"
     ? ["Seller dashboard", "/seller/dashboard", Store]
     : gate.status === "pending"
       ? ["Seller application", "/seller/dashboard", Store]

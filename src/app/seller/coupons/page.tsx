@@ -30,7 +30,7 @@ export default function SellerCouponsPage() {
     setToken(t); setReady(true);
     if (!t) return;
     sellerApi.status(t).then((s) => {
-      const status = (s?.sellerStatus ?? "buyer").toLowerCase();
+      const status = s ? (s.sellerStatus ?? "buyer").toLowerCase() : "unavailable";
       const approved = ["approved", "active"].includes(status);
       setSeller({ approved, status, display: s?.statusDisplay });
       if (approved) load(t);

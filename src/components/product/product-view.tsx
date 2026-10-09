@@ -206,7 +206,12 @@ export function ProductView({ product }: { product: Product }) {
           )}
 
           <div className="mt-7">
-            {status === "added" ? (
+            {product.myProduct ? (
+              <p className="rounded-2xl bg-surface-2 px-4 py-3.5 text-[15px] text-ink">
+                This is your product, so buying and offers are off for you.
+                <Link href="/seller/products" className="ml-1 font-semibold underline underline-offset-4">Manage products</Link>
+              </p>
+            ) : status === "added" ? (
               <div className="flex items-center gap-3 rounded-full bg-lime px-4 py-3">
                 <Check className="h-5 w-5 text-lime-ink" />
                 <span className="text-[15px] font-semibold text-lime-ink">Added to cart</span>
@@ -243,14 +248,16 @@ export function ProductView({ product }: { product: Product }) {
           )}
         </div>
 
-        <BargainBox
-          productId={product._id}
-          listPrice={price}
-          color={color}
-          size={size}
-          autoAcceptDiscount={product.bargainSettings?.autoAcceptDiscount ?? 10}
-          maxDiscount={product.bargainSettings?.maximumDiscount ?? 30}
-        />
+        {!product.myProduct && (
+          <BargainBox
+            productId={product._id}
+            listPrice={price}
+            color={color}
+            size={size}
+            autoAcceptDiscount={product.bargainSettings?.autoAcceptDiscount ?? 10}
+            maxDiscount={product.bargainSettings?.maximumDiscount ?? 30}
+          />
+        )}
       </div>
     </div>
   );
