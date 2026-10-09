@@ -263,7 +263,8 @@ export const coupons = {
   create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t, keepError: true }),
   update: (id: string, b: unknown, t: string) =>
     api(`/coupons/${id}`, { method: "PUT", body: b, token: t, keepError: true }),
-  toggle: (id: string, t: string) => api(`/coupons/${id}/toggle`, { method: "POST", token: t }),
+  // The server does not flip the state: { pause: true } pauses, anything else activates (and refuses if expired).
+  toggle: (id: string, pause: boolean, t: string) => api(`/coupons/${id}/toggle`, { method: "POST", body: { pause }, token: t, keepError: true }),
   remove: (id: string, t: string) => api(`/coupons/${id}`, { method: "DELETE", token: t }),
 };
 

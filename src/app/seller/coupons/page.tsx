@@ -48,9 +48,11 @@ export default function SellerCouponsPage() {
   async function toggle(id: string) {
     if (!token) return;
     setNotice(null);
-    setList((l) => l.map((c) => (c._id === id ? { ...c, isActive: !(c.isActive ?? c.active) } : c)));
-    const res = await couponsApi.toggle(id, token);
-    if (!res) setNotice("Couldn't change the coupon. Try again.");
+    const wasActive = list.find((c) => c._id === id)?.isActive ?? true;
+    setList((l) => l.map((c) => (c._id === id ? { ...c, isActive: !wasActive } : c)));
+    const res = await couponsApi.toggle(id, wasActive, token);
+    const failure = apiError(res, "Couldn't change the coupon. Try again.");
+    if (failure) setNotice(failure);
     load(token);
   }
   async function remove(id: string) {
