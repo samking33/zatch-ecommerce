@@ -11,6 +11,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Uploads reach the backend through the rewrite below, and Next cuts proxied
+    // bodies off at 10 MB by default, which breaks multi-photo products and Bit
+    // videos (the backend allows 50 MB). Photos are also shrunk in the browser.
+    // ponytail: the proxy holds up to this much per upload in memory; move uploads
+    // to direct-to-CDN tokens (/product/upload-tokens) if that ever bites.
+    middlewareClientMaxBodySize: "60mb",
+  },
   images: {
     // Seller uploads are raw phone photos (up to ~21MB), and resizing them with
     // sharp on a 0.5-CPU instance starves the event loop until outbound fetches

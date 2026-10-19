@@ -118,17 +118,18 @@ export async function register(input: {
 }
 
 // OTP login - the mobile app's primary sign-in. Send a code to the phone,
-// verify it, then log in with method:"otp" (no password required).
+// then log in with method:"otp" and that code (no password required).
 export const otp = {
   send: (phone: string, countryCode: string) =>
     post("/twilio-sms/send-otp", { phoneNumber: phone, countryCode }),
-  verify: (phone: string, countryCode: string, code: string) =>
-    post("/twilio-sms/verify-otp", { phoneNumber: phone, countryCode, otp: code }),
 };
 
+// The server checks the code itself as part of login, so it must not be verified separately first
+// (a code can only be used once).
 export async function loginWithOtp(input: {
   phone: string;
   countryCode: string;
+  otp: string;
 }): Promise<SessionUser> {
   const json = await post("/user/login", { ...input, method: "otp" });
   if (!json?.token) throw new Error(json?.message ?? "Login failed.");

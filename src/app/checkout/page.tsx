@@ -57,7 +57,13 @@ export default function CheckoutPage() {
     setToken(tk);
     setReady(true);
     if (!tk) return;
-    cartApi.get(tk).then((c) => setCart((c as Cart) ?? { items: [] }));
+    // ?item=<cart line id> (from Buy now) checks out that one line; anything else is the whole cart.
+    const only = new URLSearchParams(window.location.search).get("item");
+    cartApi.get(tk).then((c) => {
+      const full = (c as Cart) ?? { items: [] };
+      const one = only ? full.items?.filter((it) => it._id === only) : undefined;
+      setCart(one?.length ? { ...full, items: one } : full);
+    });
     addressApi.list(tk).then((a) => {
       const list = (a as Addr[]) ?? [];
       setAddrs(list);

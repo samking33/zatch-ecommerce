@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Upload, Video, X, Plus } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
+import { shrinkImage } from "@/lib/shrink-image";
 import type { Product } from "@/lib/types";
 
 /** Real Bit upload → POST /bits/upload (multipart: video + thumbnail).
@@ -22,6 +23,10 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
     e.preventDefault();
     if (!video) { setError("Choose a video to upload."); return; }
     if (video.size > 50 * 1024 * 1024) { setError("The video must be under 50 MB."); return; }
+    // Same length rule as the app (5 seconds to 2 minutes).
+    const secs = await videoSeconds(video);
+    if (secs < 5) { setError("Bit is too short. Please upload at least 5 seconds."); return; }
+    if (secs > 121) { setError("Bit is too long. Please keep it under 2 minutes."); return; }
     // Bits with no tagged product never appear in the buyer feed.
     if (tagged.length === 0) { setError(myProducts.length === 0 ? "Create a product first, then tag it in your Bit." : "Tag at least one product so buyers can see your Bit."); return; }
     setBusy(true); setError(null);
@@ -81,7 +86,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
         </label>
         <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-hairline bg-surface-2 px-4 py-3 text-sm text-muted hover:border-ink">
           <Upload className="h-4 w-4" /> {thumb ? thumb.name : "Thumbnail (optional)"}
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => setThumb(e.target.files?.[0] ?? null)} />
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) shrinkImage(f).then(setThumb); else setThumb(null); }} />
         </label>
 
         {myProducts.length > 0 && (
@@ -114,4 +119,18 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
       </button>
     </form>
   );
+}
+
+// NaN when the browser can't read the file's length; the upload is then allowed, as the server does.
+function videoSeconds(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    const done = (d: number) => { URL.revokeObjectURL(url); resolve(Number.isFinite(d) ? d : NaN); };
+    v.preload = "metadata";
+    v.onloadedmetadata = () => done(v.duration);
+    v.onerror = () => done(NaN);
+    setTimeout(() => done(NaN), 5000);
+    v.src = url;
+  });
 }

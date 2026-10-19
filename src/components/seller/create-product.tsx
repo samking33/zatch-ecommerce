@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
+import { shrinkImages } from "@/lib/shrink-image";
 import type { Category } from "@/lib/types";
 
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
+// The backend model's enum.
+const CONDITIONS = ["New", "Like New", "Good", "Fair", "Used"];
 
 // Real 4-step create matching the backend: step 1 (basics → productId),
 // step 2 (colors), step 3 (multipart images + sizes), step 4 (stock per variant).
@@ -20,7 +23,11 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
 
   const [s1, setS1] = useState({
     category: categories[0]?.slug ?? "", subCategory: "", name: "", description: "",
-    price: "", discountedPrice: "", totalStock: "",
+    price: "", discountedPrice: "", totalStock: "", hsn: "",
+    brand: "", model: "", condition: "New",
+    // Same defaults as the backend model. The server stores COD as false unless it is sent as true.
+    freeShipping: false, codAvailable: true, estimatedDeliveryDays: "7", returnPolicy: "7 days return policy",
+    orderAcceptingType: "autoAccept",
     // Colours and sizes are always collected; the backend needs them to build variants.
     hasColor: true, hasSize: true,
     autoAcceptDiscount: "10", maximumDiscount: "30",
@@ -57,6 +64,10 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   // The backend lower-cases colours and upper-cases sizes, so key everything the same way.
   const colorKey = (c: string) => c.trim().toLowerCase();
 
+  // One colour: the main images are that colour's images, so no second upload box.
+  const singleColour = s1.hasColor && colors.length === 1;
+  const imagesFor = (c: string) => (singleColour ? files : colorFiles[colorKey(c)] ?? []);
+
   const cat = categories.find((c) => c.slug === s1.category);
   const subs = (cat?.subCategories ?? []) as { name: string; slug: string }[];
 
@@ -84,6 +95,10 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     if (!Number.isInteger(stock) || stock < 1) return "Total stock must be a whole number, 1 or more.";
     if (![auto, max].every((n) => Number.isFinite(n) && n >= 0 && n <= 100)) return "Bargain percentages must be between 0 and 100.";
     if (auto > max) return "Auto-accept discount can't be higher than the max bargain discount.";
+    // Same rule as the backend model; a bad value would otherwise fail the save with a generic error.
+    if (s1.hsn.trim() && !/^\d{4,8}$/.test(s1.hsn.trim())) return "HSN code must be 4 to 8 digits.";
+    const days = Number(s1.estimatedDeliveryDays);
+    if (!Number.isInteger(days) || days < 1) return "Delivery time must be a whole number of days, 1 or more.";
     return null;
   }
 
@@ -98,6 +113,11 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
       name: s1.name, description: s1.description,
       price: Number(s1.price), discountedPrice: s1.discountedPrice ? Number(s1.discountedPrice) : undefined,
       totalStock: Number(s1.totalStock || 0), hasColor: s1.hasColor, hasSize: s1.hasSize,
+      hsn: s1.hsn.trim() || undefined,
+      brand: s1.brand.trim() || undefined, model: s1.model.trim() || undefined, condition: s1.condition,
+      freeShipping: s1.freeShipping, codAvailable: s1.codAvailable,
+      estimatedDeliveryDays: Number(s1.estimatedDeliveryDays), returnPolicy: s1.returnPolicy.trim() || undefined,
+      orderAcceptingType: s1.orderAcceptingType,
       bargainSettings: { autoAcceptDiscount: Number(s1.autoAcceptDiscount), maximumDiscount: Number(s1.maximumDiscount) },
     });
     if (!res?.success || !res.productId) {
@@ -129,11 +149,11 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     if (s1.hasSize) fd.append("sizes", JSON.stringify(sizes));
     files.forEach((f) => fd.append("images", f));
     // Colour images go under variantImages[colour][DEFAULT]; the server reuses them for every size of that colour.
-    if (s1.hasColor) colors.forEach((c) => (colorFiles[colorKey(c)] ?? []).forEach((f) => fd.append(`variantImages[${colorKey(c)}][DEFAULT]`, f)));
+    if (s1.hasColor) colors.forEach((c) => imagesFor(c).forEach((f) => fd.append(`variantImages[${colorKey(c)}][DEFAULT]`, f)));
     const res = await fetch("/api/v1/product/create", { method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd })
       .then((r) => r.json()).catch(() => null);
     setBusy(false);
-    if (res?.success) setStep(4); else setError(res?.message ?? "Couldn't upload images.");
+    if (res?.success) setStep(4); else setError(res?.message ?? "Couldn't upload images. Try fewer or smaller photos.");
   }
 
   // One stock row per variant the product has.
@@ -191,9 +211,18 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           <Field label="Description" value={s1.description} on={(v) => setS1({ ...s1, description: v })} full />
           <Field label="Price (₹)" value={s1.price} on={(v) => setS1({ ...s1, price: v })} type="number" min={1} required />
           <Field label="Discounted price (₹, optional)" value={s1.discountedPrice} on={(v) => setS1({ ...s1, discountedPrice: v })} type="number" min={1} />
+          <Field label="HSN code (optional)" value={s1.hsn} on={(v) => setS1({ ...s1, hsn: v.replace(/\D/g, "").slice(0, 8) })} />
           <Field label="Total stock" value={s1.totalStock} on={(v) => setS1({ ...s1, totalStock: v })} type="number" min={1} required />
           <Field label="Auto-accept discount %" value={s1.autoAcceptDiscount} on={(v) => setS1({ ...s1, autoAcceptDiscount: v })} type="number" min={0} max={100} />
           <Field label="Max bargain discount %" value={s1.maximumDiscount} on={(v) => setS1({ ...s1, maximumDiscount: v })} type="number" min={0} max={100} />
+          <Field label="Brand (optional)" value={s1.brand} on={(v) => setS1({ ...s1, brand: v })} />
+          <Field label="Model (optional)" value={s1.model} on={(v) => setS1({ ...s1, model: v })} />
+          <Select label="Condition" value={s1.condition} on={(v) => setS1({ ...s1, condition: v })} options={CONDITIONS.map((c) => [c, c])} />
+          <Select label="Orders" value={s1.orderAcceptingType} on={(v) => setS1({ ...s1, orderAcceptingType: v })} options={[["autoAccept", "Accept automatically"], ["askBeforeAccepting", "Ask me before accepting"]]} />
+          <Field label="Delivery time (days)" value={s1.estimatedDeliveryDays} on={(v) => setS1({ ...s1, estimatedDeliveryDays: v })} type="number" min={1} required />
+          <Field label="Return policy" value={s1.returnPolicy} on={(v) => setS1({ ...s1, returnPolicy: v })} />
+          <Toggle label="Free shipping" checked={s1.freeShipping} on={(v) => setS1({ ...s1, freeShipping: v })} />
+          <Toggle label="Cash on delivery available" checked={s1.codAvailable} on={(v) => setS1({ ...s1, codAvailable: v })} />
           {error && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{error}</p>}
           <div className="sm:col-span-2">
             <Next busy={busy}>Continue</Next>
@@ -252,13 +281,13 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
               </div>
             </div>
           )}
-          <p className="text-[15px] text-muted">{s1.hasColor ? "Main product images" : "Product images"}</p>
+          <p className="text-[15px] text-muted">{s1.hasColor && !singleColour ? "Main product images" : "Product images"}</p>
           <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-hairline bg-surface-2 py-10 text-muted hover:border-ink">
             <Upload className="h-6 w-6" />
             <span className="text-sm font-medium">{files.length ? `${files.length} image(s) selected` : "Click to choose images"}</span>
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
+            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { shrinkImages(Array.from(e.target.files ?? [])).then(setFiles); }} />
           </label>
-          {s1.hasColor && colors.map((c) => {
+          {s1.hasColor && !singleColour && colors.map((c) => {
             const picked = colorFiles[colorKey(c)] ?? [];
             return (
               <div key={c} className="mt-5">
@@ -266,7 +295,7 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
                 <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-hairline bg-surface-2 py-6 text-muted hover:border-ink">
                   <Upload className="h-5 w-5" />
                   <span className="text-sm font-medium">{picked.length ? `${picked.length} image(s) selected` : "Click to choose images"}</span>
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => setColorFiles({ ...colorFiles, [colorKey(c)]: Array.from(e.target.files ?? []) })} />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { shrinkImages(Array.from(e.target.files ?? [])).then((f) => setColorFiles((cur) => ({ ...cur, [colorKey(c)]: f }))); }} />
                 </label>
               </div>
             );
@@ -276,7 +305,7 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
             <Back onClick={() => setStep(s1.hasColor ? 2 : 1)} />
             <button
               onClick={submitStep3}
-              disabled={busy || files.length === 0 || (s1.hasSize && sizes.length === 0) || (s1.hasColor && colors.some((c) => (colorFiles[colorKey(c)] ?? []).length === 0))}
+              disabled={busy || files.length === 0 || (s1.hasSize && sizes.length === 0) || (s1.hasColor && colors.some((c) => imagesFor(c).length === 0))}
               className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
@@ -320,6 +349,24 @@ function Field({ label, value, on, type = "text", full, required, min, max }: { 
     <label className={`block ${full ? "sm:col-span-2" : ""}`}>
       <span className="text-[12px] font-medium text-muted">{label}</span>
       <input type={type} required={required} min={min} max={max} value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+    </label>
+  );
+}
+function Select({ label, value, on, options }: { label: string; value: string; on: (v: string) => void; options: [string, string][] }) {
+  return (
+    <label className="block">
+      <span className="text-[12px] font-medium text-muted">{label}</span>
+      <select value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  );
+}
+function Toggle({ label, checked, on }: { label: string; checked: boolean; on: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-surface-2 px-4 py-3">
+      <input type="checkbox" checked={checked} onChange={(e) => on(e.target.checked)} className="h-4 w-4 accent-ink" />
+      <span className="text-[15px] text-ink">{label}</span>
     </label>
   );
 }

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw } from "lucide-react";
+import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw, Zap } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
@@ -25,6 +25,11 @@ export function ProductView({ product }: { product: Product }) {
     [variants],
   );
   const [color, setColor] = useState<string | undefined>(colors[0]);
+  // Some products store a placeholder colour "none"; it is still sent to the cart but not shown as a choice.
+  const shownColors = colors.filter((c) => c.toLowerCase() !== "none");
+  // Same rule the server applies when an offer is made: no auto-accept or max discount means no bargaining.
+  const bs = product.bargainSettings;
+  const canBargain = !!(bs && (bs.autoAcceptDiscount || bs.maximumDiscount));
 
   const sizes = useMemo(
     () =>
@@ -92,6 +97,21 @@ export function ProductView({ product }: { product: Product }) {
     setStatus(failure ? "error" : "added");
   }
 
+  // Buy now: put this item in the cart, then check out just this line.
+  async function buyNow() {
+    const token = getToken();
+    if (!token) { router.push("/login"); return; }
+    setStatus("adding");
+    const res = await cartApi.update({ productId: product._id, color, size, qty: 1 }, token);
+    const failure = apiError(res, "Couldn't start checkout. Try again.");
+    if (failure) { setCartError(failure); setStatus("error"); return; }
+    type Line = { _id?: string; productId?: string; variant?: { color?: string | null; size?: string | null } };
+    const fresh = (await cartApi.get(token)) as { items?: Line[] } | null;
+    const same = (a?: string | null, b?: string | null) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
+    const line = fresh?.items?.find((i) => i.productId === product._id && same(i.variant?.color, color) && same(i.variant?.size, size));
+    router.push(line?._id ? `/checkout?item=${line._id}` : "/checkout");
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {/* gallery */}
@@ -157,13 +177,13 @@ export function ProductView({ product }: { product: Product }) {
             )}
           </div>
 
-          {colors.length > 0 && (
+          {shownColors.length > 0 && (
             <div className="mt-6">
               <p className="text-[13px] font-medium text-muted">
                 Colour{color ? <span className="text-ink"> · {color}</span> : null}
               </p>
               <div className="mt-2 flex flex-wrap gap-2.5">
-                {colors.map((c) => {
+                {shownColors.map((c) => {
                   const v = swatchImg(c);
                   const active = c === color;
                   return (
@@ -221,10 +241,17 @@ export function ProductView({ product }: { product: Product }) {
                 <Link href="/cart" className="btn-ink ml-auto rounded-full px-5 py-2.5 text-sm font-semibold">View cart</Link>
               </div>
             ) : (
-              <button onClick={addToCart} disabled={status === "adding" || outOfStock} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
-                {status === "adding" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ShoppingBag className="h-[18px] w-[18px]" />}
-                {unavailable ? "Not available yet" : outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
-              </button>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button onClick={addToCart} disabled={status === "adding" || outOfStock} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
+                  {status === "adding" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ShoppingBag className="h-[18px] w-[18px]" />}
+                  {unavailable ? "Not available yet" : outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
+                </button>
+                {!outOfStock && (
+                  <button onClick={buyNow} disabled={status === "adding"} className="pill-lime inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
+                    <Zap className="h-[18px] w-[18px]" /> Buy now
+                  </button>
+                )}
+              </div>
             )}
             {status === "error" && <p role="alert" className="mt-2 text-sm font-medium text-live">{cartError}</p>}
           </div>
@@ -251,7 +278,7 @@ export function ProductView({ product }: { product: Product }) {
           )}
         </div>
 
-        {!product.myProduct && (
+        {!product.myProduct && canBargain && (
           <BargainBox
             productId={product._id}
             listPrice={price}

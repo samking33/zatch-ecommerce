@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
+import { shrinkImage } from "@/lib/shrink-image";
 
 const DOC_TYPES = [
   { value: "pan", label: "PAN card" },
@@ -22,7 +23,7 @@ export function SellerRegister() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [shop, setShop] = useState({ businessName: "", gstin: "" });
+  const [shop, setShop] = useState({ businessName: "", gstin: "", pan: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
   const [addr, setAddr] = useState({ pickupAddress: "", pinCode: "", state: "", shippingMethod: "self_ship" });
   const [tc, setTc] = useState(false);
@@ -36,6 +37,7 @@ export function SellerRegister() {
     fd.append("step", "1");
     fd.append("businessName", shop.businessName);
     if (shop.gstin) fd.append("gstin", shop.gstin);
+    if (shop.pan) fd.append("pan", shop.pan);
     // "[]" makes the server read this as a list even with a single document.
     docs.forEach((d) => { fd.append("documents", d.file); fd.append("documentTypes[]", d.type); });
     const res = await fetch("/api/v1/user/seller/register", { method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd })
@@ -71,7 +73,9 @@ export function SellerRegister() {
       {step === 1 && (
         <form onSubmit={submitStep1} className="grid gap-4">
           <Field label="Business name" value={shop.businessName} on={(v) => setShop({ ...shop, businessName: v })} required />
-          <Field label="GSTIN (optional)" value={shop.gstin} on={(v) => setShop({ ...shop, gstin: v.toUpperCase() })} />
+          {/* The server checks the format, the GSTIN checksum and that the PAN matches the GSTIN. */}
+          <Field label="GSTIN / Enrollment ID (optional)" value={shop.gstin} on={(v) => setShop({ ...shop, gstin: idChars(v, 15) })} />
+          <Field label="PAN (optional)" value={shop.pan} on={(v) => setShop({ ...shop, pan: idChars(v, 10) })} />
           <div>
             <p className="text-[12px] font-medium text-muted">KYC documents (up to 3)</p>
             <div className="mt-2 space-y-2">
@@ -174,10 +178,11 @@ function AddDoc({ onAdd }: { onAdd: (d: Doc) => void }) {
         {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
       </select>
       <Upload className="h-4 w-4" /> Add document
-      <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAdd({ type, file: f }); }} />
+      <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) shrinkImage(f).then((file) => onAdd({ type, file })); }} />
     </label>
   );
 }
+const idChars = (v: string, max: number) => v.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, max);
 function Field({ label, value, on, required }: { label: string; value: string; on: (v: string) => void; required?: boolean }) {
   return (
     <label className="block">

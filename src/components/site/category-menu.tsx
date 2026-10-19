@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { catalog } from "@/lib/api";
+import { getToken } from "@/lib/client-auth";
 import type { Category } from "@/lib/types";
 
 /** Categories live in the nav now, so the home page can lead with video.
@@ -91,6 +93,15 @@ export function CategoryMenu() {
  *  Shares the same public /category fetch as the dropdown. */
 export function CategoryStrip() {
   const [cats, setCats] = useState<Category[]>([]);
+  const [anyoneLive, setAnyoneLive] = useState(false);
+
+  // The list also holds shows starting within 30 minutes; only a session that is on air counts.
+  // The endpoint needs a sign-in, so signed-out visitors don't see the link.
+  useEffect(() => {
+    const t = getToken();
+    if (!t) return;
+    catalog.liveSessions(t).then((s) => setAnyoneLive(!!s?.some((x) => x.status === "live")));
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -109,9 +120,11 @@ export function CategoryStrip() {
       aria-label="Categories"
       className="mx-auto mt-2 flex max-w-[1400px] gap-1 overflow-x-auto rounded-full bg-canvas/90 px-2 py-1 text-[14px] backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      <Link href="/live" className="shrink-0 rounded-full px-3 py-1.5 font-medium text-ink transition-colors hover:bg-surface-2">
-        Live
-      </Link>
+      {anyoneLive && (
+        <Link href="/live" className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-ink transition-colors hover:bg-surface-2">
+          <span className="live-dot h-1.5 w-1.5 rounded-full bg-live" /> Live
+        </Link>
+      )}
       <Link href="/bits" className="shrink-0 rounded-full px-3 py-1.5 font-medium text-ink transition-colors hover:bg-surface-2">
         Videos
       </Link>

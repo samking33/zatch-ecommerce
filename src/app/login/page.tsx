@@ -48,15 +48,14 @@ export default function LoginPage() {
         done(await login({ phone: ph, countryCode, password }));
         return;
       }
-      // SMS OTP: step 1 sends the code, step 2 verifies and signs in.
+      // SMS OTP: step 1 sends the code, step 2 signs in with it.
       if (!otpSent) {
         await otpApi.send(ph, countryCode);
         setOtpSent(true);
         setBusy(false);
         return;
       }
-      await otpApi.verify(ph, countryCode, code.trim());
-      done(await loginWithOtp({ phone: ph, countryCode }));
+      done(await loginWithOtp({ phone: ph, countryCode, otp: code.trim() }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
       setBusy(false);

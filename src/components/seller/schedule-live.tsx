@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Radio, Upload, ArrowRight, ArrowLeft, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
+import { shrinkImage } from "@/lib/shrink-image";
 import type { Product } from "@/lib/types";
 
 type Row = { productId: string; name: string; autoAcceptDiscount: number; maximumDiscount: number };
@@ -137,7 +138,7 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
           </label>
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-hairline bg-surface-2 px-4 py-3 text-sm text-muted hover:border-ink">
             <Upload className="h-4 w-4" /> {thumb ? thumb.name : "Thumbnail (required)"}
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => setThumb(e.target.files?.[0] ?? null)} />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) shrinkImage(f).then(setThumb); else setThumb(null); }} />
           </label>
 
           <div>
