@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
+import Script from "next/script";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import "./globals.css";
@@ -10,6 +11,9 @@ const interTight = Inter_Tight({
   weight: ["500", "600", "700"],
   display: "swap",
 });
+
+// Google Ads tag (gtag.js).
+const GOOGLE_TAG_ID = "AW-18516509424";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,6 +42,13 @@ export default function RootLayout({
         <AuthProvider>
           <RealtimeProvider>{children}</RealtimeProvider>
         </AuthProvider>
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} strategy="afterInteractive" />
+        <Script id="google-tag" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GOOGLE_TAG_ID}');`}
+        </Script>
       </body>
     </html>
   );
