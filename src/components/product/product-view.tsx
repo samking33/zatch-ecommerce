@@ -59,17 +59,13 @@ export function ProductView({ product }: { product: Product }) {
   const unavailable = variants.length === 0;
   const outOfStock = unavailable || soldOut(selected);
 
-  // All browsable images: product gallery + every variant image, de-duped.
+  // The selected colour's photos; the main photos only when that colour has none of its own.
+  // (The main photos are copies of the first colour's, so showing both would repeat them.)
   const gallery = useMemo<ProductImage[]>(() => {
+    const own = variants.filter((v) => v.color === color).flatMap((v) => v.images ?? []);
     const seen = new Set<string>();
-    const out: ProductImage[] = [];
-    const push = (im?: ProductImage) => {
-      if (im?.url && !seen.has(im.url)) { seen.add(im.url); out.push(im); }
-    };
-    (product.images ?? []).forEach(push);
-    variants.forEach((v) => (v.images ?? []).forEach(push));
-    return out;
-  }, [product.images, variants]);
+    return (own.length ? own : product.images ?? []).filter((im) => !!im?.url && !seen.has(im.url) && !!seen.add(im.url));
+  }, [product.images, variants, color]);
 
   const [activeUrl, setActiveUrl] = useState<string | undefined>(gallery[0]?.url);
 

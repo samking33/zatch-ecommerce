@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag, Loader2, Check, Sparkles, Trash2 } from "lucide-react";
+import { Tag, Loader2, Check, Sparkles, Trash2, Pencil } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { products as productsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
@@ -18,6 +18,7 @@ export function ProductManage({ product, canTopPick = false }: { product: Produc
   const [status, setStatus] = useState((product.status ?? "active").toLowerCase());
   const [busy, setBusy] = useState(false);
   const [bargainOpen, setBargainOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [topPick, setTopPick] = useState(!!product.isTopPick);
   const [error, setError] = useState<string | null>(null);
   const price = product.discountedPrice ?? product.price;
@@ -91,6 +92,9 @@ export function ProductManage({ product, canTopPick = false }: { product: Produc
         >
           <Sparkles className="h-3.5 w-3.5" /> Top pick
         </button>}
+        <button onClick={() => setEditOpen((v) => !v)} aria-expanded={editOpen} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-surface-2">
+          <Pencil className="h-3.5 w-3.5" /> Edit
+        </button>
         <button onClick={() => setBargainOpen((v) => !v)} className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-surface-2">
           <Tag className="h-3.5 w-3.5" /> Bargain
         </button>
@@ -106,8 +110,68 @@ export function ProductManage({ product, canTopPick = false }: { product: Produc
       </div>
       {incomplete && <p className="mt-2 text-sm font-medium text-live">Missing colour, size and stock details, so buyers can&apos;t add this to their cart. Delete it and add it again to finish.</p>}
       {error && <p role="alert" className="mt-2 text-sm font-medium text-live">{error}</p>}
+      {editOpen && <EditDetails product={product} onClose={() => setEditOpen(false)} />}
       {bargainOpen && <BargainSettings productId={product._id} initial={product.bargainSettings} onClose={() => setBargainOpen(false)} />}
     </div>
+  );
+}
+
+function EditDetails({ product, onClose }: { product: Product; onClose: () => void }) {
+  const router = useRouter();
+  const [f, setF] = useState({
+    name: product.name ?? "", description: product.description ?? "",
+    price: String(product.price ?? ""), discountedPrice: String(product.discountedPrice ?? product.price ?? ""),
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const price = Number(f.price);
+    const discounted = Number(f.discountedPrice);
+    if (!f.name.trim()) return setError("Enter a product name.");
+    if (!(price > 0) || !(discounted > 0)) return setError("Prices must be above 0.");
+    if (discounted > price) return setError("The discounted price can't be higher than the price.");
+    const t = getToken();
+    if (!t) return;
+    setSaving(true);
+    setError(null);
+    const res = await productsApi.edit(product._id, { name: f.name.trim(), description: f.description.trim(), price, discountedPrice: discounted }, t);
+    const failure = apiError(res, "Couldn't save your changes. Try again.");
+    setSaving(false);
+    if (failure) { setError(failure); return; }
+    onClose();
+    router.refresh();
+  }
+
+  const input = "mt-1 h-10 w-full rounded-xl border border-hairline bg-surface px-3 text-[15px] text-ink focus:border-ink focus:outline-none";
+  return (
+    <form onSubmit={save} className="mt-3 grid gap-4 rounded-2xl bg-surface-2 p-4 sm:grid-cols-2">
+      <label className="block sm:col-span-2">
+        <span className="text-[12px] font-medium text-muted">Name</span>
+        <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={input} />
+      </label>
+      <label className="block sm:col-span-2">
+        <span className="text-[12px] font-medium text-muted">Description</span>
+        <textarea rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} className="mt-1 w-full rounded-xl border border-hairline bg-surface px-3 py-2 text-[15px] text-ink focus:border-ink focus:outline-none" />
+      </label>
+      <label className="block">
+        <span className="text-[12px] font-medium text-muted">Price (₹)</span>
+        <input type="number" min={1} required value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} className={input} />
+      </label>
+      <label className="block">
+        <span className="text-[12px] font-medium text-muted">Discounted price (₹)</span>
+        <input type="number" min={1} required value={f.discountedPrice} onChange={(e) => setF({ ...f, discountedPrice: e.target.value })} className={input} />
+      </label>
+      <p className="text-[13px] text-muted sm:col-span-2">To change photos, colours, sizes or stock, delete the product and add it again.</p>
+      {error && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{error}</p>}
+      <div className="flex gap-3 sm:col-span-2">
+        <button type="button" onClick={onClose} className="rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink hover:bg-surface">Cancel</button>
+        <button disabled={saving} className="btn-ink inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold disabled:opacity-70">
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />} Save changes
+        </button>
+      </div>
+    </form>
   );
 }
 

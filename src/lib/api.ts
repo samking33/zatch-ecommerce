@@ -206,6 +206,9 @@ export const products = {
   // Permanent: removes the product and its images. The server checks ownership.
   remove: (id: string, t: string) =>
     api(`/product/${id}/action`, { method: "POST", body: { action: "delete" }, token: t }),
+  // Never send `variants` here: the server rebuilds them without their colour photos.
+  edit: (id: string, b: { name: string; description: string; price: number; discountedPrice: number }, t: string) =>
+    api(`/product/${id}/action`, { method: "POST", body: { action: "edit", ...b }, token: t, keepError: true }),
   like: (id: string, t: string) => api(`/product/${id}/like`, { method: "POST", token: t }),
   save: (id: string, t: string) => api(`/product/${id}/save`, { method: "POST", token: t }),
   view: (id: string, t?: string) => api(`/product/${id}/view`, { method: "POST", token: t }),
