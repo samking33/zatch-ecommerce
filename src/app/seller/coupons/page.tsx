@@ -5,10 +5,15 @@ import { Plus, Trash2, Loader2, Check, Ticket, Pencil } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
-import { coupons as couponsApi, seller as sellerApi, apiError } from "@/lib/api";
+import { coupons as couponsApi, seller as sellerApi, products as productsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
-type Coupon = { _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; minSpend?: number; startDate?: string; endDate?: string; isActive?: boolean; active?: boolean; isExpired?: boolean; status?: string; daysRemaining?: number };
+type Coupon = {
+  _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; maxDiscount?: number | null; minSpend?: number;
+  startDate?: string; endDate?: string; isActive?: boolean; active?: boolean; isExpired?: boolean; status?: string; daysRemaining?: number;
+  appliedProducts?: { _id: string }[];
+};
+type MyProduct = { _id: string; name: string };
 type Dash = {
   performanceSummary?: { orders?: number; gmv?: number; views?: number; period?: string };
   overview?: { totalCoupons?: number; activeCoupons?: number; expiredCoupons?: number };
@@ -23,6 +28,7 @@ export default function SellerCouponsPage() {
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mine, setMine] = useState<MyProduct[]>([]);
   const [seller, setSeller] = useState<{ approved: boolean; status: string; display?: import("@/lib/api").SellerStatusDisplay } | null>(null);
 
   useEffect(() => {
@@ -33,7 +39,10 @@ export default function SellerCouponsPage() {
       const status = s ? (s.sellerStatus ?? "buyer").toLowerCase() : "unavailable";
       const approved = ["approved", "active"].includes(status);
       setSeller({ approved, status, display: s?.statusDisplay });
-      if (approved) load(t);
+      if (approved) {
+        load(t);
+        productsApi.myProducts(t).then((p) => setMine((p ?? []).map(({ _id, name }) => ({ _id, name }))));
+      }
     });
   }, []);
 
@@ -96,7 +105,7 @@ export default function SellerCouponsPage() {
 
           {notice && <p role="alert" className="mb-3 text-sm font-medium text-live">{notice}</p>}
 
-          {adding && token && <CouponForm token={token} onSaved={() => { load(token); setAdding(false); }} />}
+          {adding && token && <CouponForm token={token} products={mine} onSaved={() => { load(token); setAdding(false); }} />}
 
           {list.length === 0 && !adding ? (
             <EmptyState title="No coupons yet" sub="Create a discount code to drive more orders." />
@@ -107,6 +116,7 @@ export default function SellerCouponsPage() {
                 if (editing?._id === c._id && token) {
                   return (
                     <CouponForm
+                      products={mine}
                       key={c._id}
                       token={token}
                       initial={c}
@@ -146,7 +156,10 @@ export default function SellerCouponsPage() {
   );
 }
 
-function CouponForm({ token, onSaved, initial }: { token: string; onSaved: () => void; initial?: Coupon }) {
+function CouponForm({ token, onSaved, initial, products }: { token: string; onSaved: () => void; initial?: Coupon; products: MyProduct[] }) {
+  // Which products the coupon covers; none ticked means all of the seller's products.
+  const [picked, setPicked] = useState<string[]>(() => (initial?.appliedProducts ?? []).map((x) => x._id));
+  const togglePick = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   // yyyy-mm-dd in IST, which is what the date input and the server's day boundaries use
   const initialEnd = initial?.endDate ? new Date(initial.endDate).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : "";
   const [f, setF] = useState({
@@ -154,7 +167,7 @@ function CouponForm({ token, onSaved, initial }: { token: string; onSaved: () =>
     code: initial?.code ?? "",
     discountType: initial?.discountType ?? "percentage",
     discountValue: initial?.discountValue != null ? String(initial.discountValue) : "",
-    maxDiscount: "",
+    maxDiscount: initial?.maxDiscount != null ? String(initial.maxDiscount) : "",
     minSpend: initial?.minSpend != null ? String(initial.minSpend) : "",
     endDate: initialEnd,
   });
@@ -169,7 +182,11 @@ function CouponForm({ token, onSaved, initial }: { token: string; onSaved: () =>
     const code = f.code.toUpperCase();
     const body = {
       name: f.name || code, discountType: f.discountType,
-      discountValue: Number(f.discountValue), maxDiscount: f.maxDiscount ? Number(f.maxDiscount) : undefined,
+      discountValue: Number(f.discountValue),
+      // null clears a cap the seller emptied
+      maxDiscount: f.discountType === "percentage" && f.maxDiscount ? Number(f.maxDiscount) : null,
+      // Create takes `productIds` (checked against the seller's own); update takes `applicableProducts`.
+      ...(initial ? { applicableProducts: picked } : { productIds: picked }),
       minSpend: f.minSpend ? Number(f.minSpend) : undefined,
       // valid through the end of that day, IST; an unchanged date is left as the server has it
       ...(f.endDate !== initialEnd ? { endDate: new Date(`${f.endDate}T23:59:59+05:30`).toISOString() } : {}),
@@ -194,8 +211,22 @@ function CouponForm({ token, onSaved, initial }: { token: string; onSaved: () =>
         </select>
       </label>
       <F label={f.discountType === "percentage" ? "Discount %" : "Discount ₹"} v={f.discountValue} on={set("discountValue")} type="number" required />
+      {f.discountType === "percentage" && <F label="Max discount ₹ (optional)" v={f.maxDiscount} on={set("maxDiscount")} type="number" />}
       <F label="Min spend ₹ (optional)" v={f.minSpend} on={set("minSpend")} type="number" />
       <F label="Valid until" v={f.endDate} on={set("endDate")} type="date" required />
+      {products.length > 0 && (
+        <fieldset className="sm:col-span-2">
+          <legend className="text-[12px] font-medium text-muted">Applies to {picked.length ? `${picked.length} product${picked.length !== 1 ? "s" : ""}` : "all your products"}</legend>
+          <div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-hairline p-2">
+            {products.map((p) => (
+              <label key={p._id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-surface-2">
+                <input type="checkbox" checked={picked.includes(p._id)} onChange={() => togglePick(p._id)} className="h-4 w-4 accent-ink" />
+                <span className="line-clamp-1">{p.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       {err && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{err}</p>}
       <button disabled={saving} className="btn-ink sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}

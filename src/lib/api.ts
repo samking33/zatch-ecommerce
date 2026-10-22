@@ -274,8 +274,9 @@ export const coupons = {
   dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true, revalidate: 0 }),
   get: (id: string, t: string) => api(`/coupons/${id}`, { token: t, revalidate: 0 }),
   create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t, keepError: true }),
-  update: (id: string, b: unknown, t: string) =>
-    api(`/coupons/${id}`, { method: "PUT", body: b, token: t, keepError: true }),
+  // The app's edit route; unlike PUT /:id it checks the products belong to the seller.
+  update: (id: string, b: object, t: string) =>
+    api(`/coupons/${id}/action`, { method: "POST", body: { ...b, action: "edit" }, token: t, keepError: true }),
   // The server does not flip the state: { pause: true } pauses, anything else activates (and refuses if expired).
   toggle: (id: string, pause: boolean, t: string) => api(`/coupons/${id}/toggle`, { method: "POST", body: { pause }, token: t, keepError: true }),
   remove: (id: string, t: string) => api(`/coupons/${id}`, { method: "DELETE", token: t }),
