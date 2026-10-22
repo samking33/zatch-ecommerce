@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus, UserCheck, Loader2, Share2, Check } from "lucide-react";
-import { users } from "@/lib/api";
+import { users, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 export function FollowButton({
@@ -31,7 +31,11 @@ export function FollowButton({
     setFollowing(next); setCount((n) => n + (next ? 1 : -1));
     const res = await users.toggleFollow(userId, t);
     setBusy(false);
-    if (!res) { setFollowing(!next); setCount((n) => n + (next ? -1 : 1)); }
+    if (apiError(res, "failed")) { setFollowing(!next); setCount((n) => n + (next ? -1 : 1)); return; }
+    // Trust the server's state if it differs from what we assumed.
+    if (typeof res?.isFollowing === "boolean" && res.isFollowing !== next) {
+      setFollowing(res.isFollowing); setCount((n) => n + (res.isFollowing ? 1 : -1));
+    }
   }
 
   return (

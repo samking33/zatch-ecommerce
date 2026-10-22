@@ -153,8 +153,9 @@ export const users = {
     }),
   follow: (b: unknown, t: string) => api("/user/follow", { method: "POST", body: b, token: t }),
   unfollow: (b: unknown, t: string) => api("/user/unfollow", { method: "POST", body: b, token: t }),
+  // Raw: unwrapped, an unfollow came back as plain `false` and looked like a failure.
   toggleFollow: (targetUserId: string, t: string) =>
-    api(`/user/${targetUserId}/toggleFollow`, { method: "POST", token: t }),
+    api<{ success?: boolean; message?: string; isFollowing?: boolean }>(`/user/${targetUserId}/toggleFollow`, { method: "POST", token: t, raw: true, keepError: true }),
   review: (b: unknown, t: string) => api("/user/review", { method: "POST", body: b, token: t }),
 };
 

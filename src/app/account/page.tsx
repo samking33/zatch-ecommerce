@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Tag, MapPin, Heart, Bell, Store, ChevronRight, Ticket, SlidersHorizontal } from "lucide-react";
+import { Package, Tag, MapPin, Heart, Bell, Store, ChevronRight, Ticket, SlidersHorizontal, Users } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -41,6 +41,7 @@ export default async function AccountPage() {
     ["My orders", "/orders", Package],
     ["My bargains", "/bargains", Tag],
     ["Saved & liked", "/wishlist", Heart],
+    ["Following", "/account/following", Users],
     ["My coupons", "/account/coupons", Ticket],
     ["Addresses", "/account/addresses", MapPin],
     ["Shopping preferences", "/account/preferences", SlidersHorizontal],
