@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { catalog } from "@/lib/api";
+import { catalog, preferences } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import type { Category } from "@/lib/types";
 
@@ -94,6 +94,7 @@ export function CategoryMenu() {
 export function CategoryStrip() {
   const [cats, setCats] = useState<Category[]>([]);
   const [anyoneLive, setAnyoneLive] = useState(false);
+  const [preferred, setPreferred] = useState<string[]>([]);
 
   // The list also holds shows starting within 30 minutes; only a session that is on air counts.
   // The endpoint needs a sign-in, so signed-out visitors don't see the link.
@@ -101,6 +102,8 @@ export function CategoryStrip() {
     const t = getToken();
     if (!t) return;
     catalog.liveSessions(t).then((s) => setAnyoneLive(!!s?.some((x) => x.status === "live")));
+    // As in the app, the user's chosen categories come first, in the order they picked them.
+    preferences.get(t).then((p) => setPreferred((p as { categories?: string[] } | null)?.categories ?? []));
   }, []);
 
   useEffect(() => {
@@ -112,7 +115,8 @@ export function CategoryStrip() {
     return () => { alive = false; };
   }, []);
 
-  const list = cats.filter((c) => c.slug !== "explore-all");
+  const rank = (slug: string) => { const i = preferred.indexOf(slug); return i < 0 ? preferred.length : i; };
+  const list = cats.filter((c) => c.slug !== "explore-all").sort((a, b) => rank(a.slug) - rank(b.slug));
   if (list.length === 0) return null;
 
   return (

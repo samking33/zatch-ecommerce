@@ -483,6 +483,9 @@ export const content = {
 // when present so a signed-in user gets personalised fields (liked/saved).
 export const catalog = {
   topPicks: (t?: string) => api<Product[]>("/product/top-picks", { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
+  // The full list, a page at a time: { products, pagination: { totalPages } }.
+  topPicksPage: (page: number, t?: string) =>
+    api<{ products?: Product[]; pagination?: { totalPages?: number } }>(`/product/top-picks${qs({ page, limit: 24 })}`, { token: t, raw: true, version: "v2", revalidate: t ? 0 : 60 }),
   products: (q = "", t?: string) => api<Product[]>(`/product/products${q}`, { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
   product: (id: string, t?: string) => api<Product>(`/product/${id}`, { token: t, pick: "product", version: "v2", revalidate: t ? 0 : 60 }),
   categories: () => categories.list(),

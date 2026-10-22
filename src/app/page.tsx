@@ -76,7 +76,7 @@ export default async function HomePage() {
         )}
 
         {products.length > 0 && (
-          <Rail title="Today's picks" sub="Every price here is a starting point." href="/shop">
+          <Rail title="Today's picks" sub="Every price here is a starting point." href="/picks">
             {products.map((p) => <ProductRailCard key={p._id} product={p} />)}
           </Rail>
         )}
