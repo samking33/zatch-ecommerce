@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Package, Tag, MapPin, Heart, Bell, Store, ChevronRight, Ticket, SlidersHorizontal, Users } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
@@ -56,8 +57,8 @@ export default async function AccountPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
         <div className="card h-fit rounded-[1.75rem] p-6">
           <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-ink text-2xl font-semibold text-surface">
-              {initial}
+            <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-ink text-2xl font-semibold text-surface">
+              {user?.profilePic?.url ? <Image src={user.profilePic.url} alt="" width={64} height={64} className="h-full w-full object-cover" /> : initial}
             </span>
             <div className="min-w-0">
               <p className="break-words font-display text-lg font-semibold text-ink">{user?.username}</p>

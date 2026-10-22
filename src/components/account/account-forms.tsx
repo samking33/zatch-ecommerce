@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Check, ChevronDown, Trash2 } from "lucide-react";
+import { Loader2, Check, ChevronDown, Trash2, Camera } from "lucide-react";
+import Image from "next/image";
+import { shrinkImage } from "@/lib/shrink-image";
 import { users, auth, apiError } from "@/lib/api";
 import { getToken, USERNAME_MAX, type SessionUser } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -10,6 +12,8 @@ import { useAuth } from "@/components/auth/auth-provider";
 export function AccountForms({ user }: { user: SessionUser | null }) {
   return (
     <div className="card rounded-[1.75rem] p-3">
+      <ProfilePhoto user={user} />
+      <div className="mx-4 h-px bg-hairline" />
       <EditProfile user={user} />
       <div className="mx-4 h-px bg-hairline" />
       <ChangePassword />
@@ -97,11 +101,13 @@ function EditProfile({ user }: { user: SessionUser | null }) {
     email: (user?.email as string) ?? "",
     // The server stores Male | Female | Other; normalise in case an older record differs in case.
     gender: ((user?.gender as string) ?? "").replace(/^./, (c) => c.toUpperCase()).replace(/(?<=.)./g, (c) => c.toLowerCase()),
+    phone: (user?.phone as string) ?? "",
   });
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // When the email changes, the backend emails a code and asks us to verify it
   // before the change applies. Collect that code here.
   const [otpRequired, setOtpRequired] = useState(false);
+  const [otpFor, setOtpFor] = useState<"email" | "phone">("email");
   const [otp, setOtp] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
@@ -112,14 +118,23 @@ function EditProfile({ user }: { user: SessionUser | null }) {
     if (!t) return;
     setState("saving");
     setMsg(null);
-    const body = otpRequired && otp ? { ...f, otp: otp.trim() } : f;
+    const phone = f.phone.replace(/\D/g, "");
+    const phoneChanged = phone !== ((user?.phone as string) ?? "");
+    if (phoneChanged && phone.length !== 10) { setState("error"); setMsg("Enter a valid 10-digit mobile number."); return; }
+    // The server reads a new number from `mobileNumber` (not `phone`) and texts it a code.
+    const body = {
+      username: f.username, email: f.email, gender: f.gender,
+      ...(phoneChanged ? { mobileNumber: phone, countryCode: (user?.countryCode as string) ?? "+91" } : {}),
+      ...(otpRequired && otp ? { otp: otp.trim() } : {}),
+    };
     const res = await users.updateProfile(body, t);
 
     if (!res) { setState("error"); return; }
-    // Email changed: backend sent a code, wants us to verify it.
-    if (res.action === "verify-email-otp") {
+    // New email or phone: the server sent a code and wants it before applying the change.
+    if (res.action === "verify-email-otp" || res.action === "verify-phone-otp") {
+      setOtpFor(res.action === "verify-phone-otp" ? "phone" : "email");
       setOtpRequired(true);
-      setMsg(res.message ?? "We emailed a code to your new address. Enter it to confirm.");
+      setMsg(res.message ?? "We sent you a code. Enter it to confirm.");
       setState("idle");
       return;
     }
@@ -152,6 +167,12 @@ function EditProfile({ user }: { user: SessionUser | null }) {
             <p className="mt-1 text-[12px] text-muted">Email not verified yet.</p>
           ) : null}
         </div>
+        <Field
+          label="Mobile number"
+          value={f.phone}
+          on={(e) => { set("phone")(e); if (otpRequired) { setOtpRequired(false); setOtp(""); setMsg(null); } }}
+          type="tel"
+        />
         <label className="block">
           <span className="text-[12px] font-medium text-muted">Gender</span>
           <select value={f.gender} onChange={set("gender")} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
@@ -165,7 +186,7 @@ function EditProfile({ user }: { user: SessionUser | null }) {
         {otpRequired && (
           <div className="sm:col-span-2">
             <Field
-              label={`Verification code (sent to ${f.email})`}
+              label={`Verification code (sent to ${otpFor === "phone" ? f.phone : f.email})`}
               value={otp}
               on={(e) => setOtp(e.target.value)}
             />
@@ -186,6 +207,64 @@ function EditProfile({ user }: { user: SessionUser | null }) {
           />
         </div>
       </form>
+    </Section>
+  );
+}
+
+/** Profile photo (the app's camera / gallery picker): upload or remove. */
+function ProfilePhoto({ user }: { user: SessionUser | null }) {
+  const router = useRouter();
+  const { setUser } = useAuth();
+  const [url, setUrl] = useState<string | undefined>(user?.profilePic?.url);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function send(form: FormData) {
+    const t = getToken();
+    if (!t) return;
+    setBusy(true); setErr(null);
+    const res = await fetch("/api/v1/user/profile-update", { method: "PUT", headers: { Authorization: `Bearer ${t}` }, body: form })
+      .then((r) => r.json()).catch(() => null);
+    setBusy(false);
+    const failure = apiError(res, "Couldn't update your photo. Try a smaller image.");
+    if (failure) return setErr(failure);
+    const next = (res?.user as SessionUser | undefined)?.profilePic?.url;
+    setUrl(next);
+    if (user) setUser({ ...user, profilePic: next ? { url: next } : undefined });
+    router.refresh();
+  }
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const small = await shrinkImage(file);
+    // The server takes images up to 5 MB.
+    if (small.size > 5 * 1024 * 1024) return setErr("That photo is too large. Pick one under 5 MB.");
+    const form = new FormData();
+    form.append("profilePic", small);
+    send(form);
+  }
+
+  function remove() {
+    const form = new FormData();
+    form.append("removeProfilePic", "true");
+    send(form);
+  }
+
+  return (
+    <Section title="Profile photo">
+      <div className="flex items-center gap-4">
+        <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-surface-2 text-xl font-semibold text-ink">
+          {url ? <Image src={url} alt="Your profile photo" width={64} height={64} className="h-full w-full object-cover" /> : (user?.username?.[0] ?? "Z").toUpperCase()}
+        </span>
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} {url ? "Change photo" : "Add photo"}
+          <input type="file" accept="image/*" className="hidden" onChange={pick} disabled={busy} />
+        </label>
+        {url && <button onClick={remove} disabled={busy} className="text-sm font-medium text-muted hover:text-live">Remove</button>}
+      </div>
+      {err && <p role="alert" className="mt-2 text-sm font-medium text-live">{err}</p>}
     </Section>
   );
 }
