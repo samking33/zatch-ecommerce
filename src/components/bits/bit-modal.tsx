@@ -25,9 +25,9 @@ function videoUrl(b: Bit) {
 }
 
 /**
- * Reel player. Holds the whole feed so you can move between videos the way the
- * app does: swipe or scroll (native scroll-snap, so it follows the finger and keeps
- * momentum), arrow keys, or the on-screen up/down controls.
+ * Reel player, moved the way Instagram's is: the reel follows the finger and a release
+ * goes exactly one reel up or down (or back), however hard the flick. Desktop: one wheel
+ * or trackpad gesture per reel, arrow keys, or the on-screen up/down controls.
  * Callers may pass a single bit or the list plus a starting index.
  */
 export function BitModal({
@@ -51,33 +51,93 @@ export function BitModal({
   });
   // Sound is tried on; a browser that blocks it turns it off for the whole feed until the viewer taps the speaker.
   const [muted, setMuted] = useState(false);
-  const feed = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const last = list.length - 1;
 
   const canPrev = i > 0;
-  const canNext = i < list.length - 1;
+  const canNext = i < last;
+  const go = useCallback((dir: 1 | -1) => setI((n) => Math.min(Math.max(n + dir, 0), last)), [last]);
 
-  // Open on the chosen video without an animated scroll.
+  // The stack of reels is moved with a transform; `offset` is the finger's pull in pixels.
+  const opened = useRef(false);
+  const place = useCallback((offset: number, animate: boolean) => {
+    const el = track.current;
+    if (!el) return;
+    el.style.transition = animate ? "transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1)" : "none";
+    el.style.transform = `translate3d(0, calc(${-i * 100}dvh + ${offset}px), 0)`;
+  }, [i]);
+  // Settle on the current reel; opening jumps straight to the chosen one.
+  useEffect(() => { place(0, opened.current); opened.current = true; }, [place]);
+
+  // Freeze the page behind, so no swipe ever scrolls it.
   useEffect(() => {
-    feed.current?.children[i]?.scrollIntoView({ block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on open
+    const { documentElement: html, body } = document;
+    const prev = [html.style.overflow, body.style.overflow];
+    html.style.overflow = body.style.overflow = "hidden";
+    return () => { [html.style.overflow, body.style.overflow] = prev; };
   }, []);
 
-  // The video that fills most of the screen is the one that plays.
+  // Touch: follow the finger, then one reel per release. Native listeners, because React's touchmove
+  // is passive and can't stop the browser from bouncing or scrolling. Panels (comments, products) keep their own scroll.
   useEffect(() => {
-    const root = feed.current;
-    if (!root) return;
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => { if (e.isIntersecting) setI(Number((e.target as HTMLElement).dataset.index)); }),
-      { root, threshold: 0.6 },
-    );
-    Array.from(root.children).forEach((c) => io.observe(c));
-    return () => io.disconnect();
-  }, [list.length]);
+    const el = root.current;
+    if (!el) return;
+    let drag: { x: number; y: number; t: number; dy: number; axis: "x" | "y" | null } | null = null;
+    const start = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || (e.target as HTMLElement).closest("[data-no-swipe]")) { drag = null; return; }
+      drag = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now(), dy: 0, axis: null };
+    };
+    const move = (e: TouchEvent) => {
+      if (!drag) return;
+      const dx = e.touches[0].clientX - drag.x;
+      const dy = e.touches[0].clientY - drag.y;
+      if (!drag.axis) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        drag.axis = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
+      }
+      if (drag.axis !== "y") return;
+      e.preventDefault();
+      // Pulling past the first or last reel gives way, then resists.
+      drag.dy = (i === 0 && dy > 0) || (i === last && dy < 0) ? dy / 3 : dy;
+      place(drag.dy, false);
+    };
+    const end = () => {
+      if (!drag || drag.axis !== "y") { drag = null; return; }
+      const { dy, t } = drag;
+      drag = null;
+      const speed = dy / Math.max(1, performance.now() - t); // px per ms
+      const far = Math.abs(dy) > window.innerHeight * 0.15;
+      if ((dy < 0 && (far || speed < -0.35)) && i < last) setI(i + 1);
+      else if ((dy > 0 && (far || speed > 0.35)) && i > 0) setI(i - 1);
+      else place(0, true);
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, [i, last, place]);
 
-  const go = useCallback(
-    (dir: 1 | -1) => feed.current?.children[Math.min(Math.max(i + dir, 0), list.length - 1)]?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    [i, list.length],
-  );
+  // Wheel and trackpad: one reel per gesture. A trackpad keeps sending wheel events while it coasts,
+  // so the next reel waits until the events have stopped for a moment, and never comes within half a
+  // second of the last one (a busy page can stall the events long enough to look like a new gesture).
+  const wheel = useRef<{ busy: boolean; at: number; timer?: ReturnType<typeof setTimeout> }>({ busy: false, at: 0 });
+  function onWheel(e: React.WheelEvent) {
+    if ((e.target as HTMLElement).closest("[data-no-swipe]")) return;
+    const w = wheel.current;
+    clearTimeout(w.timer);
+    w.timer = setTimeout(() => { w.busy = false; }, 220);
+    if (w.busy || Math.abs(e.deltaY) < 12 || performance.now() - w.at < 500) return;
+    w.busy = true;
+    w.at = performance.now();
+    go(e.deltaY > 0 ? 1 : -1);
+  }
 
   // Keyboard: up/down to move, escape to close.
   useEffect(() => {
@@ -93,10 +153,10 @@ export function BitModal({
   if (list.length === 0) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-ink/85 backdrop-blur-sm">
-      <div ref={feed} className="h-[100dvh] snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div ref={root} onWheel={onWheel} className="fixed inset-0 z-[100] overflow-hidden overscroll-none bg-ink/85 backdrop-blur-sm">
+      <div ref={track} className="will-change-transform">
         {list.map((b, j) => (
-          <div key={b._id} data-index={j} onClick={onClose} className="flex h-[100dvh] snap-start snap-always items-center justify-center md:p-3">
+          <div key={b._id} onClick={onClose} className="flex h-[100dvh] items-center justify-center md:p-3">
             <div className="relative flex h-full w-full max-w-5xl justify-center gap-3 md:h-[92vh]" onClick={(e) => e.stopPropagation()}>
               {/* Only this video and its neighbours are loaded, so a swipe shows the next one at once. */}
               {Math.abs(j - i) <= 1 ? (
@@ -150,18 +210,23 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
   const [buffering, setBuffering] = useState(true);
 
   // Play only the video on screen. If the browser refuses sound, play muted and leave the speaker button to turn it on.
+  const onScreen = useRef(active);
   useEffect(() => {
+    onScreen.current = active;
     const v = video.current;
     if (!v) return;
     if (!active) { v.pause(); return; }
     v.muted = muted;
+    // Only a real refusal counts: a reel swiped past while starting rejects too (AbortError), and must stay stopped.
+    const refused = (e: unknown) => (e as DOMException)?.name === "NotAllowedError" && onScreen.current;
     // Refused even muted (an iPhone in Low Power Mode): show the play button so a tap starts it.
     const stuck = () => { setPaused(true); setBuffering(false); };
-    v.play().catch(() => {
+    v.play().catch((e) => {
+      if (!refused(e)) return;
       if (v.muted) return stuck();
       onMuted(true);
       v.muted = true;
-      v.play().catch(stuck);
+      v.play().catch((e2) => { if (refused(e2)) stuck(); });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when this video comes on or off screen
   }, [active]);
@@ -385,7 +450,7 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
       </div>
 
       {/* Always beside the video on larger screens; a sheet over it on phones when opened. */}
-      <aside className={`${panel ? "flex" : "hidden md:flex"} w-[22rem] shrink-0 flex-col overflow-hidden rounded-[1.75rem] bg-surface max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[60%] max-md:w-auto`}>
+      <aside data-no-swipe className={`${panel ? "flex" : "hidden md:flex"} w-[22rem] shrink-0 flex-col overflow-hidden rounded-[1.75rem] bg-surface max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[60%] max-md:w-auto`}>
         {showComments ? (
           <>
             <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
