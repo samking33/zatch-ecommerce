@@ -360,20 +360,34 @@ export const address = {
 export const ifsc = { lookup: (code: string) => api(`/ifsc${qs({ ifsc: code })}`) };
 
 // --- Live (/live) ---
+export type LiveDetails = {
+  _id: string;
+  title?: string;
+  status?: "scheduled" | "live" | "ended";
+  viewersCount?: number;
+  likeCount?: number;
+  isLiked?: boolean;
+  host?: { _id: string; username?: string; profilePic?: { url?: string } };
+  products?: { _id: string; name: string; price: number; discountedPrice?: number; images?: { url?: string }[]; bargainSettings?: { maximumDiscount?: number } }[];
+  comments?: { user?: { _id?: string; username?: string }; text: string; timestamp?: string }[];
+};
+
 export const live = {
   sessions: () => api<LiveSession[]>("/live/sessions"),
+  // { sessionDetails: { title, status, host, products, comments, likeCount, isLiked, ... } }
   details: (sessionId: string, t?: string) =>
-    api<{ session?: LiveSession } & LiveSession>(`/live/session/${sessionId}/details`, { token: t, raw: true, revalidate: 0 }),
-  comments: (sessionId: string) => api(`/live/session/${sessionId}/comments`),
+    api<{ sessionDetails?: LiveDetails }>(`/live/session/${sessionId}/details`, { token: t, raw: true, revalidate: 0 }),
   token: (b: unknown, t: string) => api("/live/token", { method: "POST", body: b, token: t, raw: true }),
   refreshToken: (b: unknown, t: string) => api("/live/refresh-token", { method: "POST", body: b, token: t, raw: true }),
+  // Credentials are under `session`; a show that hasn't started answers 400 "starts in N minutes".
   join: (sessionId: string, t: string) =>
-    api<{ appId?: string; token?: string; uid?: number; channelName?: string }>(
-      `/live/session/${sessionId}/join`, { method: "POST", token: t, raw: true }),
-  leave: (sessionId: string, t: string) => api(`/live/session/${sessionId}/leave`, { method: "POST", token: t }),
+    api<{ success?: boolean; message?: string; session?: { appId?: string; token?: string; uid?: number; channelName?: string } }>(
+      `/live/session/${sessionId}/join`, { method: "POST", token: t, raw: true, keepError: true }),
   comment: (sessionId: string, b: unknown, t: string) =>
-    api(`/live/session/${sessionId}/comment`, { method: "POST", body: b, token: t }),
-  like: (sessionId: string, t: string) => api(`/live/session/${sessionId}/like`, { method: "POST", token: t }),
+    api(`/live/session/${sessionId}/comment`, { method: "POST", body: b, token: t, keepError: true }),
+  // Once per viewer: answers { likeCount, isLiked }.
+  like: (sessionId: string, t: string) =>
+    api<{ likeCount?: number; isLiked?: boolean; success?: boolean; message?: string }>(`/live/session/${sessionId}/like`, { method: "POST", token: t, raw: true, keepError: true }),
   heartbeat: (sessionId: string, t: string) => api(`/live/session/${sessionId}/heartbeat`, { method: "POST", token: t }),
   share: (sessionId: string, t?: string) => api(`/live/session/${sessionId}/share`, { token: t, raw: true }),
   // seller-side

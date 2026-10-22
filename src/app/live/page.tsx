@@ -50,12 +50,19 @@ export default async function LivePage() {
                 sizes="(max-width: 640px) 100vw, 33vw"
                 className="h-full w-full"
               />
-              <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-live px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-                <span className="live-dot h-1.5 w-1.5 rounded-full bg-white" /> Live
-              </span>
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-ink/80 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                <Users className="h-3 w-3" /> {compact(s.viewersCount ?? 900)}
-              </span>
+              {/* The list also holds shows starting soon; only on-air ones say LIVE or show viewers. */}
+              {s.status === "live" ? (
+                <>
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-live px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                    <span className="live-dot h-1.5 w-1.5 rounded-full bg-white" /> Live
+                  </span>
+                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-ink/80 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                    <Users className="h-3 w-3" /> {compact(s.viewersCount ?? 0)}
+                  </span>
+                </>
+              ) : (
+                <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-ink">Starting soon</span>
+              )}
               <span className="btn-ink absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full opacity-0 transition-opacity group-hover:opacity-100">
                 <ArrowUpRight className="h-4 w-4" />
               </span>
