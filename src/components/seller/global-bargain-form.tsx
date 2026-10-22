@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Check, Tag } from "lucide-react";
-import { products as productsApi } from "@/lib/api";
+import { products as productsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 type Settings = { enabled?: boolean; autoAcceptDiscount?: number; maximumDiscount?: number };
@@ -14,17 +14,22 @@ export function GlobalBargainForm({ initial }: { initial?: Settings }) {
   const [auto, setAuto] = useState(initial?.autoAcceptDiscount ?? 10);
   const [max, setMax] = useState(initial?.maximumDiscount ?? 30);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [err, setErr] = useState<string | null>(null);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     const t = getToken();
     if (!t) return;
+    if (enabled && auto > max) { setErr("Auto-accept discount cannot be more than the maximum discount."); setState("error"); return; }
+    setErr(null);
     setState("saving");
     const res = await productsApi.setGlobalBargain(
       { enabled, autoAcceptDiscount: auto, maximumDiscount: max },
       t,
     );
-    setState(res ? "saved" : "error");
+    const failure = apiError(res, "Couldn't save your settings. Try again.");
+    setErr(failure);
+    setState(failure ? "error" : "saved");
   }
 
   return (
@@ -64,6 +69,7 @@ export function GlobalBargainForm({ initial }: { initial?: Settings }) {
         </div>
       )}
 
+      {err && <p role="alert" className="mt-4 text-sm font-medium text-live">{err}</p>}
       <button type="submit" disabled={state === "saving"} className="pill-lime mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold disabled:opacity-70">
         {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "saved" ? <Check className="h-4 w-4" /> : null}
         {state === "saved" ? "Saved" : state === "error" ? "Try again" : "Save settings"}

@@ -229,7 +229,7 @@ export const products = {
   setBargainSettings: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/bargain-settings`, { method: "POST", body: b, token: t, keepError: true }),
   setGlobalBargain: (b: unknown, t: string) =>
-    api("/product/global-bargain-settings", { method: "POST", body: b, token: t }),
+    api("/product/global-bargain-settings", { method: "POST", body: b, token: t, keepError: true }),
   setTopPick: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/set-top-pick`, { method: "POST", body: b, token: t }),
 };
@@ -349,11 +349,14 @@ export const bargains = {
   rejectCounter: (id: string, t: string) => api(`/bargains/${id}/reject-counter`, { method: "POST", token: t, keepError: true }),
   // seller-side
   sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t, pick: "bargains", revalidate: 0 }),
-  sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t, raw: true, revalidate: 0 }),
-  accept: (id: string, t: string) => api(`/bargains/${id}/accept`, { method: "POST", token: t }),
-  reject: (id: string, t: string) => api(`/bargains/${id}/reject`, { method: "POST", token: t }),
-  counter: (id: string, b: unknown, t: string) =>
-    api(`/bargains/${id}/counter`, { method: "POST", body: b, token: t }),
+  // timeFilter (This Week | This Month | This Year) sets the report period only; the lists are not filtered.
+  sellerDashboard: (t: string, timeFilter?: string) =>
+    api(`/bargains/seller/dashboard${qs({ timeFilter })}`, { token: t, raw: true, revalidate: 0 }),
+  accept: (id: string, t: string) => api(`/bargains/${id}/accept`, { method: "POST", token: t, keepError: true }),
+  reject: (id: string, b: { sellerNote?: string }, t: string) =>
+    api(`/bargains/${id}/reject`, { method: "POST", body: b, token: t, keepError: true }),
+  counter: (id: string, b: { counterPrice: number; message?: string }, t: string) =>
+    api(`/bargains/${id}/counter`, { method: "POST", body: b, token: t, keepError: true }),
 };
 
 // --- Addresses (/address) & IFSC (/ifsc) ---
