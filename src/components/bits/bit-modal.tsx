@@ -144,13 +144,52 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [commentError, setCommentError] = useState(false);
-  const [showComments, setShowComments] = useState(false);
+  // Side panel: products or comments. On phones it opens as a sheet over the video.
+  const [panel, setPanel] = useState<"products" | "comments" | null>(null);
+  const showComments = panel === "comments";
   const [shared, setShared] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
 
+  // Watch data for the view log, the same fields the app sends (reel_watch_tracker.dart).
+  // Without them the server records every web view as 0% watched on "android".
+  // Length and sound are kept here as it plays: the video element is gone by the time the view is sent.
+  const watch = useRef({ watchedMs: 0, lastT: 0, durationMs: 0, soundOn: false, pauseCount: 0, replayCount: 0, liked: false, shared: false, tapped: null as string | null });
   useEffect(() => {
-    bitsApi.view(bit._id, getToken()).catch(() => {});
+    const w = watch.current;
+    Object.assign(w, { watchedMs: 0, lastT: 0, durationMs: 0, soundOn: false, pauseCount: 0, replayCount: 0, liked: false, shared: false, tapped: null });
+    let sent = false;
+    const send = () => {
+      const t = getToken();
+      const totalDurationMs = w.durationMs;
+      if (sent || !t || (w.watchedMs <= 0 && totalDurationMs <= 0)) return;
+      sent = true;
+      // keepalive lets the request finish when the tab is closing.
+      fetch(`/api/v1/bits/${bit._id}/view`, {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({
+          watchedMs: Math.round(w.watchedMs), totalDurationMs, pauseCount: w.pauseCount, replayCount: w.replayCount,
+          soundOn: w.soundOn, likedDuringWatch: w.liked, sharedDuringWatch: w.shared,
+          tappedProduct: w.tapped, scrolledToProduct: !!w.tapped, deviceType: "web", source: "feed",
+        }),
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", send);
+    return () => { window.removeEventListener("pagehide", send); send(); };
   }, [bit._id]);
+
+  function onTimeUpdate(e: React.SyntheticEvent<HTMLVideoElement>) {
+    const w = watch.current;
+    const v = e.currentTarget;
+    const now = v.currentTime;
+    if (Number.isFinite(v.duration)) w.durationMs = Math.round(v.duration * 1000);
+    w.soundOn = !v.muted && v.volume > 0;
+    const step = now - w.lastT;
+    if (step > 0 && step < 1.5) w.watchedMs += step * 1000; // seeks don't count as watching
+    else if (step < -1 && w.lastT > e.currentTarget.duration - 1.5) w.replayCount += 1; // looped back to the start
+    w.lastT = now;
+  }
 
   // The feed the Bit came from can be minutes old (like count, your like, comments), so
   // read this Bit again when it opens. Otherwise "like" can undo a like you already made.
@@ -187,6 +226,7 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
   async function toggleLike() {
     const t = requireAuth(); if (!t) return;
     const next = !liked;
+    if (next) watch.current.liked = true;
     setLiked(next); setLikes((n) => n + (next ? 1 : -1));
     const res = await bitsApi.toggleLike(bit._id, t);
     if (!res) { setLiked(!next); setLikes((n) => n + (next ? -1 : 1)); }
@@ -200,6 +240,7 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
   }
 
   async function share() {
+    watch.current.shared = true;
     const url = `${window.location.origin}/bits?bit=${bit._id}`;
     try {
       if (navigator.share) await navigator.share({ title: bit.title ?? "Zatch video", url });
@@ -237,6 +278,8 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
         {src ? (
           <video
             key={bit._id}
+            onTimeUpdate={onTimeUpdate}
+            onPause={(e) => { if (!e.currentTarget.ended) watch.current.pauseCount += 1; }}
             src={src}
             poster={bit.thumbnail?.url}
             controls
@@ -255,7 +298,13 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
           <Rail onClick={toggleLike} label={compact(likes)} active={liked}>
             <Heart className={`h-6 w-6 ${liked ? "fill-live text-live" : ""}`} />
           </Rail>
-          <Rail onClick={() => setShowComments((v) => !v)} label={compact(comments.length)}>
+          {/* Products sit in the side panel on larger screens; phones open them from here. */}
+          <span className="md:hidden">
+            <Rail onClick={() => setPanel((p) => (p === "products" ? null : "products"))} label={products.length ? `Shop ${products.length}` : "Shop"} active={panel === "products"}>
+              <ShoppingBag className="h-6 w-6" />
+            </Rail>
+          </span>
+          <Rail onClick={() => setPanel((p) => (p === "comments" ? null : "comments"))} label={compact(comments.length)} active={showComments}>
             <MessageCircle className="h-6 w-6" />
           </Rail>
           <Rail onClick={share} label={shared ? "Copied" : "Share"}>
@@ -268,20 +317,23 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4 pr-20">
           {bit.uploadedBy?.username && (
-            <p className="text-sm font-semibold text-white">@{bit.uploadedBy.username}</p>
+            <Link href={`/seller/${bit.uploadedBy._id}`} className="pointer-events-auto text-sm font-semibold text-white hover:underline">@{bit.uploadedBy.username}</Link>
           )}
           <p className="mt-1 line-clamp-2 text-[15px] text-white/90">{bit.title}</p>
           <p className="mt-1 text-[13px] text-white/60">{compact(bit.viewCount ?? 0)} views</p>
         </div>
       </div>
 
-      {/* Products stay desktop-only; comments open as a sheet over the video on phones. */}
-      <aside className={`${showComments ? "flex" : "hidden md:flex"} w-[22rem] shrink-0 flex-col overflow-hidden rounded-[1.75rem] bg-surface max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[60%] max-md:w-auto`}>
+      {/* Always beside the video on larger screens; a sheet over it on phones when opened. */}
+      <aside className={`${panel ? "flex" : "hidden md:flex"} w-[22rem] shrink-0 flex-col overflow-hidden rounded-[1.75rem] bg-surface max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:max-h-[60%] max-md:w-auto`}>
         {showComments ? (
           <>
             <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
               <h2 className="font-display text-[15px] font-semibold text-ink">Comments ({comments.length})</h2>
-              <button onClick={() => setShowComments(false)} className="text-sm text-muted hover:text-ink">Products</button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setPanel("products")} className="text-sm text-muted hover:text-ink">Products</button>
+                <button onClick={() => setPanel(null)} aria-label="Close" className="md:hidden"><X className="h-4 w-4 text-muted" /></button>
+              </div>
             </div>
             <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               {comments.length === 0 ? (
@@ -310,13 +362,16 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
               <h2 className="font-display text-[15px] font-semibold text-ink">
                 {products.length ? `Shop this video (${products.length})` : "Shop this video"}
               </h2>
-              <button onClick={() => setShowComments(true)} className="text-sm text-muted hover:text-ink">Comments</button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setPanel("comments")} className="text-sm text-muted hover:text-ink">Comments</button>
+                <button onClick={() => setPanel(null)} aria-label="Close" className="md:hidden"><X className="h-4 w-4 text-muted" /></button>
+              </div>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
               {products.length === 0 ? (
                 <p className="text-sm text-muted">No products tagged in this video.</p>
               ) : products.map((p) => (
-                <Link key={p._id} href={`/product/${p._id}`} className="flex items-center gap-3 rounded-2xl border border-hairline p-2.5 transition-colors hover:bg-surface-2">
+                <Link key={p._id} href={`/product/${p._id}`} onClick={() => { watch.current.tapped = p._id; }} className="flex items-center gap-3 rounded-2xl border border-hairline p-2.5 transition-colors hover:bg-surface-2">
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface-2">
                     <ProductMedia src={p.image?.url} alt={p.name} sizes="56px" className="h-full w-full" />
                   </div>
