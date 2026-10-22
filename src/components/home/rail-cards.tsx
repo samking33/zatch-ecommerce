@@ -6,7 +6,13 @@ import { useRef, useState } from "react";
 import { Play, Heart } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { compact, inr } from "@/lib/utils";
+import { FollowButton } from "@/components/seller/follow-button";
 import type { Bit, LiveSession, Product } from "@/lib/types";
+
+export type RailSeller = {
+  _id: string; username?: string; businessName?: string; profilePic?: { url?: string };
+  followerCount?: number; isFollowing?: boolean;
+};
 
 function videoUrl(b: Bit) {
   if (!b.video) return undefined;
@@ -86,10 +92,15 @@ export function LiveRailCard({ session }: { session: LiveSession }) {
     <Link href={`/live/${session._id}`} className="w-[168px] shrink-0 snap-start sm:w-[196px] lg:w-[224px]">
       <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-ink">
         <ProductMedia src={session.thumbnail?.url} alt={session.title} tone="coral" sizes="224px" className="absolute inset-0 h-full w-full" />
-        <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full bg-lime px-2.5 py-1 text-[11px] font-bold text-lime-ink">
-          <span className="live-dot h-1.5 w-1.5 rounded-full bg-lime-ink" />
-          LIVE · {compact(session.viewersCount ?? 0)}
-        </span>
+        {/* /live/sessions also lists shows starting soon, so only on-air ones say LIVE. */}
+        {session.status === "live" ? (
+          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full bg-lime px-2.5 py-1 text-[11px] font-bold text-lime-ink">
+            <span className="live-dot h-1.5 w-1.5 rounded-full bg-lime-ink" />
+            LIVE · {compact(session.viewersCount ?? 0)}
+          </span>
+        ) : (
+          <span className="absolute left-2.5 top-2.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-ink">Starting soon</span>
+        )}
         <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-ink/85 to-transparent px-2.5 pb-2.5 pt-8">
           <span className="ml-auto grid h-7 w-7 place-items-center rounded-full bg-white text-ink">
             <Play className="h-3 w-3 translate-x-px fill-current" />
@@ -98,6 +109,27 @@ export function LiveRailCard({ session }: { session: LiveSession }) {
       </div>
       <p className="mt-2 line-clamp-2 text-[14px] leading-snug text-ink">{session.title}</p>
     </Link>
+  );
+}
+
+/** Seller card for the "Explore sellers" row, with follow (as in the app's home). */
+export function SellerRailCard({ seller }: { seller: RailSeller }) {
+  const name = seller.businessName || seller.username || "Seller";
+  return (
+    <div className="flex w-[168px] shrink-0 snap-start flex-col items-center rounded-xl bg-surface-2 p-4 text-center sm:w-[196px]">
+      <Link href={`/seller/${seller._id}`} className="flex flex-col items-center">
+        <span className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-surface text-xl font-semibold text-ink">
+          {seller.profilePic?.url
+            ? <Image src={seller.profilePic.url} alt={name} width={64} height={64} className="h-full w-full object-cover" />
+            : name[0]?.toUpperCase()}
+        </span>
+        <span className="mt-2 line-clamp-1 text-[14px] font-medium text-ink">{name}</span>
+        <span className="text-[12px] text-muted">{compact(seller.followerCount ?? 0)} followers</span>
+      </Link>
+      <div className="mt-3">
+        <FollowButton userId={seller._id} initialFollowing={seller.isFollowing} followers={seller.followerCount ?? 0} compact />
+      </div>
+    </div>
   );
 }
 

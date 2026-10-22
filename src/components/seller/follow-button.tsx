@@ -10,10 +10,13 @@ export function FollowButton({
   userId,
   initialFollowing,
   followers = 0,
+  compact = false,
 }: {
   userId: string;
   initialFollowing?: boolean;
   followers?: number;
+  /** Small button without the count, for cards. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [following, setFollowing] = useState(!!initialFollowing);
@@ -35,13 +38,14 @@ export function FollowButton({
     <button
       onClick={toggle}
       disabled={busy}
-      className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-70 ${
+      aria-pressed={following}
+      className={`inline-flex items-center gap-2 rounded-full font-semibold transition-colors disabled:opacity-70 ${compact ? "px-4 py-2 text-[13px]" : "px-5 py-2.5 text-sm"} ${
         following ? "border border-hairline bg-surface-2 text-ink" : "bg-ink text-surface"
       }`}
     >
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : following ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
       {following ? "Following" : "Follow"}
-      <span className={following ? "text-muted" : "text-surface/60"}>· {count}</span>
+      {!compact && <span className={following ? "text-muted" : "text-surface/60"}>· {count}</span>}
     </button>
   );
 }

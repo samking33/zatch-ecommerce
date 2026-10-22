@@ -2,7 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star, Package, Users as UsersIcon } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
-import { users } from "@/lib/api";
+import { api } from "@/lib/api";
+import { FollowButton } from "@/components/seller/follow-button";
 import { serverToken } from "@/lib/session";
 import { compact } from "@/lib/utils";
 
@@ -21,7 +22,9 @@ type SellerRow = {
   productsSoldCount?: number;
   activeProductCount?: number;
   activeBitsCount?: number;
+  isFollowing?: boolean;
 };
+type SellersPage = { sellers?: SellerRow[]; totalSellers?: number; currentPage?: number; totalPages?: number };
 
 const SORTS = [
   { key: "", label: "Most active" },
@@ -33,17 +36,22 @@ const SORTS = [
 export default async function SellersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; page?: string }>;
 }) {
-  const { sort = "" } = await searchParams;
-  const list = ((await users.all(await serverToken(), { sortBy: sort || undefined })) as SellerRow[] | null) ?? [];
+  const { sort = "", page = "1" } = await searchParams;
+  const qs = new URLSearchParams({ ...(sort && { sortBy: sort }), page: String(Math.max(1, Number(page) || 1)) });
+  const res = await api<SellersPage>(`/user/all-users?${qs}`, { token: await serverToken(), raw: true, revalidate: 0 });
+  const list = res?.sellers ?? [];
+  const current = res?.currentPage ?? 1;
+  const pages = res?.totalPages ?? 1;
+  const pageHref = (n: number) => `/sellers?${new URLSearchParams({ ...(sort && { sort }), page: String(n) })}`;
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Community"
         title="Sellers on Zatch"
-        sub={`${list.length} sellers going live, dropping Bits, and open to offers.`}
+        sub={`${res?.totalSellers ?? list.length} sellers going live, dropping Bits, and open to offers.`}
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-1.5 text-sm">
@@ -70,7 +78,8 @@ export default async function SellersPage({
           {list.map((s) => {
             const name = s.businessName || s.name || s.username || "Seller";
             return (
-              <Link key={s._id} href={`/seller/${s._id}`} className="card card-hover flex items-center gap-4 rounded-[1.5rem] p-5">
+              <div key={s._id} className="card card-hover flex items-center gap-4 rounded-[1.5rem] p-5">
+              <Link href={`/seller/${s._id}`} className="flex min-w-0 flex-1 items-center gap-4">
                 <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-surface-2 text-lg font-semibold text-ink">
                   {s.profilePic?.url
                     ? <Image src={s.profilePic.url} alt={name} width={56} height={56} className="h-full w-full object-cover" />
@@ -90,9 +99,18 @@ export default async function SellersPage({
                   </div>
                 </div>
               </Link>
+              <FollowButton userId={s._id} initialFollowing={s.isFollowing} followers={s.followerCount ?? 0} compact />
+              </div>
             );
           })}
         </div>
+      )}
+      {pages > 1 && (
+        <nav aria-label="Pages" className="mt-6 flex items-center justify-center gap-3 text-sm">
+          {current > 1 && <Link href={pageHref(current - 1)} className="rounded-full bg-surface-2 px-3.5 py-1.5 font-medium text-ink hover:bg-canvas">Previous</Link>}
+          <span className="text-muted">Page {current} of {pages}</span>
+          {current < pages && <Link href={pageHref(current + 1)} className="rounded-full bg-surface-2 px-3.5 py-1.5 font-medium text-ink hover:bg-canvas">Next</Link>}
+        </nav>
       )}
     </PageShell>
   );

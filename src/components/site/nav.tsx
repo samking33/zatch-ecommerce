@@ -95,7 +95,8 @@ export function Nav() {
               <Store className="h-[18px] w-[18px]" />
             </IconButton>
           )}
-          <IconButton href="/notifications" label="Notifications" badge={unread || undefined} className="hidden sm:grid">
+          {/* Shown on phones too: counter-offers and order updates arrive here (the app's header has it). */}
+          <IconButton href="/notifications" label="Notifications" badge={unread || undefined} className={user ? "" : "hidden sm:grid"}>
             <Bell className="h-[18px] w-[18px]" />
           </IconButton>
           <IconButton href="/wishlist" label="Wishlist" className="hidden sm:grid">
