@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Lock, Plus, Minus, Loader2, Check, Tag, X, CircleCheck, Clock } from "lucide-react";
+import { MapPin, Lock, Plus, Minus, Loader2, Tag, X, CircleCheck, Clock } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
+import { AddressForm, type Addr } from "@/components/account/address-form";
 import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, apiError } from "@/lib/api";
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
 import { inr } from "@/lib/utils";
 
-type Addr = { _id: string; label?: string; type?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string; isDefault?: boolean };
 type PItem = {
   _id?: string;
   product?: { _id?: string; name?: string; price?: number; images?: { url?: string }[]; sellerId?: string };
@@ -305,7 +305,7 @@ export default function CheckoutPage() {
                       <span className="text-[15px] text-ink">
                         <span className="font-medium">{a.label ?? "Address"}</span>
                         <span className="block text-sm text-muted">
-                          {[a.line1, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
+                          {[a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
                           {a.phone ? ` · ${a.phone}` : ""}
                         </span>
                       </span>
@@ -313,7 +313,7 @@ export default function CheckoutPage() {
                   ))}
                 </div>
                 {adding && token && (
-                  <AddressForm token={token} onSaved={(a) => { setAddrs((l) => [...l, a]); setSelected(a._id); setAdding(false); }} />
+                  <div className="mt-4"><AddressForm token={token} onSaved={(a) => { setAddrs((l) => [...l, a]); setSelected(a._id); setAdding(false); }} /></div>
                 )}
               </section>
 
@@ -417,62 +417,11 @@ function ItemRow({ line, qty, bargain, onQty, onRemove }: { line?: PItem; qty: n
   );
 }
 
-function AddressForm({ onSaved, token }: { onSaved: (a: Addr) => void; token: string }) {
-  // The backend stores the address kind as both `label` and `type` (Home | Office | Others).
-  const [f, setF] = useState({ label: "Home", line1: "", city: "", state: "", pincode: "", phone: "" });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    if (!/^\d{6}$/.test(f.pincode.trim())) return setErr("Enter a 6-digit pincode.");
-    setSaving(true);
-    const res = await addressApi.save({ ...f, type: f.label }, token);
-    setSaving(false);
-    // The helper unwraps `{ success, address }` to the address itself.
-    const saved = ((res as { address?: Addr } | null)?.address ?? res) as Addr | null;
-    const failure = apiError(res, "Couldn't save the address. Try again.");
-    if (failure || !saved?._id) return setErr(failure ?? "Couldn't save the address. Try again.");
-    onSaved(saved);
-  }
-
-  return (
-    <form onSubmit={save} className="mt-4 grid gap-3 rounded-2xl bg-surface-2 p-4 sm:grid-cols-2">
-      <label className="block">
-        <span className="text-[12px] font-medium text-muted">Type</span>
-        <select value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
-          {["Home", "Office", "Others"].map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-      </label>
-      <Field label="Phone" v={f.phone} on={set("phone")} />
-      <Field label="Address" v={f.line1} on={set("line1")} full />
-      <Field label="City" v={f.city} on={set("city")} />
-      <Field label="State" v={f.state} on={set("state")} />
-      <Field label="Pincode" v={f.pincode} on={set("pincode")} />
-      {err && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{err}</p>}
-      <button disabled={saving} className="btn-ink sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save address
-      </button>
-    </form>
-  );
-}
-
 function PRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between">
       <dt className={strong ? "font-semibold text-ink" : "text-muted"}>{label}</dt>
       <dd className={strong ? "font-display text-2xl font-semibold text-ink" : "font-medium text-ink"}>{value}</dd>
     </div>
-  );
-}
-
-function Field({ label, v, on, full }: { label: string; v: string; on: (e: React.ChangeEvent<HTMLInputElement>) => void; full?: boolean }) {
-  return (
-    <label className={`block ${full ? "sm:col-span-2" : ""}`}>
-      <span className="text-[12px] font-medium text-muted">{label}</span>
-      <input required value={v} onChange={on} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
-    </label>
   );
 }

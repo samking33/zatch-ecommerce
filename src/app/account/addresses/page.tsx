@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MapPin, Plus, Trash2, Loader2, Check, Pencil } from "lucide-react";
+import { MapPin, Plus, Trash2, Pencil } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
-import { address as addressApi, apiError } from "@/lib/api";
+import { address as addressApi } from "@/lib/api";
+import { AddressForm, type Addr } from "@/components/account/address-form";
 import { getToken } from "@/lib/client-auth";
-
-type Addr = { _id: string; label?: string; type?: string; isDefault?: boolean; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
 
 export default function AddressesPage() {
   const [token, setToken] = useState<string | undefined>();
@@ -26,7 +25,7 @@ export default function AddressesPage() {
   }, []);
 
   async function remove(id: string) {
-    if (!token) return;
+    if (!token || !window.confirm("Remove this address?")) return;
     const before = list;
     setList((l) => l.filter((a) => a._id !== id));
     const res = await addressApi.remove(id, token);
@@ -80,7 +79,7 @@ export default function AddressesPage() {
                       )}
                     </p>
                     <p className="mt-0.5 text-sm text-muted">
-                      {[a.line1, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
+                      {[a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(", ")}
                       {a.phone ? ` · ${a.phone}` : ""}
                     </p>
                   </div>
@@ -103,97 +102,5 @@ export default function AddressesPage() {
       </main>
       <Footer />
     </>
-  );
-}
-
-const ADDRESS_TYPES = ["Home", "Office", "Others"];
-
-function AddressForm({ token, onSaved, initial }: { token: string; onSaved: (a: Addr) => void; initial?: Addr }) {
-  const [f, setF] = useState({
-    label: initial?.label ?? "Home",
-    line1: initial?.line1 ?? "",
-    city: initial?.city ?? "",
-    state: initial?.state ?? "",
-    pincode: initial?.pincode ?? "",
-    phone: initial?.phone ?? "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
-
-  // Browser geolocation -> backend reverse-geocode -> autofill.
-  function useMyLocation() {
-    if (!navigator.geolocation) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const a = await addressApi.geocode(pos.coords.latitude, pos.coords.longitude, token);
-        setLocating(false);
-        if (a) setF((prev) => ({
-          ...prev,
-          line1: a.line1?.trim() || a.formatted || prev.line1,
-          city: a.city || prev.city,
-          state: a.state || prev.state,
-          pincode: a.pincode || prev.pincode,
-        }));
-      },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  }
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    if (!/^\d{6}$/.test(f.pincode.trim())) return setErr("Enter a 6-digit pincode.");
-    setSaving(true);
-    // `type` must be Home | Office | Others; older addresses may carry a free-text label.
-    const body = { ...f, type: ADDRESS_TYPES.includes(f.label) ? f.label : initial?.type ?? "Others" };
-    const res = initial ? await addressApi.update(initial._id, body, token) : await addressApi.save(body, token);
-    setSaving(false);
-    // The helper unwraps `{ success, address }` to the address itself.
-    const saved = ((res as { address?: Addr } | null)?.address ?? res) as Addr | null;
-    const failure = apiError(res, "Couldn't save the address. Try again.");
-    if (failure || !saved?._id) return setErr(failure ?? "Couldn't save the address. Try again.");
-    onSaved(saved);
-  }
-
-  return (
-    <form onSubmit={save} className="card grid gap-3 rounded-[1.5rem] p-6 sm:grid-cols-2">
-      <label className="block">
-        <span className="text-[12px] font-medium text-muted">Type</span>
-        <select value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-[15px] text-ink focus:border-ink focus:outline-none">
-          {ADDRESS_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-      </label>
-      <F label="Phone" v={f.phone} on={set("phone")} />
-      <F label="Address" v={f.line1} on={set("line1")} full />
-      <F label="City" v={f.city} on={set("city")} />
-      <F label="State" v={f.state} on={set("state")} />
-      <F label="Pincode" v={f.pincode} on={set("pincode")} />
-      {err && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{err}</p>}
-      <button
-        type="button"
-        onClick={useMyLocation}
-        disabled={locating}
-        className="sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full border border-hairline py-2.5 text-sm font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
-      >
-        {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-        {locating ? "Finding you…" : "Use my current location"}
-      </button>
-      <button disabled={saving} className="pill-lime sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save address
-      </button>
-    </form>
-  );
-}
-
-function F({ label, v, on, full }: { label: string; v: string; on: (e: React.ChangeEvent<HTMLInputElement>) => void; full?: boolean }) {
-  return (
-    <label className={`block ${full ? "sm:col-span-2" : ""}`}>
-      <span className="text-[12px] font-medium text-muted">{label}</span>
-      <input required value={v} onChange={on} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
-    </label>
   );
 }

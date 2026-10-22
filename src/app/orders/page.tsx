@@ -9,6 +9,9 @@ import { inr } from "@/lib/utils";
 
 export const metadata = { title: "My orders" };
 
+// The app's "Past Orders" tab; everything else is still on its way.
+const PAST = ["delivered", "cancelled", "returned", "refunded"];
+
 type OrderLine = { name?: string; image?: string; qty?: number; total?: number; price?: number };
 type Order = {
   _id: string;
@@ -41,40 +44,51 @@ export default async function OrdersPage() {
       {list.length === 0 ? (
         <EmptyOrders />
       ) : (
-        <div className="flex flex-col gap-4">
-          {list.map((o) => {
-            const line = o.product ?? o.items?.[0] ?? {};
-            const total = o.pricing?.total ?? line.total ?? 0;
-            return (
-              <Link
-                key={o._id}
-                href={`/orders/${o._id}`}
-                className="card card-hover flex items-center gap-4 rounded-[1.5rem] p-3"
-              >
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
-                  <ProductMedia src={line.image} alt={line.name ?? "Order"} sizes="80px" className="h-full w-full" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">
-                    {line.name ?? `Order ${o.orderId ?? o._id.slice(-6)}`}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    #{o.orderId ?? o._id.slice(-6)}
-                    {line.qty ? ` · Qty ${line.qty}` : ""}
-                  </p>
-                  {o.status && (
-                    <span className="mt-1.5 inline-block rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-medium capitalize text-ink">
-                      {o.status}
-                    </span>
-                  )}
-                </div>
-                <span className="font-display text-lg font-semibold text-ink">{inr(total)}</span>
-              </Link>
-            );
-          })}
+        <div className="flex flex-col gap-8">
+          {([
+            ["Ongoing", list.filter((o) => !PAST.includes((o.status ?? "").toLowerCase()))],
+            ["Past orders", list.filter((o) => PAST.includes((o.status ?? "").toLowerCase()))],
+          ] as const).map(([title, group]) => group.length > 0 && (
+            <section key={title}>
+              <h2 className="mb-3 px-1 font-display text-lg font-semibold text-ink">{title}</h2>
+              <div className="flex flex-col gap-4">
+                {group.map((o) => <OrderRow key={o._id} o={o} />)}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </PageShell>
+  );
+}
+
+function OrderRow({ o }: { o: Order }) {
+  const line = o.product ?? o.items?.[0] ?? {};
+  const more = (o.items?.length ?? 1) - 1;
+  const total = o.pricing?.total ?? line.total ?? 0;
+  const past = PAST.includes((o.status ?? "").toLowerCase());
+  return (
+    <Link href={`/orders/${o._id}`} className="card card-hover flex items-center gap-4 rounded-[1.5rem] p-3">
+      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
+        <ProductMedia src={line.image} alt={line.name ?? "Order"} sizes="80px" className="h-full w-full" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">
+          {line.name ?? `Order ${o.orderId ?? o._id.slice(-6)}`}
+          {more > 0 && <span className="font-sans text-sm font-normal text-muted"> + {more} more</span>}
+        </p>
+        <p className="mt-0.5 text-sm text-muted">
+          #{o.orderId ?? o._id.slice(-6)}
+          {line.qty ? ` · Qty ${line.qty}` : ""}
+        </p>
+        {o.status && (
+          <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-[12px] font-medium capitalize ${o.status === "cancelled" ? "bg-live/10 text-live" : "bg-surface-2 text-ink"}`}>
+            {past ? o.status.replace(/_/g, " ") : `${o.status.replace(/_/g, " ")} · arriving soon`}
+          </span>
+        )}
+      </div>
+      <span className="font-display text-lg font-semibold text-ink">{inr(total)}</span>
+    </Link>
   );
 }
 

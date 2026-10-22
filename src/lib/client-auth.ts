@@ -111,6 +111,7 @@ export async function register(input: {
   countryCode: string;
   password: string;
   email?: string;
+  gender?: "Male" | "Female" | "Other";
 }): Promise<SessionUser> {
   await post("/user/register", input);
   // Registration succeeded - sign in to establish the session.
@@ -123,6 +124,13 @@ export const otp = {
   send: (phone: string, countryCode: string) =>
     post("/twilio-sms/send-otp", { phoneNumber: phone, countryCode }),
 };
+
+/** Sign-up only: proves the phone is the user's before the account is created, as the app does.
+ *  The server answers 200 for a wrong code too, so only status "approved" counts. */
+export async function verifyPhone(phone: string, countryCode: string, code: string): Promise<void> {
+  const json = await post("/twilio-sms/verify-otp", { phoneNumber: phone, countryCode, otp: code });
+  if (json?.data?.status !== "approved") throw new Error("That code is wrong or has expired.");
+}
 
 // The server checks the code itself as part of login, so it must not be verified separately first
 // (a code can only be used once).
