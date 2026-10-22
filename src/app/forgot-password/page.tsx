@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
-import { forgot } from "@/lib/client-auth";
+import { forgot, STRONG_PASSWORD } from "@/lib/client-auth";
 
 type Step = "phone" | "otp" | "reset" | "done";
 
@@ -19,6 +19,17 @@ export default function ForgotPasswordPage() {
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<string | undefined>();
+  const [wait, setWait] = useState(0);
+  const digits = phone.replace(/\D/g, "");
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const id = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
+
+  const sendCode = async () => { await forgot.sendOtp(digits, countryCode); setWait(30); };
 
   async function run(fn: () => Promise<unknown>, next: Step) {
     setBusy(true);
@@ -40,29 +51,37 @@ export default function ForgotPasswordPage() {
         <h1 className="mt-6 font-display text-2xl font-semibold text-ink">Reset password</h1>
 
         {step === "phone" && (
-          <form onSubmit={(e) => { e.preventDefault(); run(() => forgot.sendOtp(phone.trim(), countryCode), "otp"); }} className="mt-5 space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); if (digits.length !== 10) return setError("Enter a valid 10-digit mobile number."); run(sendCode, "otp"); }} className="mt-5 space-y-4">
             <p className="text-[15px] text-muted">Enter your phone and we&apos;ll text a code.</p>
             <div className="flex items-center rounded-2xl border border-hairline bg-surface-2 focus-within:border-ink">
               <input value={countryCode} onChange={(e) => setCountryCode(e.target.value)} aria-label="Country code" className="h-12 w-16 rounded-l-2xl bg-transparent pl-4 text-[15px] font-medium text-ink focus:outline-none" />
               <span className="h-6 w-px bg-hairline" />
-              <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" className="h-12 w-full rounded-r-2xl bg-transparent px-3 text-[15px] text-ink focus:outline-none" />
+              <input type="tel" inputMode="numeric" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" aria-label="Phone number" className="h-12 w-full rounded-r-2xl bg-transparent px-3 text-[15px] text-ink focus:outline-none" />
             </div>
             <Submit busy={busy}>Send code</Submit>
           </form>
         )}
 
         {step === "otp" && (
-          <form onSubmit={(e) => { e.preventDefault(); run(() => forgot.verifyOtp(phone.trim(), countryCode, otp.trim()), "reset"); }} className="mt-5 space-y-4">
-            <p className="text-[15px] text-muted">Enter the code sent to {countryCode} {phone}.</p>
-            <Input value={otp} onChange={setOtp} placeholder="6-digit code" inputMode="numeric" />
+          <form onSubmit={(e) => { e.preventDefault(); run(async () => setResetToken(await forgot.verifyOtp(digits, countryCode, otp.trim())), "reset"); }} className="mt-5 space-y-4">
+            <p className="text-[15px] text-muted">Enter the code sent to {countryCode} {digits}.</p>
+            <Input value={otp} onChange={(v) => setOtp(v.replace(/\D/g, "").slice(0, 6))} placeholder="Code" inputMode="numeric" />
             <Submit busy={busy}>Verify code</Submit>
+            <button type="button" disabled={wait > 0 || busy} onClick={() => { setError(null); sendCode().catch((e) => setError(e instanceof Error ? e.message : "Couldn't send the code.")); }} className="block text-sm font-medium text-ink disabled:text-muted">
+              {wait > 0 ? `Resend code in ${wait}s` : "Resend code"}
+            </button>
             <button type="button" onClick={() => setStep("phone")} className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink"><ArrowLeft className="h-3.5 w-3.5" /> Change number</button>
           </form>
         )}
 
         {step === "reset" && (
-          <form onSubmit={(e) => { e.preventDefault(); if (pw !== pw2) return setError("Passwords don't match."); run(() => forgot.reset(phone.trim(), countryCode, pw, pw2), "done"); }} className="mt-5 space-y-4">
-            <p className="text-[15px] text-muted">Choose a new password.</p>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!STRONG_PASSWORD.test(pw)) return setError("Use at least 8 characters with an uppercase letter, a lowercase letter and a number.");
+            if (pw !== pw2) return setError("Passwords don't match.");
+            run(() => forgot.reset(digits, countryCode, pw, pw2, resetToken), "done");
+          }} className="mt-5 space-y-4">
+            <p className="text-[15px] text-muted">Choose a new password: at least 8 characters, with an uppercase letter, a lowercase letter and a number.</p>
             <Input value={pw} onChange={setPw} placeholder="New password" type="password" />
             <Input value={pw2} onChange={setPw2} placeholder="Confirm password" type="password" />
             <Submit busy={busy}>Reset password</Submit>

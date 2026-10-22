@@ -145,10 +145,15 @@ export async function loginWithOtp(input: {
   return json.user as SessionUser;
 }
 
-// Forgot-password flow (3 steps).
+// Forgot-password flow (3 steps). The code check returns a short-lived resetToken; it is sent
+// with the reset so the server can require it (it doesn't yet, see the parity checklist).
 export const forgot = {
   sendOtp: (phone: string, countryCode: string) => post("/user/forgot-password/send-otp", { phone, countryCode }),
-  verifyOtp: (phone: string, countryCode: string, otp: string) => post("/user/forgot-password/verify-otp", { phone, countryCode, otp }),
-  reset: (phone: string, countryCode: string, newPassword: string, confirmPassword: string) =>
-    post("/user/forgot-password/reset", { phone, countryCode, newPassword, confirmPassword }),
+  verifyOtp: async (phone: string, countryCode: string, otp: string): Promise<string | undefined> =>
+    (await post("/user/forgot-password/verify-otp", { phone, countryCode, otp }))?.resetToken,
+  reset: (phone: string, countryCode: string, newPassword: string, confirmPassword: string, resetToken?: string) =>
+    post("/user/forgot-password/reset", { phone, countryCode, newPassword, confirmPassword, resetToken }),
 };
+
+/** The server's rule for a new password on reset: 8+ characters with upper case, lower case and a number. */
+export const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
