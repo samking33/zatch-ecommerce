@@ -277,7 +277,9 @@ export default function CartPage() {
               </dl>
               {picked.length ? (
                 <Link
-                  href={allPicked ? "/checkout" : `/checkout?ids=${picked.map((it) => it._id).join(",")}`}
+                  // Always the shown lines: without ids the server checks out every stored line,
+                  // including ones /cart hides because the product is sold or gone.
+                  href={`/checkout?ids=${picked.map((it) => it._id).join(",")}`}
                   className="pill-lime mt-5 flex items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold"
                 >
                   Checkout <ArrowRight className="h-4 w-4" />

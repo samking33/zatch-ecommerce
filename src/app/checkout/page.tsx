@@ -86,7 +86,11 @@ export default function CheckoutPage() {
     const q = new URLSearchParams(window.location.search);
     if (q.has("items")) setDirect(parseBuyItems(q.get("items")));
     else {
-      setCartIds((q.get("ids") ?? "").split(",").filter(Boolean));
+      const ids = (q.get("ids") ?? "").split(",").filter(Boolean);
+      // Without ids the server would price every stored cart line, including ones the cart page
+      // hides (sold or removed products), so the cart picks the lines first.
+      if (ids.length === 0) { router.replace("/cart"); return; }
+      setCartIds(ids);
       // A code applied on the cart page carries over to a cart checkout.
       setCoupon(getAppliedCoupon());
     }
