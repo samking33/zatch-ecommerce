@@ -143,10 +143,11 @@ export default function LoginPage() {
                 <span className="text-[13px] font-medium text-muted">Code sent to your phone</span>
                 <input
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   required
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="6-digit code"
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="4-digit code"
                   className="mt-1.5 h-12 w-full rounded-2xl border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
                 />
               </label>
