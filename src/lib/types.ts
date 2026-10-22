@@ -42,6 +42,8 @@ export interface Product {
   comments?: ProductComment[];
   reviews?: ProductReview[];
   sellerId?: string | Seller;
+  // Product detail: who sells it.
+  seller?: { _id: string; username?: string; businessName?: string | null; profilePic?: { url?: string }; followerCount?: number; customerRating?: number } | null;
   SKU?: string;
   isSold?: boolean;
   myProduct?: boolean; // the signed-in viewer is this product's seller

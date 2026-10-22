@@ -215,9 +215,9 @@ export const products = {
   view: (id: string, t?: string) => api(`/product/${id}/view`, { method: "POST", token: t }),
   share: (id: string, t?: string) => api(`/product/${id}/share`, { method: "POST", token: t }),
   comment: (id: string, b: unknown, t: string) =>
-    api(`/product/${id}/comment`, { method: "POST", body: b, token: t }),
+    api(`/product/${id}/comment`, { method: "POST", body: b, token: t, keepError: true }),
   review: (id: string, b: unknown, t: string) =>
-    api(`/product/${id}/review`, { method: "POST", body: b, token: t }),
+    api(`/product/${id}/review`, { method: "POST", body: b, token: t, keepError: true }),
   setBargainSettings: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/bargain-settings`, { method: "POST", body: b, token: t, keepError: true }),
   setGlobalBargain: (b: unknown, t: string) =>

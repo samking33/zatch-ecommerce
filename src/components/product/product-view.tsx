@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw, Zap } from "lucide-react";
+import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw, Zap, X, Minus, Plus } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
@@ -59,6 +59,10 @@ export function ProductView({ product }: { product: Product }) {
   // A product with no variants can never be added to a cart (the server matches a variant), so it is unavailable.
   const unavailable = variants.length === 0;
   const outOfStock = unavailable || soldOut(selected);
+  // Picking a colour clears the size; without one the server would match any size of that colour.
+  const needsSize = sizes.length > 0 && !size;
+  const [qty, setQty] = useState(1);
+  const maxQty = Math.max(1, selected?.stock ?? 1);
 
   // The selected colour's photos; the main photos only when that colour has none of its own.
   // (The main photos are copies of the first colour's, so showing both would repeat them.)
@@ -69,6 +73,8 @@ export function ProductView({ product }: { product: Product }) {
   }, [product.images, variants, color]);
 
   const [activeUrl, setActiveUrl] = useState<string | undefined>(gallery[0]?.url);
+  // Full-screen photo (the app's image viewer); <dialog> handles focus and Esc.
+  const viewer = useRef<HTMLDialogElement>(null);
 
   function swatchImg(c: string): Variant | undefined {
     return variants.find((v) => v.color === c && v.images?.length);
@@ -77,6 +83,7 @@ export function ProductView({ product }: { product: Product }) {
   function pickColor(c: string) {
     setColor(c);
     setSize(undefined);
+    setQty(1);
     // Switch the main image to this colour's image when it has one.
     const v = swatchImg(c);
     if (v?.images?.[0]?.url) setActiveUrl(v.images[0].url);
@@ -88,7 +95,7 @@ export function ProductView({ product }: { product: Product }) {
     const token = getToken();
     if (!token) { router.push("/login"); return; }
     setStatus("adding");
-    const res = await cartApi.update({ productId: product._id, color, size, qty: 1 }, token);
+    const res = await cartApi.update({ productId: product._id, color, size, qty }, token);
     const failure = apiError(res, "Couldn't add to cart. Try again.");
     setCartError(failure);
     setStatus(failure ? "error" : "added");
@@ -96,14 +103,19 @@ export function ProductView({ product }: { product: Product }) {
 
   // Buy now goes straight to checkout with this item; the cart is left alone (same as the app).
   function buyNow() {
-    router.push(buyHref([{ productId: product._id, variantColor: color ?? "", variantSize: size ?? "", qty: 1 }]));
+    router.push(buyHref([{ productId: product._id, variantColor: color ?? "", variantSize: size ?? "", qty }]));
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {/* gallery */}
       <div className="card h-fit rounded-[2rem] p-6 lg:sticky lg:top-28">
-        <div className="aspect-square overflow-hidden rounded-[1.5rem] bg-surface-2">
+        <button
+          type="button"
+          onClick={() => activeUrl && viewer.current?.showModal()}
+          aria-label="View photo full screen"
+          className="block aspect-square w-full cursor-zoom-in overflow-hidden rounded-[1.5rem] bg-surface-2"
+        >
           <ProductMedia
             key={activeUrl}
             src={activeUrl}
@@ -112,7 +124,20 @@ export function ProductView({ product }: { product: Product }) {
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="h-full w-full"
           />
-        </div>
+        </button>
+        <dialog
+          ref={viewer}
+          onClick={(e) => { if (e.target === e.currentTarget) viewer.current?.close(); }}
+          className="m-auto h-full max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-ink/90"
+        >
+          <div className="relative grid h-full w-full place-items-center p-4" onClick={() => viewer.current?.close()}>
+            {/* The original from the CDN, not the resized copy. */}
+            {activeUrl && <img src={activeUrl} alt={product.name} className="max-h-full max-w-full object-contain" />}
+            <button type="button" onClick={() => viewer.current?.close()} aria-label="Close" autoFocus className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-ink">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </dialog>
         {gallery.length > 1 && (
           <div className="mt-4 flex flex-wrap gap-3">
             {gallery.map((im) => {
@@ -202,7 +227,7 @@ export function ProductView({ product }: { product: Product }) {
                 {sizes.map((s) => (
                   <button
                     key={s}
-                    onClick={() => setSize(s)}
+                    onClick={() => { setSize(s); setQty(1); }}
                     aria-pressed={s === size}
                     disabled={sizeSoldOut(s)}
                     title={sizeSoldOut(s) ? "Sold out" : undefined}
@@ -228,17 +253,30 @@ export function ProductView({ product }: { product: Product }) {
                 <Link href="/cart" className="btn-ink ml-auto rounded-full px-5 py-2.5 text-sm font-semibold">View cart</Link>
               </div>
             ) : (
+              <>
+              {!outOfStock && (
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="text-[13px] font-medium text-muted">Quantity</span>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-hairline p-1">
+                    <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Decrease quantity" className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                    <span className="w-7 text-center text-sm font-semibold tabular-nums" aria-live="polite">{qty}</span>
+                    <button type="button" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label="Increase quantity" className="grid h-8 w-8 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              )}
+              {needsSize && <p className="mb-3 text-sm font-medium text-ink">Choose a size to continue.</p>}
               <div className="grid gap-3 sm:grid-cols-2">
-                <button onClick={addToCart} disabled={status === "adding" || outOfStock} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
+                <button onClick={addToCart} disabled={status === "adding" || outOfStock || needsSize} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
                   {status === "adding" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ShoppingBag className="h-[18px] w-[18px]" />}
                   {unavailable ? "Not available yet" : outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
                 </button>
                 {!outOfStock && (
-                  <button onClick={buyNow} disabled={status === "adding"} className="pill-lime inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
+                  <button onClick={buyNow} disabled={status === "adding" || needsSize} className="pill-lime inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
                     <Zap className="h-[18px] w-[18px]" /> Buy now
                   </button>
                 )}
               </div>
+              </>
             )}
             {status === "error" && <p role="alert" className="mt-2 text-sm font-medium text-live">{cartError}</p>}
           </div>
@@ -267,7 +305,9 @@ export function ProductView({ product }: { product: Product }) {
         </div>
 
         {!product.myProduct && canBargain && (
-          <BargainBox
+          needsSize ? (
+            <p className="card rounded-[1.5rem] p-5 text-[15px] text-muted">Choose a size to make an offer.</p>
+          ) : <BargainBox
             productId={product._id}
             listPrice={price}
             color={color}

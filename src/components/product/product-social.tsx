@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart, Bookmark, Share2, Check, Star, Send, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { products as productsApi } from "@/lib/api";
+import { products as productsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { compact } from "@/lib/utils";
 import type { Product, ProductComment, ProductReview } from "@/lib/types";
@@ -93,17 +93,20 @@ export function ProductReviews({ product }: { product: Product }) {
     if (tab === "reviews") {
       const res = await productsApi.review(product._id, { rating, comment: body }, t);
       setBusy(false);
-      if (res) {
+      // e.g. "You have already reviewed this product"
+      const failure = apiError(res, "Couldn't post your review.");
+      if (!failure) {
         setReviews((r) => [...r, { _id: `local-${Date.now()}`, rating, comment: body, user: { _id: "me", username: "You" } }]);
         setText(""); setMsg("Thanks for the review!");
-      } else setMsg("Couldn't post your review.");
+      } else setMsg(failure);
     } else {
       const res = await productsApi.comment(product._id, { text: body }, t);
       setBusy(false);
-      if (res) {
+      const failure = apiError(res, "Couldn't post your comment.");
+      if (!failure) {
         setComments((c) => [...c, { _id: `local-${Date.now()}`, text: body, user: { _id: "me", username: "You" } }]);
         setText(""); setMsg(null);
-      } else setMsg("Couldn't post your comment.");
+      } else setMsg(failure);
     }
   }
 
@@ -154,6 +157,9 @@ export function ProductReviews({ product }: { product: Product }) {
         )}
       </div>
 
+      {product.myProduct && tab === "reviews" ? (
+        <p className="mt-6 border-t border-hairline pt-5 text-sm text-muted">You can&apos;t review your own product.</p>
+      ) : (
       <form onSubmit={submit} className="mt-6 border-t border-hairline pt-5">
         {tab === "reviews" && (
           <div className="mb-3 flex gap-1">
@@ -177,6 +183,7 @@ export function ProductReviews({ product }: { product: Product }) {
         </div>
         {msg && <p className="mt-2 text-sm font-medium text-ink">{msg}</p>}
       </form>
+      )}
     </div>
   );
 }

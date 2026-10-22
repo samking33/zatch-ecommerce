@@ -65,7 +65,7 @@ export function VideoRailCard({ bit, onOpen }: { bit: Bit; onOpen: () => void })
         )}
         {price != null && (
           <span className="absolute left-2.5 top-2.5 rounded-full bg-lime px-2.5 py-1 text-[11px] font-bold text-lime-ink">
-            {inr(price)}
+            Zatch from {inr(price)}
           </span>
         )}
         <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-ink/85 to-transparent px-2.5 pb-2.5 pt-8">
