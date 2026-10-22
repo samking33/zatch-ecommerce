@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Heart, MessageCircle, Share2, Bookmark, Send, ShoppingBag, Check, Loader2,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Volume2, VolumeX, Play,
 } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { Avatar } from "@/components/ui/avatar";
@@ -26,7 +26,8 @@ function videoUrl(b: Bit) {
 
 /**
  * Reel player. Holds the whole feed so you can move between videos the way the
- * app does: scroll, swipe, arrow keys, or the on-screen up/down controls.
+ * app does: swipe or scroll (native scroll-snap, so it follows the finger and keeps
+ * momentum), arrow keys, or the on-screen up/down controls.
  * Callers may pass a single bit or the list plus a starting index.
  */
 export function BitModal({
@@ -48,14 +49,34 @@ export function BitModal({
     }
     return index;
   });
+  // Sound is tried on; a browser that blocks it turns it off for the whole feed until the viewer taps the speaker.
+  const [muted, setMuted] = useState(false);
+  const feed = useRef<HTMLDivElement>(null);
 
-  const current = list[i];
   const canPrev = i > 0;
   const canNext = i < list.length - 1;
 
+  // Open on the chosen video without an animated scroll.
+  useEffect(() => {
+    feed.current?.children[i]?.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on open
+  }, []);
+
+  // The video that fills most of the screen is the one that plays.
+  useEffect(() => {
+    const root = feed.current;
+    if (!root) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) setI(Number((e.target as HTMLElement).dataset.index)); }),
+      { root, threshold: 0.6 },
+    );
+    Array.from(root.children).forEach((c) => io.observe(c));
+    return () => io.disconnect();
+  }, [list.length]);
+
   const go = useCallback(
-    (dir: 1 | -1) => setI((n) => Math.min(Math.max(n + dir, 0), list.length - 1)),
-    [list.length],
+    (dir: 1 | -1) => feed.current?.children[Math.min(Math.max(i + dir, 0), list.length - 1)]?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    [i, list.length],
   );
 
   // Keyboard: up/down to move, escape to close.
@@ -69,52 +90,39 @@ export function BitModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [go, onClose]);
 
-  // Wheel: one gesture moves one video, so a trackpad flick does not skip five.
-  const lock = useRef(false);
-  function onWheel(e: React.WheelEvent) {
-    if (Math.abs(e.deltaY) < 12 || lock.current) return;
-    lock.current = true;
-    go(e.deltaY > 0 ? 1 : -1);
-    setTimeout(() => { lock.current = false; }, 450);
-  }
-
-  // Touch: vertical swipe.
-  const startY = useRef(0);
-  function onTouchStart(e: React.TouchEvent) { startY.current = e.touches[0].clientY; }
-  function onTouchEnd(e: React.TouchEvent) {
-    const dy = startY.current - e.changedTouches[0].clientY;
-    if (Math.abs(dy) > 60) go(dy > 0 ? 1 : -1);
-  }
-
-  if (!current) return null;
+  if (list.length === 0) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] grid place-items-center bg-ink/85 p-3 backdrop-blur-sm"
-      onClick={onClose}
-      onWheel={onWheel}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
-      <div className="relative flex max-h-[92vh] w-full max-w-5xl gap-3" onClick={(e) => e.stopPropagation()}>
-        {/* Remount per video so like/comment state belongs to the one on screen. */}
-        <BitPane key={current._id} bit={current} onClose={onClose} />
-
-        {/* Up/down, outside the card like a feed control */}
-        {list.length > 1 && (
-          <div className="absolute -right-14 top-1/2 hidden -translate-y-1/2 flex-col gap-2 lg:flex">
-            <NavBtn onClick={() => go(-1)} disabled={!canPrev} label="Previous video">
-              <ChevronUp className="h-5 w-5" />
-            </NavBtn>
-            <NavBtn onClick={() => go(1)} disabled={!canNext} label="Next video">
-              <ChevronDown className="h-5 w-5" />
-            </NavBtn>
-            <span className="mt-1 text-center text-[11px] font-medium text-white/60">
-              {i + 1}/{list.length}
-            </span>
+    <div className="fixed inset-0 z-[100] bg-ink/85 backdrop-blur-sm">
+      <div ref={feed} className="h-[100dvh] snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {list.map((b, j) => (
+          <div key={b._id} data-index={j} onClick={onClose} className="flex h-[100dvh] snap-start snap-always items-center justify-center md:p-3">
+            <div className="relative flex h-full w-full max-w-5xl justify-center gap-3 md:h-[92vh]" onClick={(e) => e.stopPropagation()}>
+              {/* Only this video and its neighbours are loaded, so a swipe shows the next one at once. */}
+              {Math.abs(j - i) <= 1 ? (
+                <BitPane bit={b} active={j === i} muted={muted} onMuted={setMuted} onClose={onClose} />
+              ) : (
+                <div className="flex-1 bg-black md:aspect-[9/16] md:flex-none md:rounded-[1.75rem]" />
+              )}
+            </div>
           </div>
-        )}
+        ))}
       </div>
+
+      {/* Up/down, outside the card like a feed control */}
+      {list.length > 1 && (
+        <div className="fixed right-6 top-1/2 hidden -translate-y-1/2 flex-col gap-2 lg:flex">
+          <NavBtn onClick={() => go(-1)} disabled={!canPrev} label="Previous video">
+            <ChevronUp className="h-5 w-5" />
+          </NavBtn>
+          <NavBtn onClick={() => go(1)} disabled={!canNext} label="Next video">
+            <ChevronDown className="h-5 w-5" />
+          </NavBtn>
+          <span className="mt-1 text-center text-[11px] font-medium text-white/60">
+            {i + 1}/{list.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -135,8 +143,36 @@ function NavBtn({
 }
 
 /** One video plus its social rail and shop panel. */
-function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
+function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: boolean; muted: boolean; onMuted: (m: boolean) => void; onClose: () => void }) {
   const router = useRouter();
+  const video = useRef<HTMLVideoElement>(null);
+  const [paused, setPaused] = useState(false);
+  const [buffering, setBuffering] = useState(true);
+
+  // Play only the video on screen. If the browser refuses sound, play muted and leave the speaker button to turn it on.
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (!active) { v.pause(); return; }
+    v.muted = muted;
+    // Refused even muted (an iPhone in Low Power Mode): show the play button so a tap starts it.
+    const stuck = () => { setPaused(true); setBuffering(false); };
+    v.play().catch(() => {
+      if (v.muted) return stuck();
+      onMuted(true);
+      v.muted = true;
+      v.play().catch(stuck);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when this video comes on or off screen
+  }, [active]);
+  useEffect(() => { if (video.current) video.current.muted = muted; }, [muted]);
+
+  function togglePlay() {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) v.play().catch(() => {}); else v.pause();
+  }
+
   const [liked, setLiked] = useState(!!bit.isLiked);
   const [likes, setLikes] = useState(bit.likeCount ?? 0);
   const [saved, setSaved] = useState(!!bit.isSaved);
@@ -270,26 +306,50 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
 
   return (
     <>
-      <div className="relative flex-1 overflow-hidden rounded-[1.75rem] bg-black">
-        <button onClick={onClose} aria-label="Close" className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-white/85 text-ink backdrop-blur">
+      {/* Full screen on phones; a 9:16 card on larger screens. */}
+      <div className="relative flex-1 overflow-hidden bg-black md:aspect-[9/16] md:flex-none md:rounded-[1.75rem]">
+        <button onClick={onClose} aria-label="Close" className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 grid h-9 w-9 place-items-center rounded-full bg-white/85 text-ink backdrop-blur">
           <X className="h-4 w-4" />
         </button>
 
         {src ? (
-          <video
-            key={bit._id}
-            onTimeUpdate={onTimeUpdate}
-            onPause={(e) => { if (!e.currentTarget.ended) watch.current.pauseCount += 1; }}
-            src={src}
-            poster={bit.thumbnail?.url}
-            controls
-            autoPlay
-            loop
-            playsInline
-            className="aspect-[9/16] max-h-[92vh] w-full bg-black object-contain"
-          />
+          <>
+            {/* No native controls: on phones they cover the title, the close button and the action rail. */}
+            <video
+              ref={video}
+              key={bit._id}
+              onClick={togglePlay}
+              onTimeUpdate={onTimeUpdate}
+              onPlay={() => setPaused(false)}
+              onPause={(e) => { setPaused(true); if (active && !e.currentTarget.ended) watch.current.pauseCount += 1; }}
+              onWaiting={() => setBuffering(true)}
+              onPlaying={() => setBuffering(false)}
+              src={src}
+              poster={bit.thumbnail?.url}
+              muted={muted}
+              loop
+              playsInline
+              preload={active ? "auto" : "metadata"}
+              className="h-full w-full cursor-pointer bg-black object-cover md:object-contain"
+            />
+            <button
+              onClick={() => onMuted(!muted)}
+              aria-label={muted ? "Turn sound on" : "Turn sound off"}
+              className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur"
+            >
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+            {active && paused && !buffering && (
+              <span className="pointer-events-none absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white backdrop-blur">
+                <Play className="ml-1 h-7 w-7 fill-current" />
+              </span>
+            )}
+            {active && buffering && (
+              <Loader2 className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-spin text-white/80" />
+            )}
+          </>
         ) : (
-          <div className="aspect-[9/16] max-h-[92vh] w-full">
+          <div className="h-full w-full">
             <ProductMedia src={bit.thumbnail?.url} alt={bit.title ?? "Video"} className="h-full w-full" />
           </div>
         )}
@@ -315,7 +375,7 @@ function BitPane({ bit, onClose }: { bit: Bit; onClose: () => void }) {
           </Rail>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4 pr-20">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pr-20">
           {bit.uploadedBy?.username && (
             <Link href={`/seller/${bit.uploadedBy._id}`} className="pointer-events-auto text-sm font-semibold text-white hover:underline">@{bit.uploadedBy.username}</Link>
           )}
