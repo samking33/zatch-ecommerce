@@ -59,23 +59,17 @@ export function OrderActions({
   const [comment, setComment] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [showTracking, setShowTracking] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [reason, setReason] = useState("");
 
   const list = actions?.length ? actions : [{ action: "view_details", label: "View details", type: "secondary" as const, icon: "visibility" }];
 
   async function run(a: ServerAction) {
     if (!token) return;
     switch (a.action) {
-      case "cancel": {
-        const reason = window.prompt("Reason for cancellation?");
-        if (reason === null) return;
-        setBusy(a.action);
-        setMsg(null);
-        const res = await ordersApi.cancel(orderId, { reason: reason || "Changed my mind" }, token);
-        setBusy(null);
-        const failure = apiError(res, "Couldn't cancel this order.");
-        if (failure) setMsg(failure); else router.refresh();
+      case "cancel":
+        setCancelling((v) => !v);
         return;
-      }
       case "download_invoice": {
         setBusy(a.action);
         setMsg(null);
@@ -98,6 +92,20 @@ export function OrderActions({
       default:
         return; // view_details - already here
     }
+  }
+
+  // Like the app: a reason is required, and "Keep order" backs out.
+  async function confirmCancel(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    if (!reason.trim()) return setMsg("Please tell us why you're cancelling.");
+    setBusy("cancel");
+    setMsg(null);
+    const res = await ordersApi.cancel(orderId, { reason: reason.trim() }, token);
+    setBusy(null);
+    const failure = apiError(res, "Couldn't cancel this order.");
+    if (failure) setMsg(failure);
+    else { setCancelling(false); router.refresh(); }
   }
 
   async function submitReview() {
@@ -140,6 +148,23 @@ export function OrderActions({
           </button>
         )}
       </div>
+
+      {cancelling && (
+        <form onSubmit={confirmCancel} className="mt-4 rounded-2xl bg-surface-2 p-4">
+          <label className="block">
+            <span className="text-sm font-medium text-ink">Why are you cancelling this order?</span>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} required autoFocus
+              placeholder="For example: ordered by mistake"
+              className="mt-2 w-full rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setCancelling(false); setMsg(null); }} className="rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink hover:bg-surface">Keep order</button>
+            <button disabled={busy === "cancel"} className="inline-flex items-center gap-2 rounded-full bg-live px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-70">
+              {busy === "cancel" && <Loader2 className="h-4 w-4 animate-spin" />} Cancel order
+            </button>
+          </div>
+        </form>
+      )}
 
       {showTracking && (
         <div className="mt-4 rounded-2xl bg-surface-2 p-4 text-[15px]">
