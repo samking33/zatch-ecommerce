@@ -174,7 +174,7 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
       .map((r) => ({ color: r.color, size: r.size, stock: Number(stockOf(r.key)) }));
     const res = await postJson({ step: "4", productId, variantStock });
     setBusy(false);
-    if (res?.success) { setPublished(true); router.push("/seller/products"); }
+    if (res?.success) { setPublished(true); router.push(`/seller/products?added=${productId}`); }
     // e.g. "Total variant stock exceeds declared stock" or "No valid variants created" + the reason
     else setError([res?.message, res?.details].filter(Boolean).join(". ") || "Couldn't save the stock.");
   }

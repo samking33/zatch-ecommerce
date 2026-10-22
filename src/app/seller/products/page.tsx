@@ -4,17 +4,31 @@ import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/selle
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductManage } from "@/components/seller/product-manage";
-import { products as productsApi, users } from "@/lib/api";
+import { api, products as productsApi, users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
 import type { Product } from "@/lib/types";
 
 export const metadata = { title: "Seller · Products" };
 
+type Listing = Product & { status?: string };
+// The app's inventory filters and sorts. The server sorts by price and stock; A to Z is done here.
+const STOCK = [
+  { key: "", label: "All" },
+  { key: "low", label: "Low stock" },
+  { key: "out", label: "Out of stock" },
+];
+const SORTS = [
+  { key: "", label: "Newest" },
+  { key: "az", label: "A to Z" },
+  { key: "stock_low", label: "Stock: low first" },
+  { key: "price_desc", label: "Price: high first" },
+];
+
 export default async function SellerProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; stock?: string; sort?: string; added?: string }>;
 }) {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your products" /></div></SellerShell>;
@@ -22,12 +36,28 @@ export default async function SellerProductsPage({
   const gate = await sellerGate(t);
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
-  const { q = "" } = await searchParams;
+  const { q = "", stock = "", sort = "", added = "" } = await searchParams;
+  const serverSort = sort === "stock_low" || sort === "price_desc" ? sort : undefined;
   const [mine, me] = await Promise.all([
-    q ? productsApi.searchMine(q, t) : productsApi.myProducts(t),
+    q
+      ? productsApi.searchMine(q, t).then((r) => ({ products: (r as Listing[] | null) ?? [] }))
+      : api<{ products?: Listing[]; inventoryStats?: { lowStockThreshold?: number } }>(
+          `/product/seller/my-products${serverSort ? `?sortBy=${serverSort}` : ""}`, { token: t, raw: true, revalidate: 0 }),
     users.profile(t),
   ]);
-  const list = (mine as (Product & { status?: string })[] | null) ?? [];
+  const all = mine?.products ?? [];
+  const threshold = (mine as { inventoryStats?: { lowStockThreshold?: number } } | null)?.inventoryStats?.lowStockThreshold ?? 5;
+  const stockOf = (p: Listing) => p.totalStock ?? 0;
+  const list = all
+    .filter((p) => (stock === "out" ? stockOf(p) === 0 : stock === "low" ? stockOf(p) > 0 && stockOf(p) <= threshold : true))
+    .sort((a, b) => (sort === "az" ? a.name.localeCompare(b.name) : 0));
+  const href = (k: string, v: string) => {
+    const p = new URLSearchParams({ ...(q && { q }), ...(stock && { stock }), ...(sort && { sort }) });
+    if (v) p.set(k, v); else p.delete(k);
+    const qs = p.toString();
+    return `/seller/products${qs ? `?${qs}` : ""}`;
+  };
+  const chip = (on: boolean) => `rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${on ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"}`;
   // The server only lets admins feature a product as a top pick.
   const canTopPick = (me as { isAdmin?: boolean } | null)?.isAdmin === true;
 
@@ -44,6 +74,24 @@ export default async function SellerProductsPage({
         {q && <Link href="/seller/products" className="grid place-items-center rounded-full border border-hairline px-4 text-sm text-muted hover:text-ink">Clear</Link>}
       </form>
 
+      {/* The app's "Product added" screen: confirm and offer the next steps. */}
+      {/^[a-f\d]{24}$/i.test(added) && (
+        <div role="status" className="mb-5 flex flex-wrap items-center gap-3 rounded-[1.5rem] bg-lime px-5 py-4 text-lime-ink">
+          <p className="flex-1 font-semibold">Product published. Buyers can see it now.</p>
+          <Link href={`/product/${added}`} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-surface">View product</Link>
+          <Link href="/seller/products/new" className="rounded-full border border-lime-ink/30 px-4 py-2 text-sm font-semibold">Add another</Link>
+        </div>
+      )}
+
+      <div className="mb-2 flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="text-muted">Stock</span>
+        {STOCK.map((x) => <Link key={x.key} href={href("stock", x.key)} className={chip((stock || "") === x.key)}>{x.label}</Link>)}
+      </div>
+      <div className="mb-5 flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="text-muted">Sort</span>
+        {SORTS.map((x) => <Link key={x.key} href={href("sort", x.key)} className={chip((sort || "") === x.key)}>{x.label}</Link>)}
+      </div>
+
       <SellerHeader
         title="Products"
         sub={q ? `${list.length} match${list.length !== 1 ? "es" : ""} for “${q}”` : `${list.length} listing${list.length !== 1 ? "s" : ""}`}
@@ -53,7 +101,13 @@ export default async function SellerProductsPage({
           </Link>
         }
       />
-      {list.length === 0 ? (
+      {list.length === 0 && all.length > 0 ? (
+        <EmptyState
+          title="Nothing matches"
+          sub="No products match this filter."
+          cta={<Link href="/seller/products" className="pill-lime rounded-full px-6 py-3 text-sm font-semibold">Show all</Link>}
+        />
+      ) : list.length === 0 ? (
         <EmptyState
           title="No products yet"
           sub="List your first product - set a price and a bargain range, and you're live."
