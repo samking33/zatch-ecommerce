@@ -21,6 +21,17 @@ const statusTone: Record<string, string> = {
   expired: "bg-surface-2 text-muted",
 };
 
+// The app's wording for each status.
+const LABEL: Record<string, string> = {
+  pending: "Request sent",
+  countered: "Seller responded",
+  buyer_countered: "You countered",
+  accepted: "Accepted",
+  auto_accepted: "Accepted",
+  rejected: "Rejected",
+  expired: "Expired",
+};
+
 // Statuses where the ball is in the buyer's court.
 const NEEDS_BUYER = ["countered", "seller_countered"];
 const ACTIVE = ["pending", "countered", "buyer_countered"];
@@ -100,6 +111,7 @@ export default async function BargainsPage({
             const yours = b.offeredPrice ?? b.currentPrice ?? 0;
             const counter = b.counterOffer?.price ?? b.currentPrice;
             const needsYou = NEEDS_BUYER.includes(status) && !!counter;
+            const agreed = status === "accepted" || status === "auto_accepted";
             const pid = b.product._id;
 
             return (
@@ -112,13 +124,19 @@ export default async function BargainsPage({
                   <Link href={`/bargains/${b._id}`} className="line-clamp-1 font-display text-[15px] font-semibold text-ink hover:underline">
                     {b.product.name}
                   </Link>
-                  {(b.product.discountedPrice || b.product.price) ? <p className="mt-0.5 text-sm text-muted">List {inr(b.product.discountedPrice || b.product.price)}</p> : null}
+                  <p className="mt-0.5 text-sm text-muted">
+                    {b.seller?.businessName ? `Sold by ${b.seller.businessName}` : null}
+                    {b.seller?.businessName && (b.product.discountedPrice || b.product.price) ? " · " : null}
+                    {(b.product.discountedPrice || b.product.price) ? `List ${inr(b.product.discountedPrice || b.product.price)}` : null}
+                    {(b.quantity ?? 1) > 1 ? ` · Qty ${b.quantity}` : null}
+                  </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     {b.status && (
                       <span className={`inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold capitalize ${statusTone[status] ?? "bg-surface-2 text-ink"}`}>
-                        {b.status.replace(/_/g, " ")}
+                        {LABEL[status] ?? b.status.replace(/_/g, " ")}
                       </span>
                     )}
+                    {b.orderPlaced && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-semibold text-muted">Ordered</span>}
                     {b.timeLeft?.text && (
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${
                         b.timeLeft.isExpiringSoon ? "bg-live/10 text-live" : "bg-surface-2 text-muted"
@@ -130,8 +148,8 @@ export default async function BargainsPage({
                 </div>
 
                 <div className="text-right">
-                  <p className="text-[12px] text-muted">{needsYou ? "Seller countered" : "Your price"}</p>
-                  <p className="font-display text-lg font-semibold text-ink">{inr(needsYou ? counter! : yours)}</p>
+                  <p className="text-[12px] text-muted">{needsYou ? "Seller countered" : agreed ? "Agreed price" : "Your price"}</p>
+                  <p className="font-display text-lg font-semibold text-ink">{inr(needsYou ? counter! : agreed ? b.currentPrice ?? yours : yours)}</p>
                 </div>
 
                 {needsYou && (
@@ -139,6 +157,7 @@ export default async function BargainsPage({
                     bargainId={b._id}
                     counterPrice={counter!}
                     listPrice={b.product.discountedPrice || b.product.price || counter!}
+                    item={{ productId: pid, color: b.variant?.color, size: b.variant?.size, qty: b.quantity ?? 1 }}
                   />
                 )}
               </div>

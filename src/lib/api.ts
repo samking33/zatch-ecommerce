@@ -318,6 +318,10 @@ export type BuyerBargain = {
   counterOffer?: { price?: number | null; message?: string } | null;
   product: { _id?: string; name: string; image: string; price: number; discountedPrice?: number | null };
   timeLeft?: { text?: string | null; isExpiringSoon?: boolean } | null;
+  variant?: { color?: string | null; size?: string | null } | null;
+  quantity?: number;
+  orderPlaced?: boolean;
+  seller?: { businessName?: string } | null;
 };
 
 export const bargains = {
