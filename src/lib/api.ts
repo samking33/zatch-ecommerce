@@ -175,13 +175,19 @@ export type SellerStatusDisplay = {
   action?: { label?: string; route?: string };
 };
 
+/** What the seller already entered (bank details are never sent back). */
+export type SellerProfileDraft = {
+  businessName?: string; gstin?: string; enrollmentId?: string;
+  address?: { pickupAddress?: string; billingAddress?: string; pinCode?: string; state?: string };
+};
+
 export const seller = {
   register: (b: unknown, t: string) =>
     api("/user/seller/register", { method: "POST", body: b, token: t }),
   approve: (b: unknown, t: string) =>
     api("/user/seller/approve", { method: "POST", body: b, token: t }),
   status: (t: string) =>
-    api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay }>("/user/seller/status", { token: t, raw: true, revalidate: 0 }),
+    api<{ sellerStatus?: string; statusDisplay?: SellerStatusDisplay; sellerProfile?: SellerProfileDraft }>("/user/seller/status", { token: t, raw: true, revalidate: 0 }),
   terms: () => api("/user/seller/terms-and-conditions"),
   profileCompletion: (t: string) => api("/user/seller/profile-completion", { token: t, raw: true, revalidate: 0 }),
   benefits: (t: string) => api<SellerBenefits>("/user/seller/benefits", { token: t, pick: "data" }),

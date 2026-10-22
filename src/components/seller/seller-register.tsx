@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
-import { address as addressApi, ifsc as ifscApi } from "@/lib/api";
+import { address as addressApi, ifsc as ifscApi, type SellerProfileDraft } from "@/lib/api";
 import { shrinkImage } from "@/lib/shrink-image";
 
 const DOC_TYPES = [
@@ -18,16 +18,17 @@ type Doc = { type: string; file: File };
 
 // Real 3-step seller KYC onboarding → POST /user/seller/register (step-based).
 // After all steps the account moves to `pending` for admin approval.
-export function SellerRegister() {
+export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  // Pick up where the seller left off (the app's "Resume application"); earlier answers are filled in.
+  const [step, setStep] = useState(!draft?.businessName ? 1 : !draft.address?.pickupAddress ? 2 : 3);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [shop, setShop] = useState({ businessName: "", gstin: "", pan: "" });
+  const [shop, setShop] = useState({ businessName: draft?.businessName ?? "", gstin: draft?.gstin ?? draft?.enrollmentId ?? "", pan: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
   // Same fields as the app's address step. Billing is the pickup address unless unticked.
-  const [addr, setAddr] = useState({ line1: "", line2: "", pinCode: "", state: "" });
+  const [addr, setAddr] = useState({ line1: draft?.address?.pickupAddress ?? "", line2: "", pinCode: draft?.address?.pinCode ?? "", state: draft?.address?.state ?? "" });
   const [billingSame, setBillingSame] = useState(true);
   const [billing, setBilling] = useState({ line1: "", line2: "", pinCode: "", state: "" });
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
