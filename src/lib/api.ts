@@ -418,7 +418,8 @@ export const bits = {
   list: (t?: string) => api<Bit[]>("/bits/list", { token: t, pick: "bits", version: "v2", revalidate: t ? 0 : 60 }),
   // The single-bit endpoint wraps the bit as `bitsDetails` (the list endpoint uses `bits`).
   get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bitsDetails", version: "v2", revalidate: t ? 0 : 60 }),
-  dashboard: (t: string) => api("/bits/dashboard", { token: t, raw: true, revalidate: 0 }),
+  // timeFilter: This Week (default) | This Month | This Year
+  dashboard: (t: string, timeFilter?: string) => api(`/bits/dashboard${qs({ timeFilter })}`, { token: t, raw: true, revalidate: 0 }),
   uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true, revalidate: 0 }),
   upload: (b: unknown, t: string) => api("/bits/upload", { method: "POST", body: b, token: t }),
   toggleLike: (id: string, t: string) => api(`/bits/${id}/toggleLike`, { method: "POST", token: t, raw: true }),

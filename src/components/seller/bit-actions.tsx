@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Eye, EyeOff, Trash2, Loader2 } from "lucide-react";
-import { bits as bitsApi } from "@/lib/api";
+import { MoreHorizontal, Eye, EyeOff, Trash2, Loader2, Send } from "lucide-react";
+import { bits as bitsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 /** Seller reel actions → PATCH /bits/:id/action (Activate | Deactivate | Delete). */
@@ -58,5 +58,40 @@ function Item({ onClick, icon: Icon, label, danger }: { onClick: () => void; ico
     >
       <Icon className="h-3.5 w-3.5" /> {label}
     </button>
+  );
+}
+
+/** The seller's reply on their own Bit → POST /bits/:id/comments, as the app's "Add Comment". */
+export function BitCommentForm({ bitId }: { bitId: string }) {
+  const router = useRouter();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    const t = getToken();
+    if (!t || !text.trim() || busy) return;
+    setBusy(true);
+    setErr(null);
+    const res = await bitsApi.comment(bitId, { text: text.trim() }, t);
+    setBusy(false);
+    const failure = apiError(res, "Couldn't add your comment. Try again.");
+    if (failure) return setErr(failure);
+    setText("");
+    router.refresh();
+  }
+
+  return (
+    <form onSubmit={send} className="mt-3">
+      <div className="flex items-center gap-2">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a comment" aria-label="Add a comment"
+          className="h-11 flex-1 rounded-full border border-hairline bg-surface-2 px-4 text-[14px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
+        <button disabled={busy || !text.trim()} aria-label="Send" className="btn-ink grid h-11 w-11 shrink-0 place-items-center rounded-full disabled:opacity-60">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+      {err && <p role="alert" className="mt-2 text-[13px] font-medium text-live">{err}</p>}
+    </form>
   );
 }

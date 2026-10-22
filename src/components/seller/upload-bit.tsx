@@ -2,31 +2,36 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Upload, Video, X, Plus } from "lucide-react";
+import { Loader2, Upload, Video, X, Plus, Pencil } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
 import { shrinkImage } from "@/lib/shrink-image";
 import type { Product } from "@/lib/types";
 
+type EditBit = { _id: string; title?: string; description?: string; hashtags?: string[]; products: string[] };
+
 /** Real Bit upload → POST /bits/upload (multipart: video + thumbnail).
- *  Sellers can tag their own products so the Bit is shoppable. */
-export function UploadBit({ myProducts }: { myProducts: Product[] }) {
+ *  Sellers can tag their own products so the Bit is shoppable.
+ *  With `edit`, the same fields go to PATCH /bits/:id/action as the app's Edit; the video is then optional. */
+export function UploadBit({ myProducts, edit }: { myProducts: Product[]; edit?: EditBit }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ title: "", description: "", hashtags: "" });
+  const [f, setF] = useState({ title: edit?.title ?? "", description: edit?.description ?? "", hashtags: (edit?.hashtags ?? []).join(" ") });
   const [video, setVideo] = useState<File | null>(null);
   const [thumb, setThumb] = useState<File | null>(null);
-  const [tagged, setTagged] = useState<string[]>([]);
+  const [tagged, setTagged] = useState<string[]>(edit?.products ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!video) { setError("Choose a video to upload."); return; }
-    if (video.size > 50 * 1024 * 1024) { setError("The video must be under 50 MB."); return; }
-    // Same length rule as the app (5 seconds to 2 minutes).
-    const secs = await videoSeconds(video);
-    if (secs < 5) { setError("Bit is too short. Please upload at least 5 seconds."); return; }
-    if (secs > 121) { setError("Bit is too long. Please keep it under 2 minutes."); return; }
+    if (!video && !edit) { setError("Choose a video to upload."); return; }
+    if (video) {
+      if (video.size > 50 * 1024 * 1024) { setError("The video must be under 50 MB."); return; }
+      // Same length rule as the app (5 seconds to 2 minutes).
+      const secs = await videoSeconds(video);
+      if (secs < 5) { setError("Bit is too short. Please upload at least 5 seconds."); return; }
+      if (secs > 121) { setError("Bit is too long. Please keep it under 2 minutes."); return; }
+    }
     // Bits with no tagged product never appear in the buyer feed.
     if (tagged.length === 0) { setError(myProducts.length === 0 ? "Create a product first, then tag it in your Bit." : "Tag at least one product so buyers can see your Bit."); return; }
     setBusy(true); setError(null);
@@ -38,21 +43,26 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
     const tags = f.hashtags.split(/[\s,]+/).filter(Boolean).join(",");
     if (tags) fd.append("hashtags", tags);
     fd.append("products", JSON.stringify(tagged.map((productId) => ({ productId }))));
-    fd.append("video", video);
+    if (video) fd.append("video", video);
     if (thumb) fd.append("thumbnail", thumb);
-    const res = await fetch("/api/v1/bits/upload", {
-      method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd,
+    if (edit) fd.append("action", "Edit");
+    const res = await fetch(edit ? `/api/v1/bits/${edit._id}/action` : "/api/v1/bits/upload", {
+      method: edit ? "PATCH" : "POST", headers: { Authorization: `Bearer ${t}` }, body: fd,
     }).then((r) => r.json()).catch(() => null);
     setBusy(false);
     if (res?.success) {
-      setOpen(false); setVideo(null); setThumb(null); setTagged([]);
-      setF({ title: "", description: "", hashtags: "" });
+      setOpen(false); setVideo(null); setThumb(null);
+      if (!edit) { setTagged([]); setF({ title: "", description: "", hashtags: "" }); }
       router.refresh();
-    } else setError(res?.message ?? "Upload failed. Try again.");
+    } else setError(res?.message ?? (edit ? "Couldn't save the changes. Try again." : "Upload failed. Try again."));
   }
 
   if (!open) {
-    return (
+    return edit ? (
+      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2">
+        <Pencil className="h-4 w-4" /> Edit Bit
+      </button>
+    ) : (
       <button onClick={() => setOpen(true)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold">
         <Plus className="h-4 w-4" /> Upload a Bit
       </button>
@@ -62,7 +72,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
   return (
     <form onSubmit={submit} className="card w-full max-w-lg rounded-[1.75rem] p-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-lg font-semibold text-ink">Upload a Bit</h2>
+        <h2 className="font-display text-lg font-semibold text-ink">{edit ? "Edit Bit" : "Upload a Bit"}</h2>
         <button type="button" onClick={() => setOpen(false)} aria-label="Close"><X className="h-4 w-4 text-muted" /></button>
       </div>
 
@@ -81,7 +91,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
         </label>
 
         <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-hairline bg-surface-2 px-4 py-4 text-sm text-muted hover:border-ink">
-          <Video className="h-5 w-5" /> {video ? video.name : "Choose video (required)"}
+          <Video className="h-5 w-5" /> {video ? video.name : edit ? "Replace video (optional)" : "Choose video (required)"}
           <input type="file" accept="video/*" className="hidden" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
         </label>
         <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-hairline bg-surface-2 px-4 py-3 text-sm text-muted hover:border-ink">
@@ -103,7 +113,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
                     className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors ${on ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"}`}
                   >
                     <span className="line-clamp-1 flex-1">{p.name}</span>
-                    <span className={on ? "text-surface/70" : "text-muted"}>₹{p.discountedPrice ?? p.price}</span>
+                    <span className={on ? "text-surface/70" : "text-muted"}>₹{p.discountedPrice ?? p.price} · {p.totalStock ?? 0} in stock</span>
                   </button>
                 );
               })}
@@ -115,7 +125,7 @@ export function UploadBit({ myProducts }: { myProducts: Product[] }) {
       {error && <p className="mt-3 text-sm font-medium text-live">{error}</p>}
       <button type="submit" disabled={busy} className="pill-lime mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold disabled:opacity-70">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        {busy ? "Uploading…" : "Publish Bit"}
+        {busy ? (edit ? "Saving…" : "Uploading…") : edit ? "Save changes" : "Publish Bit"}
       </button>
     </form>
   );
