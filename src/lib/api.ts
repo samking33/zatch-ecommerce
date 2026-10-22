@@ -271,7 +271,7 @@ export const coupons = {
   // seller-side
   // Active coupons, minus ones this user has used up; `sellerId` narrows to one seller's.
   list: (t: string, sellerId?: string) => api(`/coupons/list${qs({ sellerId })}`, { token: t, pick: "coupons", revalidate: 0 }),
-  dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true, revalidate: 0 }),
+  dashboard: (t: string, period?: string) => api(`/coupons/dashboard${qs({ period })}`, { token: t, raw: true, revalidate: 0 }),
   get: (id: string, t: string) => api(`/coupons/${id}`, { token: t, revalidate: 0 }),
   create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t, keepError: true }),
   // The app's edit route; unlike PUT /:id it checks the products belong to the seller.

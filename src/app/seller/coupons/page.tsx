@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, Check, Ticket, Pencil } from "lucide-react";
 import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/seller-shell";
@@ -7,13 +8,19 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { coupons as couponsApi, seller as sellerApi, products as productsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
+import { inr } from "@/lib/utils";
 
 type Coupon = {
   _id: string; name?: string; code?: string; discountType?: string; discountValue?: number; maxDiscount?: number | null; minSpend?: number;
   startDate?: string; endDate?: string; isActive?: boolean; active?: boolean; isExpired?: boolean; status?: string; daysRemaining?: number;
-  appliedProducts?: { _id: string }[];
+  appliedProducts?: { _id: string; name?: string }[];
+  stats?: { orders?: number; revenue?: number };
 };
 type MyProduct = { _id: string; name: string };
+const PERIODS = [{ key: "week", label: "This week" }, { key: "month", label: "This month" }, { key: "year", label: "This year" }];
+// As in the app, paused coupons are listed with the expired ones.
+const isLive = (c: Coupon) => !!c.isActive && !c.isExpired;
+
 type Dash = {
   performanceSummary?: { orders?: number; gmv?: number; views?: number; period?: string };
   overview?: { totalCoupons?: number; activeCoupons?: number; expiredCoupons?: number };
@@ -28,6 +35,9 @@ export default function SellerCouponsPage() {
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const [period, setPeriod] = useState("week");
+  const [tab, setTab] = useState<"active" | "expired">("active");
   const [mine, setMine] = useState<MyProduct[]>([]);
   const [seller, setSeller] = useState<{ approved: boolean; status: string; display?: import("@/lib/api").SellerStatusDisplay } | null>(null);
 
@@ -40,7 +50,7 @@ export default function SellerCouponsPage() {
       const approved = ["approved", "active"].includes(status);
       setSeller({ approved, status, display: s?.statusDisplay });
       if (approved) {
-        load(t);
+        load(t, "week");
         productsApi.myProducts(t).then((p) => setMine((p ?? []).map(({ _id, name }) => ({ _id, name }))));
       }
     });
@@ -48,8 +58,8 @@ export default function SellerCouponsPage() {
 
   // The dashboard is the seller's own coupons (paused and expired included);
   // /coupons/list is the public buyer-facing listing across all sellers.
-  async function load(t: string) {
-    const d = (await couponsApi.dashboard(t)) as Dash | null;
+  async function load(t: string, p = period) {
+    const d = (await couponsApi.dashboard(t, p)) as Dash | null;
     setDash(d);
     setList(d?.coupons?.all ?? []);
   }
@@ -64,8 +74,9 @@ export default function SellerCouponsPage() {
     if (failure) setNotice(failure);
     load(token);
   }
-  async function remove(id: string) {
-    if (!token) return;
+  async function remove(c: Coupon) {
+    if (!token || !confirm(`Are you sure you want to delete '${c.name ?? c.code}'? This action cannot be undone.`)) return;
+    const id = c._id;
     setNotice(null);
     setList((l) => l.filter((c) => c._id !== id));
     const res = await couponsApi.remove(id, token);
@@ -84,8 +95,21 @@ export default function SellerCouponsPage() {
           <SellerHeader
             title="Coupons"
             sub={`${list.length} coupon${list.length !== 1 ? "s" : ""}`}
-            action={<button onClick={() => setAdding((v) => !v)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"><Plus className="h-4 w-4" /> New coupon</button>}
+            action={<button onClick={() => { setAdding((v) => !v); setAdded(null); }} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"><Plus className="h-4 w-4" /> New coupon</button>}
           />
+
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                aria-pressed={p.key === period}
+                onClick={() => { setPeriod(p.key); if (token) load(token, p.key); }}
+                className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${p.key === period ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
 
           {dash && (
             <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -105,13 +129,32 @@ export default function SellerCouponsPage() {
 
           {notice && <p role="alert" className="mb-3 text-sm font-medium text-live">{notice}</p>}
 
-          {adding && token && <CouponForm token={token} products={mine} onSaved={() => { load(token); setAdding(false); }} />}
+          {added && (
+            <p role="status" className="mb-3 flex items-center gap-2 rounded-2xl bg-lime/30 px-4 py-3 text-sm font-medium text-ink">
+              <Check className="h-4 w-4 text-lime-deep" /> {added} added successfully
+            </p>
+          )}
+
+          {adding && token && <CouponForm token={token} products={mine} onSaved={(code) => { load(token); setAdding(false); setAdded(code); setTab("active"); }} />}
+
+          {list.length > 0 && (
+            <div role="tablist" className="mb-1 flex gap-1.5">
+              {(["active", "expired"] as const).map((k) => (
+                <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${tab === k ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"}`}>
+                  {k === "active" ? "Active" : "Expired"} ({list.filter((c) => isLive(c) === (k === "active")).length})
+                </button>
+              ))}
+            </div>
+          )}
 
           {list.length === 0 && !adding ? (
             <EmptyState title="No coupons yet" sub="Create a discount code to drive more orders." />
+          ) : list.length > 0 && !list.some((c) => isLive(c) === (tab === "active")) ? (
+            <p className="py-8 text-center text-sm text-muted">No {tab === "active" ? "active" : "expired or inactive"} coupons found.</p>
           ) : (
             <div className="mt-2 grid gap-3 md:grid-cols-2">
-              {list.map((c) => {
+              {list.filter((c) => isLive(c) === (tab === "active")).map((c) => {
                 const active = c.isActive ?? c.active ?? true;
                 if (editing?._id === c._id && token) {
                   return (
@@ -125,26 +168,48 @@ export default function SellerCouponsPage() {
                   );
                 }
                 return (
-                  <div key={c._id} className="card flex items-center gap-4 rounded-[1.5rem] p-5">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-surface"><Ticket className="h-5 w-5" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-display text-[15px] font-semibold text-ink">{c.code ?? c.name}</p>
-                      <p className="text-sm text-muted">
-                        {c.discountType === "percentage" ? `${c.discountValue}% off` : `₹${c.discountValue} off`}
-                        {c.minSpend ? ` · min ₹${c.minSpend}` : ""}
-                      </p>
+                  <div key={c._id} className="card rounded-[1.5rem] p-5">
+                    <div className="flex items-center gap-4">
+                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-surface"><Ticket className="h-5 w-5" /></span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-display text-[15px] font-semibold text-ink">{c.code ?? c.name}</p>
+                        <p className="text-sm text-muted">
+                          {c.discountType === "percentage" ? `${c.discountValue}% off` : `₹${c.discountValue} off`}
+                          {c.minSpend ? ` · min ₹${c.minSpend}` : ""}
+                        </p>
+                      </div>
+                      {c.isExpired || c.status === "expired" ? (
+                        <span title="Edit the end date to reactivate" className="rounded-full bg-live/10 px-3 py-1.5 text-[13px] font-semibold text-live">
+                          Expired
+                        </span>
+                      ) : (
+                        <button onClick={() => toggle(c._id)} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${active ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>
+                          {active ? "Active" : "Off"}
+                        </button>
+                      )}
+                      <button onClick={() => setEditing(c)} aria-label="Edit" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => remove(c)} aria-label="Delete" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-live"><Trash2 className="h-4 w-4" /></button>
                     </div>
-                    {c.isExpired || c.status === "expired" ? (
-                      <span title="Edit the end date to reactivate" className="rounded-full bg-live/10 px-3 py-1.5 text-[13px] font-semibold text-live">
-                        Expired
-                      </span>
-                    ) : (
-                      <button onClick={() => toggle(c._id)} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${active ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>
-                        {active ? "Active" : "Off"}
-                      </button>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                      {[
+                        ["Orders", String(c.stats?.orders ?? 0)],
+                        ["Products", c.appliedProducts?.length ? String(c.appliedProducts.length) : "All"],
+                        ["Total revenue", inr(c.stats?.revenue ?? 0)],
+                      ].map(([k, v]) => (
+                        <div key={k} className="rounded-xl bg-surface-2 py-2">
+                          <p className="text-[15px] font-semibold text-ink">{v}</p>
+                          <p className="text-[11px] text-muted">{k}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {!!c.appliedProducts?.length && (
+                      <details className="mt-3 text-sm">
+                        <summary className="cursor-pointer text-muted hover:text-ink">Products in this coupon</summary>
+                        <ul className="mt-2 space-y-1 text-ink">
+                          {c.appliedProducts.map((p) => <li key={p._id}><Link href={`/product/${p._id}`} className="hover:underline">{p.name ?? "Product"}</Link></li>)}
+                        </ul>
+                      </details>
                     )}
-                    <button onClick={() => setEditing(c)} aria-label="Edit" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => remove(c._id)} aria-label="Delete" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-live"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 );
               })}
@@ -156,7 +221,7 @@ export default function SellerCouponsPage() {
   );
 }
 
-function CouponForm({ token, onSaved, initial, products }: { token: string; onSaved: () => void; initial?: Coupon; products: MyProduct[] }) {
+function CouponForm({ token, onSaved, initial, products }: { token: string; onSaved: (code: string) => void; initial?: Coupon; products: MyProduct[] }) {
   // Which products the coupon covers; none ticked means all of the seller's products.
   const [picked, setPicked] = useState<string[]>(() => (initial?.appliedProducts ?? []).map((x) => x._id));
   const togglePick = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
@@ -197,7 +262,7 @@ function CouponForm({ token, onSaved, initial, products }: { token: string; onSa
     setSaving(false);
     const failure = apiError(res, "Couldn't save the coupon. Try again.");
     if (failure) return setErr(failure);
-    onSaved();
+    onSaved(code);
   }
 
   return (
