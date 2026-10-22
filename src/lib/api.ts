@@ -111,8 +111,9 @@ export const auth = {
   logout: (t: string) => api("/user/logout", { method: "POST", token: t }),
   changePassword: (b: unknown, t: string) =>
     api("/user/change-password", { method: "PUT", body: b, token: t, keepError: true }),
-  deleteAccount: (t: string) =>
-    api("/user/delete-account", { method: "DELETE", token: t }),
+  // The server needs the password and the exact phrase "DELETE MY ACCOUNT".
+  deleteAccount: (b: { password: string; confirmDelete: string }, t: string) =>
+    api("/user/delete-account", { method: "DELETE", body: b, token: t, keepError: true }),
   // OTP (phone + email combined, or individually)
   sendBothOtp: (b: unknown) => api("/otp/send-both", { method: "POST", body: b }),
   verifyBothOtp: (b: unknown) => api("/otp/verify-both", { method: "POST", body: b }),

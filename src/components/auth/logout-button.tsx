@@ -10,6 +10,7 @@ export function LogoutButton() {
   return (
     <button
       onClick={() => {
+        if (!window.confirm("Are you sure you want to log out?")) return;
         logout();
         router.push("/");
         router.refresh();
