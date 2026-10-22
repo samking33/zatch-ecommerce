@@ -20,7 +20,7 @@ function userIdFromToken(token?: string): string | undefined {
   }
 }
 
-type Line = { name?: string; image?: string; qty?: number; price?: number; total?: number };
+type Line = { name?: string; image?: string; qty?: number; price?: number; total?: number; productId?: string; variant?: { color?: string | null; size?: string | null } };
 type TimelineEvent = { key: string; label: string; description?: string; timestamp?: string | null; isDone?: boolean };
 type Order = {
   _id: string;
@@ -189,6 +189,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             actions={order.availableActions}
             sellerId={sellerId}
             tracking={order.tracking}
+            buyAgain={
+              !isSeller && ["delivered", "cancelled"].includes((order.status ?? "").toLowerCase())
+                ? lines.flatMap((l) => (l.productId ? [{ productId: l.productId, variantColor: l.variant?.color ?? "", variantSize: l.variant?.size ?? "", qty: l.qty ?? 1 }] : []))
+                : undefined
+            }
           />
         </div>
 

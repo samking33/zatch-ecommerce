@@ -78,8 +78,9 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T | null> {
     // keepError: callers that need the body on a 4xx (e.g. "verify email OTP"
     // responses) opt in. 409 always carries useful context (existing bargain).
     if (!res.ok) return keepError || res.status === 409 ? (json as T) : null;
+    // A 2xx can still refuse (e.g. 202 "payment under review"); keepError callers get the body.
     if (json && typeof json === "object" && "success" in json && json.success === false) {
-      return null;
+      return keepError ? (json as T) : null;
     }
     return raw ? (json as T) : unwrap<T>(json, pick);
   } catch {
@@ -250,7 +251,7 @@ export const cart = {
   applyCoupon: (b: unknown, t: string) => api("/cart/coupon", { method: "POST", body: b, token: t, keepError: true }),
   removeCoupon: (t: string) => api("/cart/coupon", { method: "DELETE", token: t }),
   addBargain: (bargainId: string, t: string) =>
-    api(`/cart/${bargainId}/add-bargain`, { method: "POST", token: t }),
+    api(`/cart/${bargainId}/add-bargain`, { method: "POST", token: t, keepError: true }),
 };
 
 // --- Coupons (/coupons) ---
@@ -260,7 +261,8 @@ export const coupons = {
   markUsed: (b: unknown, t: string) => api("/coupons/mark-used", { method: "POST", body: b, token: t }),
   trackView: (b: unknown) => api("/coupons/track-view", { method: "POST", body: b }),
   // seller-side
-  list: (t: string) => api("/coupons/list", { token: t, revalidate: 0 }),
+  // Active coupons, minus ones this user has used up; `sellerId` narrows to one seller's.
+  list: (t: string, sellerId?: string) => api(`/coupons/list${qs({ sellerId })}`, { token: t, pick: "coupons", revalidate: 0 }),
   dashboard: (t: string) => api("/coupons/dashboard", { token: t, raw: true, revalidate: 0 }),
   get: (id: string, t: string) => api(`/coupons/${id}`, { token: t, revalidate: 0 }),
   create: (b: unknown, t: string) => api("/coupons/create", { method: "POST", body: b, token: t, keepError: true }),
@@ -277,9 +279,10 @@ export const checkout = {
   // coupons, shipping and tax without creating an order.
   initiate: (b: unknown, t: string) => api("/checkout/initiate", { method: "POST", body: b, token: t, raw: true, keepError: true }),
   razorpayInitiate: (b: unknown, t: string) =>
-    api("/checkout/payment/razorpay/initiate", { method: "POST", body: b, token: t, keepError: true }),
+    api("/checkout/payment/razorpay/initiate", { method: "POST", body: b, token: t, raw: true, keepError: true }),
+  // 200 { orders }, or 202 { success: false, code: "PAYMENT_UNDER_REVIEW" } when the money was taken but needs a manual check.
   razorpayVerify: (b: unknown, t: string) =>
-    api("/checkout/payment/razorpay/verify", { method: "POST", body: b, token: t, keepError: true }),
+    api("/checkout/payment/razorpay/verify", { method: "POST", body: b, token: t, raw: true, keepError: true }),
 };
 
 // --- Orders (/orders) ---
@@ -290,9 +293,9 @@ export const orders = {
   createDirect: (b: unknown, t: string) => api("/orders/create-direct", { method: "POST", body: b, token: t }),
   verifyPayment: (b: unknown, t: string) => api("/orders/verify-payment", { method: "POST", body: b, token: t }),
   cancel: (id: string, b: unknown, t: string) => api(`/orders/${id}/cancel`, { method: "POST", body: b, token: t, keepError: true }),
-  review: (id: string, b: unknown, t: string) => api(`/orders/${id}/review`, { method: "POST", body: b, token: t }),
-  generateInvoice: (id: string, t: string) => api(`/orders/${id}/generate-invoice`, { method: "POST", token: t, raw: true }),
-  invoiceUrl: (fileName: string) => `${BASE}/api/v1/orders/invoice/download/${fileName}`,
+  review: (id: string, b: unknown, t: string) => api(`/orders/${id}/review`, { method: "POST", body: b, token: t, keepError: true }),
+  generateInvoice: (id: string, t: string) =>
+    api<{ invoice?: { buyerUrl?: string } }>(`/orders/${id}/generate-invoice`, { method: "POST", token: t, raw: true, keepError: true }),
   // seller-side
   sellerOrders: (t: string, o?: Record<string, string | undefined>) =>
     api(`/orders/seller/orders${qs(o)}`, { token: t, pick: "orders" }),
@@ -328,9 +331,9 @@ export const bargains = {
   myBargains: (t: string) =>
     api<BuyerBargain[]>("/bargains/buyer/my-bargains", { token: t, pick: "bargains", revalidate: 0 }),
   buyerCounter: (id: string, b: unknown, t: string) =>
-    api(`/bargains/${id}/buyer-counter`, { method: "POST", body: b, token: t }),
-  acceptCounter: (id: string, t: string) => api(`/bargains/${id}/accept-counter`, { method: "POST", token: t }),
-  rejectCounter: (id: string, t: string) => api(`/bargains/${id}/reject-counter`, { method: "POST", token: t }),
+    api(`/bargains/${id}/buyer-counter`, { method: "POST", body: b, token: t, keepError: true }),
+  acceptCounter: (id: string, t: string) => api(`/bargains/${id}/accept-counter`, { method: "POST", token: t, keepError: true }),
+  rejectCounter: (id: string, t: string) => api(`/bargains/${id}/reject-counter`, { method: "POST", token: t, keepError: true }),
   // seller-side
   sellerBargains: (t: string) => api("/bargains/seller/my-bargains", { token: t, pick: "bargains", revalidate: 0 }),
   sellerDashboard: (t: string) => api("/bargains/seller/dashboard", { token: t, raw: true, revalidate: 0 }),

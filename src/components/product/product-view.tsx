@@ -10,6 +10,7 @@ import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
 import { cart as cartApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
+import { buyHref } from "@/lib/checkout-link";
 import { inr } from "@/lib/utils";
 import type { Product, Variant, ProductImage } from "@/lib/types";
 
@@ -93,19 +94,9 @@ export function ProductView({ product }: { product: Product }) {
     setStatus(failure ? "error" : "added");
   }
 
-  // Buy now: put this item in the cart, then check out just this line.
-  async function buyNow() {
-    const token = getToken();
-    if (!token) { router.push("/login"); return; }
-    setStatus("adding");
-    const res = await cartApi.update({ productId: product._id, color, size, qty: 1 }, token);
-    const failure = apiError(res, "Couldn't start checkout. Try again.");
-    if (failure) { setCartError(failure); setStatus("error"); return; }
-    type Line = { _id?: string; productId?: string; variant?: { color?: string | null; size?: string | null } };
-    const fresh = (await cartApi.get(token)) as { items?: Line[] } | null;
-    const same = (a?: string | null, b?: string | null) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
-    const line = fresh?.items?.find((i) => i.productId === product._id && same(i.variant?.color, color) && same(i.variant?.size, size));
-    router.push(line?._id ? `/checkout?item=${line._id}` : "/checkout");
+  // Buy now goes straight to checkout with this item; the cart is left alone (same as the app).
+  function buyNow() {
+    router.push(buyHref([{ productId: product._id, variantColor: color ?? "", variantSize: size ?? "", qty: 1 }]));
   }
 
   return (
@@ -254,12 +245,13 @@ export function ProductView({ product }: { product: Product }) {
 
           <ProductActions product={product} />
 
-          {/* Per-product shipping + returns policy from the API. */}
+          {/* Delivery estimate (orders are due 7 days out) and the platform's payment and returns policy. */}
           <div className="mt-5 grid grid-cols-3 gap-3 text-center">
             {([
               [Truck, `Delivered in ${product.shipping?.estimatedDeliveryDays ?? 7} days`],
-              [ShieldCheck, product.shipping?.codAvailable === false ? "Prepaid only" : "COD available"],
-              [RefreshCw, product.shipping?.returnPolicy ?? "7 days return policy"],
+              // Checkout is prepaid only and returns aren't offered yet; the app tells buyers the same.
+              [ShieldCheck, "Prepaid only, no cash on delivery"],
+              [RefreshCw, "No returns for now, all sales are final"],
             ] as const).map(([Icon, label], i) => (
               <div key={i} className="rounded-2xl bg-surface-2 px-2 py-3">
                 <Icon className="mx-auto h-5 w-5 text-ink" />

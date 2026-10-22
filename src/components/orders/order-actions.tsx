@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Star, Loader2, FileText, XCircle, MapPin, Phone, Eye, Undo2, type LucideIcon,
+  Star, Loader2, FileText, XCircle, MapPin, Phone, Eye, Undo2, RotateCcw, type LucideIcon,
 } from "lucide-react";
 import { orders as ordersApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
+import { buyHref, type BuyItem } from "@/lib/checkout-link";
 
 export type ServerAction = {
   action: string;
@@ -41,11 +42,14 @@ export function OrderActions({
   actions,
   sellerId,
   tracking,
+  buyAgain,
 }: {
   orderId: string;
   actions?: ServerAction[];
   sellerId?: string;
   tracking?: { awb?: string; courier?: string; isAvailable?: boolean };
+  /** Items to buy again; the app offers this once an order is delivered or cancelled. */
+  buyAgain?: BuyItem[];
 }) {
   const router = useRouter();
   const token = getToken();
@@ -74,12 +78,12 @@ export function OrderActions({
       }
       case "download_invoice": {
         setBusy(a.action);
-        const res = (await ordersApi.generateInvoice(orderId, token)) as
-          | { fileName?: string; invoiceUrl?: string; url?: string } | null;
+        setMsg(null);
+        const res = await ordersApi.generateInvoice(orderId, token);
         setBusy(null);
-        const file = res?.fileName;
-        const url = res?.invoiceUrl ?? res?.url ?? (file ? ordersApi.invoiceUrl(file) : null);
-        url ? window.open(url, "_blank") : setMsg("Invoice isn't ready yet.");
+        const url = res?.invoice?.buyerUrl;
+        if (url) window.open(url, "_blank", "noopener");
+        else setMsg(apiError(res, "Invoice isn't ready yet.") ?? "Invoice isn't ready yet.");
         return;
       }
       case "review":
@@ -104,8 +108,9 @@ export function OrderActions({
     setBusy("review");
     const res = await ordersApi.review(orderId, { rating, comment }, token);
     setBusy(null);
-    if (res) { setReviewing(false); setMsg("Thanks for the review!"); }
-    else setMsg("Couldn't submit review.");
+    const failure = apiError(res, "Couldn't submit your review. Try again.");
+    if (failure) setMsg(failure);
+    else { setReviewing(false); setMsg("Thanks for the review!"); }
   }
 
   return (
@@ -128,6 +133,14 @@ export function OrderActions({
             </button>
           );
         })}
+        {!!buyAgain?.length && (
+          <button
+            onClick={() => router.push(buyHref(buyAgain))}
+            className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-colors ${STYLE.secondary}`}
+          >
+            <RotateCcw className="h-4 w-4" /> Buy again
+          </button>
+        )}
       </div>
 
       {showTracking && (

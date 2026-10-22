@@ -4,7 +4,7 @@ import { ArrowLeft, Tag } from "lucide-react";
 import { PageShell } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
-import { BuyerBargainActions } from "@/components/product/buyer-bargain-actions";
+import { BuyerBargainActions, AcceptedBargainActions } from "@/components/product/buyer-bargain-actions";
 import { bargains as bargainsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { inr } from "@/lib/utils";
@@ -20,6 +20,8 @@ type Bargain = {
   offeredPrice?: number;
   currentPrice?: number;
   quantity?: number;
+  variant?: { color?: string | null; size?: string | null };
+  orderPlaced?: boolean;
   buyerNote?: string;
   counterOffer?: { price?: number; message?: string };
   history?: Entry[];
@@ -44,10 +46,14 @@ export default async function BargainDetailPage({ params }: { params: Promise<{ 
   const status = (b.status ?? "").toLowerCase();
   const counter = b.counterOffer?.price ?? b.currentPrice;
   const needsYou = NEEDS_BUYER.includes(status) && !!counter;
+  const agreed = ["accepted", "auto_accepted"].includes(status);
+  // The price checkout charges: the seller's counter, the agreed price, or the buyer's own offer.
+  const shown = needsYou ? counter! : agreed ? (b.currentPrice ?? b.offeredPrice ?? 0) : (b.offeredPrice ?? b.currentPrice ?? 0);
   const prod = typeof b.productId === "object" ? b.productId : undefined;
   const name = b.productSnapshot?.name ?? prod?.name ?? "Product";
   const image = b.productSnapshot?.image ?? prod?.images?.[0]?.url;
   const pid = prod?._id ?? (typeof b.productId === "string" ? b.productId : undefined);
+  const item = { productId: pid, color: b.variant?.color, size: b.variant?.size, qty: b.quantity ?? 1 };
 
   // Thread: whatever history the backend gives, else derive from the offer pair.
   const thread: Entry[] = (b.negotiationHistory ?? b.history ?? []).length
@@ -106,13 +112,11 @@ export default async function BargainDetailPage({ params }: { params: Promise<{ 
 
         {/* action panel */}
         <aside className="card h-fit rounded-[1.75rem] p-6 lg:sticky lg:top-28">
-          <p className="text-[13px] text-muted">{needsYou ? "Seller's counter" : "Your offer"}</p>
-          <p className="mt-0.5 font-display text-3xl font-semibold text-ink">
-            {inr(needsYou ? counter! : (b.offeredPrice ?? b.currentPrice ?? 0))}
-          </p>
+          <p className="text-[13px] text-muted">{needsYou ? "Seller's counter" : agreed ? "Agreed price" : "Your offer"}</p>
+          <p className="mt-0.5 font-display text-3xl font-semibold text-ink">{inr(shown)}</p>
           {b.originalPrice ? (
             <p className="mt-1 text-sm text-muted">
-              {Math.round((1 - (needsYou ? counter! : b.offeredPrice ?? 0) / b.originalPrice) * 100)}% off list
+              {Math.round((1 - shown / b.originalPrice) * 100)}% off list
             </p>
           ) : null}
 
@@ -122,14 +126,15 @@ export default async function BargainDetailPage({ params }: { params: Promise<{ 
                 bargainId={b._id}
                 counterPrice={counter!}
                 listPrice={b.originalPrice ?? counter!}
+                item={item}
               />
-            ) : ["accepted", "auto_accepted"].includes(status) ? (
-              <Link href="/cart" className="pill-lime inline-block rounded-full px-6 py-3 text-sm font-semibold">
-                Go to cart
-              </Link>
+            ) : b.orderPlaced ? (
+              <p className="text-[15px] text-muted">You&apos;ve already ordered this at the agreed price.</p>
+            ) : agreed ? (
+              <AcceptedBargainActions bargainId={b._id} item={item} />
             ) : (
               <p className="text-[15px] text-muted">
-                {status === "rejected" ? "This offer was declined." : "Waiting for the seller to respond."}
+                {status === "rejected" ? "This offer was declined." : status === "expired" ? "This offer has expired." : "Waiting for the seller to respond."}
               </p>
             )}
           </div>

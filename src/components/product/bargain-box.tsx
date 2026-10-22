@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Tag, Check } from "lucide-react";
-import { bargains as bargainsApi, cart as cartApi } from "@/lib/api";
+import { bargains as bargainsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
-import { BuyerBargainActions } from "./buyer-bargain-actions";
+import { BuyerBargainActions, AcceptedBargainActions } from "./buyer-bargain-actions";
 
 type Phase = "idle" | "waiting" | "sent" | "countered" | "accepted";
 
@@ -107,17 +107,6 @@ export function BargainBox({
     }
   }
 
-  async function acceptAndCart() {
-    const token = getToken();
-    if (!token || !bargainId) {
-      router.push("/cart");
-      return;
-    }
-    await bargainsApi.acceptCounter(bargainId, token);
-    await cartApi.addBargain(bargainId, token);
-    router.push("/cart");
-  }
-
   return (
     <div className="card rounded-[1.5rem] p-5">
       <div className="flex items-center gap-2">
@@ -150,9 +139,13 @@ export function BargainBox({
             <p className="mt-1 font-display text-2xl font-semibold text-lime-ink">
               {inr(offer)} <span className="text-sm font-medium">· {pct}% off</span>
             </p>
-            <button onClick={acceptAndCart} className="btn-ink mt-3 w-full rounded-full py-3 text-sm font-semibold">
-              Add to cart at this price
-            </button>
+            <div className="mt-3">
+              {bargainId ? (
+                <AcceptedBargainActions bargainId={bargainId} item={{ productId, color, size, qty: 1 }} />
+              ) : (
+                <Link href="/bargains" className="btn-ink inline-block rounded-full px-5 py-2.5 text-sm font-semibold">Open My bargains</Link>
+              )}
+            </div>
           </motion.div>
         ) : phase === "countered" ? (
           <motion.div key="countered" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-surface-2 p-4">
@@ -160,7 +153,7 @@ export function BargainBox({
             <p className="mt-0.5 font-display text-2xl font-semibold text-ink">{inr(counter)}</p>
             <div className="mt-3">
               {bargainId ? (
-                <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} />
+                <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} item={{ productId, color, size, qty: 1 }} />
               ) : (
                 // ponytail: backend didn't return an id - send them to the thread.
                 <Link href="/bargains" className="pill-lime inline-block rounded-full px-5 py-2.5 text-sm font-semibold">

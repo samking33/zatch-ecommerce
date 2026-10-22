@@ -135,8 +135,15 @@ export default function CartPage() {
   }
 
   const items = cart?.items ?? [];
-  const subtotal = cart?.subtotal ?? items.reduce((s, it) => s + itemPrice(it) * (it.qty ?? 1), 0);
-  const total = cart?.total ?? subtotal;
+  // Lines left unticked stay in the cart; checkout pays for the ticked ones only (as in the app).
+  const [unticked, setUnticked] = useState<Set<string>>(new Set());
+  const picked = items.filter((it) => it._id && !unticked.has(it._id));
+  const allPicked = picked.length === items.length;
+  const pickedTotal = picked.reduce((s, it) => s + itemPrice(it) * (it.qty ?? 1), 0);
+  const subtotal = allPicked ? cart?.subtotal ?? pickedTotal : pickedTotal;
+  const total = allPicked ? cart?.total ?? subtotal : subtotal;
+  const toggle = (id: string) =>
+    setUnticked((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   return (
     <>
@@ -175,10 +182,19 @@ export default function CartPage() {
               {items.map((it, idx) => {
                 const qty = it.qty ?? 1;
                 return (
-                  <div key={it._id ?? idx} className="card flex items-center gap-4 rounded-[1.5rem] p-3">
-                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
+                  <div key={it._id ?? idx} className="card flex items-center gap-3 rounded-[1.5rem] p-3 sm:gap-4">
+                    {it._id && (
+                      <input
+                        type="checkbox"
+                        checked={!unticked.has(it._id)}
+                        onChange={() => toggle(it._id!)}
+                        aria-label={`Include ${itemName(it)} in this order`}
+                        className="h-5 w-5 shrink-0 accent-ink"
+                      />
+                    )}
+                    <Link href={lineProductId(it) ? `/product/${lineProductId(it)}` : "/shop"} className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2 sm:h-24 sm:w-24">
                       <ProductMedia src={itemImage(it)} alt={itemName(it)} sizes="96px" className="h-full w-full" />
-                    </div>
+                    </Link>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="line-clamp-1 font-display text-[15px] font-semibold text-ink">{itemName(it)}</p>
@@ -253,16 +269,22 @@ export default function CartPage() {
               </div>
 
               <dl className="mt-4 space-y-3 text-[15px]">
-                <Row label="Subtotal" value={inr(subtotal)} />
-                {cart?.discount ? <Row label="Discount" value={`− ${inr(cart.discount)}`} /> : null}
-                {cart?.tax ? <Row label="Tax" value={inr(cart.tax)} /> : null}
+                <Row label={`Subtotal (${picked.length} of ${items.length})`} value={inr(subtotal)} />
+                {allPicked && cart?.discount ? <Row label="Discount" value={`− ${inr(cart.discount)}`} /> : null}
                 <div className="border-t border-hairline pt-3">
                   <Row label="Total" value={inr(total)} strong />
                 </div>
               </dl>
-              <Link href="/checkout" className="pill-lime mt-5 flex items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold">
-                Checkout <ArrowRight className="h-4 w-4" />
-              </Link>
+              {picked.length ? (
+                <Link
+                  href={allPicked ? "/checkout" : `/checkout?ids=${picked.map((it) => it._id).join(",")}`}
+                  className="pill-lime mt-5 flex items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold"
+                >
+                  Checkout <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <p className="mt-5 text-center text-sm text-muted">Tick at least one item to check out.</p>
+              )}
               <p className="mt-3 text-center text-[13px] text-muted">Secure payment via Razorpay</p>
             </aside>
           </div>
