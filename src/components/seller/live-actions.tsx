@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Square, CalendarClock, XCircle } from "lucide-react";
-import { live as liveApi } from "@/lib/api";
+import { live as liveApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 /** Seller controls for a scheduled/live session:
@@ -23,7 +23,8 @@ export function LiveActions({ sessionId, status }: { sessionId: string; status?:
     setErr(null);
     const res = await liveApi.end(sessionId, t);
     setBusy(null);
-    if (!res) { setErr("Couldn't end the live. Try again."); return; }
+    const failure = apiError(res, "Couldn't end the live. Try again.");
+    if (failure) { setErr(failure); return; }
     router.refresh();
   }
 

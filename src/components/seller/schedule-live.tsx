@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Radio, Upload, ArrowRight, ArrowLeft, X } from "lucide-react";
+import { Loader2, Radio, Upload, ArrowRight, ArrowLeft, X, Check, Copy } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
 import { shrinkImage } from "@/lib/shrink-image";
 import type { Product } from "@/lib/types";
@@ -23,6 +23,9 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
   const [thumb, setThumb] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once step 3 queues the live: the app's success screen with the share link.
+  const [done, setDone] = useState<{ id: string; note: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const t = () => getToken();
 
@@ -78,13 +81,20 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
     if (thumb) fd.append("thumbnail", thumb);
     const res = await post(fd);
     setBusy(false);
-    if (res?.success) { reset(); router.refresh(); }
+    if (res?.success && res.session?._id) {
+      // Live now: straight to the studio to start the camera, as the app does.
+      if (res.session.status === "live") { reset(); router.push(`/seller/live/${res.session._id}`); return; }
+      const at = new Date(res.session.scheduledStartTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+      setDone({ id: res.session._id, note: res.queueInfo?.reason === "Already live" ? "You're live right now, so this one is queued and starts when your current live ends." : `Your live is scheduled for ${at}.` });
+      router.refresh();
+    }
     else if (res?.suggestedTime) {
       setError(`${res.message ?? "That slot clashes with another live."} Next free: ${new Date(res.suggestedTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}.`);
     } else setError(res?.message ?? "Couldn't schedule.");
   }
 
   function reset() {
+    setDone(null); setCopied(false);
     setOpen(false); setStep(1); setSessionId(null); setPicked([]);
     setF({ title: "", description: "", scheduledStartTime: "" }); setThumb(null); setGoLiveNow(false);
   }
@@ -116,7 +126,7 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
         <button onClick={reset} aria-label="Close"><X className="h-4 w-4 text-muted" /></button>
       </div>
 
-      <div className="mb-5 flex items-center gap-2">
+      {!done && <div className="mb-5 flex items-center gap-2">
         {["Details", "Bargains", "Schedule"].map((l, i) => (
           <div key={l} className="flex flex-1 items-center gap-2">
             <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold ${i + 1 <= step ? "bg-lime text-lime-ink" : "bg-surface-2 text-muted"}`}>{i + 1}</span>
@@ -124,9 +134,27 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
             {i < 2 && <span className={`h-0.5 flex-1 rounded ${i + 1 < step ? "bg-lime" : "bg-hairline"}`} />}
           </div>
         ))}
-      </div>
+      </div>}
 
-      {step === 1 && (
+      {done && (
+        <div className="space-y-3 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-lime text-lime-ink"><Check className="h-6 w-6" /></span>
+          <p className="font-display text-lg font-semibold text-ink">Live scheduled</p>
+          <p className="text-sm text-muted">{done.note} Share the link so buyers can set a reminder.</p>
+          <div className="flex items-center gap-2 rounded-full border border-hairline bg-surface-2 py-1 pl-4 pr-1">
+            <span className="min-w-0 flex-1 truncate text-left text-[13px] text-ink">{`${window.location.origin}/live/${done.id}`}</span>
+            <button
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/live/${done.id}`).then(() => setCopied(true), () => {})}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-3.5 py-2 text-[13px] font-semibold text-surface"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <button onClick={reset} className="pill-lime inline-flex w-full items-center justify-center rounded-full py-3 text-sm font-semibold">Done</button>
+        </div>
+      )}
+
+      {!done && step === 1 && (
         <form onSubmit={step1} className="space-y-3">
           <label className="block">
             <span className="text-[12px] font-medium text-muted">Title</span>
@@ -150,7 +178,9 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
                 return (
                   <button key={p._id} type="button" onClick={() => toggle(p)} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors ${on ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"}`}>
                     <span className="line-clamp-1 flex-1">{p.name}</span>
-                    <span className={on ? "text-surface/70" : "text-muted"}>₹{p.discountedPrice ?? p.price}</span>
+                    <span className={`shrink-0 ${on ? "text-surface/70" : "text-muted"}`}>
+                      {p.SKU ? `${p.SKU} · ` : ""}₹{p.discountedPrice ?? p.price} · {p.totalStock ?? 0} in stock
+                    </span>
                   </button>
                 );
               })}
@@ -164,7 +194,7 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
         </form>
       )}
 
-      {step === 2 && (
+      {!done && step === 2 && (
         <div className="space-y-3">
           <p className="text-[15px] text-muted">Set how far buyers can negotiate during this live.</p>
           <div className="max-h-64 space-y-3 overflow-y-auto">
@@ -198,7 +228,7 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
         </div>
       )}
 
-      {step === 3 && (
+      {!done && step === 3 && (
         <div className="space-y-3">
           <label className="flex cursor-pointer items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
             <span className="text-[15px] font-medium text-ink">Go live now</span>

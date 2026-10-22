@@ -390,7 +390,10 @@ export const live = {
   // { sessionDetails: { title, status, host, products, comments, likeCount, isLiked, ... } }
   details: (sessionId: string, t?: string) =>
     api<{ sessionDetails?: LiveDetails }>(`/live/session/${sessionId}/details`, { token: t, raw: true, revalidate: 0 }),
-  token: (b: unknown, t: string) => api("/live/token", { method: "POST", body: b, token: t, raw: true }),
+  // Publisher credentials for the host's own session; a queued one more than 5 minutes out answers 400 "starts in N minutes".
+  token: (sessionId: string, t: string) =>
+    api<{ success?: boolean; message?: string; appId?: string; token?: string; uid?: number; channelName?: string }>(
+      "/live/token", { method: "POST", body: { role: "publisher", sessionId }, token: t, raw: true, keepError: true }),
   refreshToken: (b: unknown, t: string) => api("/live/refresh-token", { method: "POST", body: b, token: t, raw: true }),
   // Credentials are under `session`; a show that hasn't started answers 400 "starts in N minutes".
   join: (sessionId: string, t: string) =>
@@ -404,9 +407,12 @@ export const live = {
   heartbeat: (sessionId: string, t: string) => api(`/live/session/${sessionId}/heartbeat`, { method: "POST", token: t }),
   share: (sessionId: string, t?: string) => api(`/live/session/${sessionId}/share`, { token: t, raw: true }),
   // seller-side
-  dashboard: (t: string) => api("/live/dashboard", { token: t, raw: true, revalidate: 0 }),
+  // timeFilter (This Week | This Month | This Year) sets the summary period only.
+  dashboard: (t: string, timeFilter?: string) => api(`/live/dashboard${qs({ timeFilter })}`, { token: t, raw: true, revalidate: 0 }),
   schedule: (b: unknown, t: string) => api("/live/schedule", { method: "POST", body: b, token: t }),
-  end: (sessionId: string, t: string) => api(`/live/session/${sessionId}/end`, { method: "PATCH", token: t }),
+  end: (sessionId: string, t: string) =>
+    api<{ success?: boolean; message?: string; stats?: { totalViews?: number; peakViewers?: number; duration?: number; totalComments?: number } }>(
+      `/live/session/${sessionId}/end`, { method: "PATCH", token: t, raw: true, keepError: true }),
   // Seller-side: edit | cancel | reschedule
   action: (
     sessionId: string,
