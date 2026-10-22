@@ -31,6 +31,8 @@ export default async function HomePage() {
   const bitList = bits ?? [];
   const trendingBits = trending?.bits ?? [];
   const sellerList = sellers ?? [];
+  // api() returns null when a request fails (empty lists come back as []).
+  const failed = topPicks === null && live === null && bits === null;
 
   // Video leads, so split the feed into rails and let the rest fall below.
   const feed = bitList.slice(0, 20);
@@ -98,11 +100,17 @@ export default async function HomePage() {
           <VideoRail title="Keep scrolling" sub="The rest of the feed." href="/bits" bits={rest} />
         )}
 
-        {products.length === 0 && bitList.length === 0 && (
+        {failed ? (
+          <div role="alert" className="card mt-10 grid place-items-center rounded-[2rem] px-6 py-16 text-center">
+            <p className="font-display text-xl font-semibold text-ink">We couldn&apos;t load the feed</p>
+            <p className="mt-2 text-muted">Check your connection and try again in a moment.</p>
+            <Link href="/" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">Try again</Link>
+          </div>
+        ) : products.length === 0 && bitList.length === 0 && sessions.length === 0 && (
           <div className="card mt-10 grid place-items-center rounded-[2rem] px-6 py-16 text-center">
-            <p className="font-display text-xl font-semibold text-ink">Catalogue is loading</p>
-            <p className="mt-2 text-muted">Sign in to browse live products and drops.</p>
-            <Link href="/login" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">Sign in</Link>
+            <p className="font-display text-xl font-semibold text-ink">Nothing here yet</p>
+            <p className="mt-2 text-muted">Sellers are setting up. Check back soon for live shows and drops.</p>
+            <Link href="/shop" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">Browse products</Link>
           </div>
         )}
       </main>
