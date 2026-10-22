@@ -36,6 +36,13 @@ export function setAppliedCoupon(code: string | undefined) {
 
 export const USERNAME_MAX = 15;
 
+/** Where to go after signing in. Like the app, someone with no shopping preferences picks categories first. */
+export function afterSignIn(user: SessionUser): string {
+  const home = isSellerStatus(user.sellerStatus) ? "/seller/dashboard" : "/account";
+  const picked = (user.shoppingPreferences as { categories?: string[] } | undefined)?.categories?.length;
+  return picked ? home : `/account/preferences?welcome=1&next=${encodeURIComponent(home)}`;
+}
+
 /** Approved sellers are "approved" or "active"; everyone else is a buyer or an applicant. */
 export const isSellerStatus = (s: unknown) => ["approved", "active"].includes(String(s ?? "").toLowerCase());
 

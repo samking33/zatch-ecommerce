@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
-import { register, otp as otpApi, verifyPhone, USERNAME_MAX } from "@/lib/client-auth";
+import { register, otp as otpApi, verifyPhone, afterSignIn, USERNAME_MAX } from "@/lib/client-auth";
 import { useAuth } from "@/components/auth/auth-provider";
 
 const GENDERS = ["Male", "Female", "Other"] as const;
@@ -64,7 +64,7 @@ export default function RegisterPage() {
         gender: gender || undefined,
       });
       setUser(user);
-      router.push("/account");
+      router.push(afterSignIn(user));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create account.");

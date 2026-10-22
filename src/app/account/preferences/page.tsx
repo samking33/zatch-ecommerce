@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { SignInRequired } from "@/components/auth/sign-in-required";
@@ -18,8 +20,16 @@ export default function PreferencesPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Straight after sign-in (?welcome=1): the app's "Let's find you something to shop for" step.
+  const router = useRouter();
+  const [welcome, setWelcome] = useState<{ next: string } | null>(null);
 
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    // Only same-site paths, so the link can't send people elsewhere.
+    const next = q.get("next") ?? "/";
+    if (q.get("welcome")) setWelcome({ next: next.startsWith("/") && !next.startsWith("//") ? next : "/" });
     const t = getToken();
     setToken(t); setReady(true);
     if (!t) { setLoading(false); return; }
@@ -38,15 +48,18 @@ export default function PreferencesPage() {
   async function save() {
     if (!token) return;
     setState("saving");
+    setError(null);
     const res = await prefApi.save({ categories: selected }, token);
-    setState(res ? "saved" : "idle");
+    if (!res) { setState("idle"); setError("Couldn't save your choices. Try again."); return; }
+    setState("saved");
+    if (welcome) { router.push(welcome.next); router.refresh(); }
   }
 
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Account"
-        title="Shopping preferences"
+        eyebrow={welcome ? "Welcome to Zatch" : "Account"}
+        title={welcome ? "Let's find you something to shop for" : "Shopping preferences"}
         sub="Pick the categories you care about - we'll tune your feed to match."
       />
 
@@ -88,8 +101,12 @@ export default function PreferencesPage() {
             className="pill-lime mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold disabled:opacity-60"
           >
             {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "saved" ? <Check className="h-4 w-4" /> : null}
-            {state === "saved" ? "Saved" : `Save preferences${selected.length ? ` (${selected.length})` : ""}`}
+            {state === "saved" ? "Saved" : `${welcome ? "Continue" : "Save preferences"}${selected.length ? ` (${selected.length})` : ""}`}
           </button>
+          {welcome && (
+            <Link href={welcome.next} className="ml-4 text-sm font-medium text-muted hover:text-ink">Skip for now</Link>
+          )}
+          {error && <p role="alert" className="mt-3 text-sm font-medium text-live">{error}</p>}
         </div>
       )}
     </PageShell>
