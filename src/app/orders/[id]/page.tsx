@@ -5,42 +5,26 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
 import { OrderActions, type ServerAction } from "@/components/orders/order-actions";
 import { orders as ordersApi } from "@/lib/api";
-import { serverToken } from "@/lib/session";
+import { serverToken, userIdFromToken } from "@/lib/session";
 import { inr } from "@/lib/utils";
-
-/** Read the user id from the JWT payload (no verification - display gating only). */
-function userIdFromToken(token?: string): string | undefined {
-  try {
-    const payload = token?.split(".")[1];
-    if (!payload) return undefined;
-    const json = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
-    return json?._id ?? json?.id;
-  } catch {
-    return undefined;
-  }
-}
 
 type Line = { name?: string; image?: string; qty?: number; price?: number; total?: number; productId?: string; variant?: { color?: string | null; size?: string | null } };
 type TimelineEvent = { key: string; label: string; description?: string; timestamp?: string | null; isDone?: boolean };
+// Shape of GET /orders/:id (orderController getOrderController).
 type Order = {
   _id: string;
   orderId?: string;
   status?: string;
-  createdAt?: string;
-  product?: Line;
-  items?: Line[];
-  deliveryAddress?: { label?: string; line1?: string; city?: string; state?: string; pincode?: string; phone?: string };
-  payment?: { method?: string; status?: string };
   orderType?: string;
   deliveryType?: string;
-  cancellation?: { reason?: string; cancelledBy?: string; cancelledAt?: string };
-  pricing?: { subtotal?: number; discount?: number; shipping?: number; tax?: number; total?: number };
-  // Server-computed UI contract (same one the app renders).
-  timeline?: TimelineEvent[];
+  items?: Line[];
+  progress?: { timeline?: TimelineEvent[] };
+  deliveryInfo?: { name?: string; formattedAddress?: string; phone?: string };
+  paymentDetails?: { subtotal?: number; discount?: number; shipping?: number; tax?: number; methodLabel?: string; status?: string };
+  statusHistory?: { status?: string; note?: string; timestamp?: string }[];
   availableActions?: ServerAction[];
   tracking?: { awb?: string; courier?: string; isAvailable?: boolean; estimatedDelivery?: string };
-  sellerId?: string | { _id?: string };
-  expectedDelivery?: string;
+  seller?: { id?: string; businessName?: string; name?: string } | null;
   expectedDeliveryFormatted?: string;
   // Seller-only settlement sheet (commission, GST, TCS/TDS) per order.
   paymentSection?: {
@@ -81,21 +65,24 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   // Only the seller of this order may see the settlement breakdown.
   const viewerId = userIdFromToken(t);
-  const orderSellerId = typeof order.sellerId === "string" ? order.sellerId : order.sellerId?._id;
-  const isSeller = !!viewerId && !!orderSellerId && viewerId === orderSellerId;
+  const sellerId = order.seller?.id;
+  const isSeller = !!viewerId && !!sellerId && viewerId === sellerId;
 
-  const lines = order.items?.length ? order.items : order.product ? [order.product] : [];
-  const p = order.pricing ?? {};
+  const lines = order.items ?? [];
+  const p = order.paymentDetails ?? {};
+  // The order total, worked out the same way as the orders list.
+  const total = (p.subtotal ?? 0) - (p.discount ?? 0) + (p.shipping ?? 0);
+  const cancelled = (order.status ?? "").toLowerCase() === "cancelled"
+    ? [...(order.statusHistory ?? [])].reverse().find((h) => h.status === "cancelled")
+    : undefined;
   // Prefer the server's computed timeline (labels, descriptions, timestamps).
-  const timeline: TimelineEvent[] = order.timeline?.length
-    ? order.timeline.filter((e) => e.key !== "in_transit")
+  const timeline: TimelineEvent[] = order.progress?.timeline?.length
+    ? order.progress.timeline.filter((e) => e.key !== "in_transit")
     : ["pending", "confirmed", "shipped", "delivered"].map((s, i) => ({
         key: s,
         label: s,
         isDone: Math.max(0, ["pending", "confirmed", "shipped", "delivered"].indexOf((order.status ?? "pending").toLowerCase())) >= i,
       }));
-  const sellerId = typeof order.sellerId === "object" ? order.sellerId?._id : order.sellerId;
-
   return (
     <PageShell>
       <Link href="/orders" className="mt-5 inline-flex items-center gap-2 px-1 text-sm text-muted hover:text-ink">
@@ -153,7 +140,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-[15px] font-medium text-ink">{l.name}</p>
-                    <p className="text-sm text-muted">Qty {l.qty ?? 1}</p>
+                    <p className="text-sm text-muted">
+                      {[l.variant?.color, l.variant?.size].filter((v) => v && v.toLowerCase() !== "none").join(" · ")}
+                      {l.variant?.color || l.variant?.size ? " · " : ""}Qty {l.qty ?? 1}
+                    </p>
                   </div>
                   <span className="font-medium text-ink">{inr(l.total ?? l.price ?? 0)}</span>
                 </div>
@@ -161,26 +151,27 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </div>
           </div>
 
-          {order.deliveryAddress && (
+          {order.deliveryInfo?.formattedAddress && (
             <div className="card rounded-[1.75rem] p-6">
               <h2 className="font-display text-lg font-semibold text-ink">Delivery to</h2>
               <p className="mt-2 text-[15px] text-ink-soft">
-                {[order.deliveryAddress.line1, order.deliveryAddress.city, order.deliveryAddress.state, order.deliveryAddress.pincode].filter(Boolean).join(", ")}
-                {order.deliveryAddress.phone ? ` · ${order.deliveryAddress.phone}` : ""}
+                {order.deliveryInfo.name && <span className="font-medium text-ink">{order.deliveryInfo.name} · </span>}
+                {order.deliveryInfo.formattedAddress}
+                {order.deliveryInfo.phone ? ` · ${order.deliveryInfo.phone}` : ""}
               </p>
+              {order.tracking?.isAvailable && (
+                <p className="mt-2 text-sm text-muted">Shipped with {order.tracking.courier} · AWB {order.tracking.awb}</p>
+              )}
             </div>
           )}
 
-          {order.cancellation?.reason && (
+          {cancelled && (
             <div className="card rounded-[1.75rem] p-6">
               <h2 className="font-display text-lg font-semibold text-live">Order cancelled</h2>
-              <p className="mt-1.5 text-[15px] text-ink-soft">{order.cancellation.reason}</p>
-              <p className="mt-1 text-[13px] text-muted">
-                Cancelled by {order.cancellation.cancelledBy ?? "-"}
-                {order.cancellation.cancelledAt
-                  ? ` · ${new Date(order.cancellation.cancelledAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}`
-                  : ""}
-              </p>
+              {cancelled.note && <p className="mt-1.5 text-[15px] text-ink-soft">{cancelled.note}</p>}
+              {cancelled.timestamp && (
+                <p className="mt-1 text-[13px] text-muted">{new Date(cancelled.timestamp).toLocaleDateString("en-IN", { dateStyle: "medium" })}</p>
+              )}
             </div>
           )}
 
@@ -205,13 +196,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             {p.shipping != null && <Row label="Shipping" value={p.shipping ? inr(p.shipping) : "Free"} />}
             {p.tax ? <Row label="Tax" value={inr(p.tax)} /> : null}
             <div className="border-t border-hairline pt-2.5">
-              <Row label="Total" value={inr(p.total ?? 0)} strong />
+              <Row label="Total" value={inr(total)} strong />
             </div>
           </dl>
-          {order.payment?.method && (
-            <p className="mt-3 text-sm capitalize text-muted">
-              {order.orderType ?? order.payment.method} · {order.payment.status}
-              {order.deliveryType ? ` · ${order.deliveryType}` : ""}
+          {p.methodLabel && (
+            <p className="mt-3 text-sm text-muted">
+              {p.methodLabel}{p.status ? ` · ${p.status}` : ""}
             </p>
           )}
 

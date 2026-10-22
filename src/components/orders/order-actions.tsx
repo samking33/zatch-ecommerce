@@ -95,9 +95,6 @@ export function OrderActions({
       case "contact_seller":
         router.push(sellerId ? `/seller/${sellerId}` : "/support");
         return;
-      case "return":
-        router.push("/returns");
-        return;
       default:
         return; // view_details - already here
     }
@@ -120,7 +117,8 @@ export function OrderActions({
       <div className="mt-4 flex flex-wrap gap-3">
         {list.map((a) => {
           const Icon = ICON[a.icon ?? ""] ?? Eye;
-          if (a.action === "view_details") return null;
+          // Returns aren't offered yet (no buyer return endpoint; the app says all sales are final).
+          if (a.action === "view_details" || a.action === "return") return null;
           return (
             <button
               key={a.action}
