@@ -18,19 +18,30 @@ type Doc = { type: string; file: File };
 
 // Real 3-step seller KYC onboarding → POST /user/seller/register (step-based).
 // After all steps the account moves to `pending` for admin approval.
-export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
+// With `edit`, an approved seller changes one section at a time, as the app's Business details tabs;
+// the server keeps an approved seller approved when steps 1 to 3 are sent again.
+export function SellerRegister({ draft, edit, initialTab = 1 }: { draft?: SellerProfileDraft; edit?: boolean; initialTab?: 1 | 2 | 3 }) {
   const router = useRouter();
   // Pick up where the seller left off (the app's "Resume application"); earlier answers are filled in.
-  const [step, setStep] = useState(!draft?.businessName ? 1 : !draft.address?.pickupAddress ? 2 : 3);
+  const [step, setStep] = useState<number>(edit ? initialTab : !draft?.businessName ? 1 : !draft.address?.pickupAddress ? 2 : 3);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const done = (next: number | "done") => {
+    if (edit) { setSaved("Changes saved."); router.refresh(); }
+    else if (next === "done") { router.push("/seller/dashboard"); router.refresh(); }
+    else setStep(next);
+  };
+  const go = (n: number) => { setStep(n); setError(null); setSaved(null); };
+  const draftBilling = draft?.address?.billingAddress;
+  const billingDiffers = !!draftBilling && draftBilling !== draft?.address?.pickupAddress;
 
   const [shop, setShop] = useState({ businessName: draft?.businessName ?? "", gstin: draft?.gstin ?? draft?.enrollmentId ?? "", pan: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
   // Same fields as the app's address step. Billing is the pickup address unless unticked.
   const [addr, setAddr] = useState({ line1: draft?.address?.pickupAddress ?? "", line2: "", pinCode: draft?.address?.pinCode ?? "", state: draft?.address?.state ?? "" });
-  const [billingSame, setBillingSame] = useState(true);
-  const [billing, setBilling] = useState({ line1: "", line2: "", pinCode: "", state: "" });
+  const [billingSame, setBillingSame] = useState(!billingDiffers);
+  const [billing, setBilling] = useState({ line1: billingDiffers ? draftBilling : "", line2: "", pinCode: "", state: "" });
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [ifscBank, setIfscBank] = useState<string | null>(null);
@@ -39,7 +50,7 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
 
   async function submitStep1(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setSaved(null);
     const t = getToken();
     const fd = new FormData();
     fd.append("step", "1");
@@ -51,18 +62,18 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
     const res = await fetch("/api/v1/user/seller/register", { method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd })
       .then((r) => r.json()).catch(() => null);
     setBusy(false);
-    if (res?.success) setStep(2); else setError(res?.message ?? "Couldn't save shop details.");
+    if (res?.success) done(2); else setError(res?.message ?? "Couldn't save shop details.");
   }
 
   async function submitJson(stepNum: number, body: Record<string, unknown>, next: number | "done") {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setSaved(null);
     const t = getToken();
     const res = await fetch("/api/v1/user/seller/register", {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
       body: JSON.stringify({ step: String(stepNum), ...body }),
     }).then((r) => r.json()).catch(() => null);
     setBusy(false);
-    if (res?.success) { if (next === "done") { router.push("/seller/dashboard"); router.refresh(); } else setStep(next); }
+    if (res?.success) done(next);
     else setError(res?.message ?? "Couldn't save. Check the fields.");
   }
 
@@ -83,12 +94,16 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
     const join = (a: typeof addr) => [a.line1.trim(), a.line2.trim()].filter(Boolean).join(", ");
     const bad = (a: typeof addr, what: string) =>
       !a.line1.trim() ? `${what} address line 1 is required.` : !/^\d{6}$/.test(a.pinCode.trim()) ? `${what} pincode must be 6 digits.` : !a.state.trim() ? `${what} state is required.` : null;
-    const problem = bad(addr, "Pickup") ?? (billingSame ? null : bad(billing, "Billing"));
+    // An unchanged billing address from the server is one line, without its own pincode and state.
+    const keptBilling = !billingSame && billingDiffers && billing.line1 === draftBilling && !billing.pinCode && !billing.state;
+    const problem = bad(addr, "Pickup") ?? (billingSame || keptBilling ? null : bad(billing, "Billing"));
     if (problem) return setError(problem);
     // The server keeps billing as one line, so its pincode and state go into the text.
-    const billingAddress = billingSame ? join(addr) : `${join(billing)}, ${billing.state.trim()} ${billing.pinCode.trim()}`;
+    const billingAddress = billingSame ? join(addr) : keptBilling ? draftBilling : `${join(billing)}, ${billing.state.trim()} ${billing.pinCode.trim()}`;
     submitJson(2, {
-      pickupAddress: join(addr), billingAddress, pinCode: addr.pinCode.trim(), state: addr.state.trim(), shippingMethod: "self_ship",
+      pickupAddress: join(addr), billingAddress, pinCode: addr.pinCode.trim(), state: addr.state.trim(),
+      // An edit leaves the seller's shipping method as the server has it.
+      ...(edit ? {} : { shippingMethod: "self_ship" }),
       ...(coords ?? {}),
     }, 3);
   }
@@ -114,6 +129,16 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
 
   return (
     <div className="card mx-auto max-w-2xl rounded-[2rem] p-6 sm:p-8">
+      {edit ? (
+        <div role="tablist" className="mb-6 flex gap-1.5">
+          {["Business", "Address", "Bank"].map((label, i) => (
+            <button key={label} role="tab" aria-selected={step === i + 1} onClick={() => go(i + 1)}
+              className={`rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${step === i + 1 ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : (
       <div className="mb-6 flex items-center gap-2">
         {["Shop & KYC", "Address", "Bank", "Submit"].map((label, i) => (
           <div key={label} className="flex flex-1 items-center gap-2">
@@ -123,6 +148,8 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
           </div>
         ))}
       </div>
+      )}
+      {saved && <p role="status" className="mb-4 flex items-center gap-2 rounded-2xl bg-lime/30 px-4 py-3 text-sm font-medium text-ink"><Check className="h-4 w-4 text-lime-deep" /> {saved}</p>}
 
       {step === 1 && (
         <form onSubmit={submitStep1} className="grid gap-4">
@@ -144,7 +171,7 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
           </div>
           {error && <p className="text-sm font-medium text-live">{error}</p>}
           <button type="submit" disabled={busy} className="pill-lime inline-flex w-full items-center justify-center gap-2 rounded-full py-3.5 text-[15px] font-semibold disabled:opacity-70">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : edit ? <Check className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />} {edit ? "Save changes" : "Continue"}
           </button>
         </form>
       )}
@@ -176,9 +203,9 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
           )}
           {error && <p className="text-sm font-medium text-live">{error}</p>}
           <div className="flex gap-3">
-            <Back onClick={() => setStep(1)} />
+            {!edit && <Back onClick={() => setStep(1)} />}
             <button onClick={submitAddress} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : edit ? <Check className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />} {edit ? "Save changes" : "Continue"}
             </button>
           </div>
         </div>
@@ -186,6 +213,7 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
 
       {step === 3 && (
         <div className="grid gap-4">
+          {edit && <p className="text-sm text-muted">Your saved account isn&apos;t shown, for your security. Enter the account you want payouts sent to.</p>}
           <Field label="Account holder name" value={bank.accountHolderName} on={(v) => setBank({ ...bank, accountHolderName: v.replace(/[^a-zA-Z\s.]/g, "") })} required />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Account number" value={bank.accountNumber} on={(v) => setBank({ ...bank, accountNumber: v.replace(/\D/g, "").slice(0, 18) })} required />
@@ -200,9 +228,9 @@ export function SellerRegister({ draft }: { draft?: SellerProfileDraft }) {
           </div>
           {error && <p className="text-sm font-medium text-live">{error}</p>}
           <div className="flex gap-3">
-            <Back onClick={() => setStep(2)} />
+            {!edit && <Back onClick={() => setStep(2)} />}
             <button onClick={submitBank} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : edit ? <Check className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />} {edit ? "Save changes" : "Continue"}
             </button>
           </div>
         </div>

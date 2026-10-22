@@ -43,7 +43,15 @@ export default async function SellerPayoutsPage({ searchParams }: { searchParams
 
   return (
     <SellerShell>
-      <SellerHeader title="Payouts" sub="Track what you've earned and what's on the way to your bank." />
+      <SellerHeader
+        title="Payouts"
+        sub="Track what you've earned and what's on the way to your bank."
+        action={
+          <Link href="/seller/settings?tab=bank#business" className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink hover:bg-surface-2">
+            Update bank details
+          </Link>
+        }
+      />
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5 text-sm">
         <span className="text-muted">Earnings</span>

@@ -22,10 +22,28 @@ const FAQS: [string, string][] = [
   ["What issues can support help with?", "Orders, payments, delivery issues, account problems, and disputes."],
 ];
 
-export function Faq() {
+// The app's seller FAQ (sellersscreens/faq_screen.dart). "How are returns and disputes handled?" is left
+// out for the same reason: there are no returns yet, and product pages say all sales are final.
+export const SELLER_FAQS: [string, string][] = [
+  ["Who can sell on Zatch?", "Any individual seller, creator, or small business can apply, subject to verification."],
+  ["How do I become a seller?", "Go to your profile and upgrade to a seller by submitting business and bank details."],
+  ["Do I need a website to sell?", "No. Zatch provides everything needed to sell online."],
+  ["How does live selling work?", "You go live on camera, explain products, answer buyer questions, and close orders in real time."],
+  ["What are short video sales?", "You can upload short product pitch videos that buyers can watch and buy from directly."],
+  ["How does bargaining work for sellers?", "You set a minimum price and acceptance rules. Buyers can send offers using “Zatch it”."],
+  ["Can I sell in my own language?", "Yes. You can speak naturally in Hindi, Telugu, or English."],
+  ["How do I manage orders?", "All orders appear in your seller dashboard where you can pack, ship, and update status."],
+  ["How do payouts work?", "Zatch collects payments and sends payouts to your linked bank account based on payout timelines."],
+  ["When will I receive my payout?", "Exact payout dates are shown on your Payouts page and depend on order completion."],
+  ["Do I get analytics and insights?", "Yes. You can view views, engagement, orders, and conversion data."],
+  ["Do I need to run ads to get sales?", "No. Zatch focuses on organic discovery through video, not pay-to-win ads."],
+  ["Are there rules on what I can sell?", "Yes. Sellers must follow Zatch’s product and conduct guidelines."],
+];
+
+export function Faq({ items = FAQS }: { items?: [string, string][] }) {
   const [q, setQ] = useState("");
   const term = q.trim().toLowerCase();
-  const shown = FAQS.filter(([a, b]) => !term || a.toLowerCase().includes(term) || b.toLowerCase().includes(term));
+  const shown = items.filter(([a, b]) => !term || a.toLowerCase().includes(term) || b.toLowerCase().includes(term));
   return (
     <section className="card mb-4 rounded-[2rem] p-6 sm:p-8">
       <h2 className="font-display text-xl font-semibold text-ink">Frequently asked questions</h2>
