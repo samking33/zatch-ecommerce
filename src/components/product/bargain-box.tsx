@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Tag, Check } from "lucide-react";
+import { Tag, Check, Minus, Plus } from "lucide-react";
 import { bargains as bargainsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 import { inr } from "@/lib/utils";
@@ -24,6 +24,7 @@ export function BargainBox({
   size,
   autoAcceptDiscount = 10,
   maxDiscount = 30,
+  maxQty = 1,
 }: {
   productId: string;
   listPrice: number;
@@ -31,6 +32,8 @@ export function BargainBox({
   size?: string;
   autoAcceptDiscount?: number;
   maxDiscount?: number;
+  /** Stock of the chosen variant; the offer is per unit for this many. */
+  maxQty?: number;
 }) {
   const router = useRouter();
   // The backend rejects offers below price*(1-max/100) and at/above the list price,
@@ -40,6 +43,8 @@ export function BargainBox({
   // Sellers can set auto-accept outside that range; keep the default inside it.
   const start = Math.min(top, Math.max(floor, Math.round(listPrice * (1 - autoAcceptDiscount / 100))));
   const [offer, setOffer] = useState(start);
+  const [qty, setQty] = useState(1);
+  const item = { productId, color, size, qty };
   const [phase, setPhase] = useState<Phase>("idle");
   const [counter, setCounter] = useState(0);
   const [bargainId, setBargainId] = useState<string | null>(null);
@@ -61,7 +66,7 @@ export function BargainBox({
         productId,
         offeredPrice: offer,
         variant: color || size ? { color, size } : undefined,
-        quantity: 1,
+        quantity: qty,
       },
       token,
     )) as
@@ -141,7 +146,7 @@ export function BargainBox({
             </p>
             <div className="mt-3">
               {bargainId ? (
-                <AcceptedBargainActions bargainId={bargainId} item={{ productId, color, size, qty: 1 }} />
+                <AcceptedBargainActions bargainId={bargainId} item={item} />
               ) : (
                 <Link href="/bargains" className="btn-ink inline-block rounded-full px-5 py-2.5 text-sm font-semibold">Open My bargains</Link>
               )}
@@ -153,7 +158,7 @@ export function BargainBox({
             <p className="mt-0.5 font-display text-2xl font-semibold text-ink">{inr(counter)}</p>
             <div className="mt-3">
               {bargainId ? (
-                <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} item={{ productId, color, size, qty: 1 }} />
+                <BuyerBargainActions bargainId={bargainId} counterPrice={counter} listPrice={listPrice} floor={floor} item={item} />
               ) : (
                 // ponytail: backend didn't return an id - send them to the thread.
                 <Link href="/bargains" className="pill-lime inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
@@ -182,6 +187,14 @@ export function BargainBox({
               <span>Floor {inr(floor)}</span>
               <span>List {inr(listPrice)}</span>
             </div>
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <span className="text-muted">Quantity (offer is per unit)</span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-hairline p-1">
+                <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Fewer units" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                <span className="w-6 text-center font-semibold tabular-nums" aria-live="polite">{qty}</span>
+                <button type="button" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label="More units" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
             {error && (
               <div className="mt-2 rounded-xl bg-surface-2 px-3.5 py-2.5">
                 <p className="text-sm font-medium text-ink">{error}</p>
@@ -197,7 +210,7 @@ export function BargainBox({
               disabled={phase === "waiting"}
               className="pill-lime mt-4 w-full rounded-full py-3.5 text-[15px] font-semibold disabled:opacity-70"
             >
-              {phase === "waiting" ? "Sending to seller…" : `Offer ${inr(offer)}`}
+              {phase === "waiting" ? "Sending to seller…" : `Offer ${inr(offer)}${qty > 1 ? ` × ${qty}` : ""}`}
             </button>
           </motion.div>
         )}

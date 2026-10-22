@@ -297,6 +297,7 @@ export function ProductView({ product }: { product: Product }) {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-[13px] text-muted">Sellers set their own shipping charges; you&apos;ll see them at checkout.</p>
           {product.orderAcceptingType === "askBeforeAccepting" && (
             <p className="mt-3 text-[13px] text-muted">
               This seller reviews each order before confirming it.
@@ -314,6 +315,8 @@ export function ProductView({ product }: { product: Product }) {
             size={size}
             autoAcceptDiscount={product.bargainSettings?.autoAcceptDiscount ?? 10}
             maxDiscount={product.bargainSettings?.maximumDiscount ?? 30}
+            maxQty={maxQty}
+            key={`${color}-${size}`}
           />
         )}
       </div>
