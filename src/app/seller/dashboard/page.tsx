@@ -15,7 +15,12 @@ export const metadata = { title: "Seller dashboard" };
 
 type Perf = { productViews?: number };
 type OrderStats = { totalRevenue?: number; totalOrders?: number; pendingOrders?: number };
-type OrdersDash = { performanceSummary?: Perf; topCards?: { totalProducts?: number; totalProductViews?: number } };
+type OrdersDash = {
+  performanceSummary?: Perf;
+  topCards?: { totalProducts?: number; totalProductViews?: number };
+  // Paid revenue per day for the last 7 days (the server's default "This Week").
+  graphData?: { data?: { label: string; revenue?: number; orders?: number }[] };
+};
 type BargainDash = { stats?: { totalBargains?: number; pendingBargains?: number; activeCount?: number } };
 type PaySummary = { totalRevenueFormatted?: string; netRevenueFormatted?: string; pendingFormatted?: string };
 type Completion = {
@@ -26,6 +31,7 @@ type Completion = {
 // Revenue and orders come from the same all-time-by-default stats the mobile app shows.
 const PERIODS = [
   { key: "", label: "All time" },
+  { key: "today", label: "Today" },
   { key: "week", label: "This week" },
   { key: "month", label: "This month" },
   { key: "year", label: "This year" },
@@ -53,6 +59,8 @@ export default async function SellerDashboardPage({ searchParams }: { searchPara
   ]);
 
   const perf = oDash?.performanceSummary ?? {};
+  const days = oDash?.graphData?.data ?? [];
+  const peak = Math.max(1, ...days.map((d) => d.revenue ?? 0));
   const orderStats = oList?.stats ?? {};
   const stats = bDash?.stats ?? {};
   const products = myProducts ?? [];
@@ -102,6 +110,21 @@ export default async function SellerDashboardPage({ searchParams }: { searchPara
           </div>
         ))}
       </div>
+
+      {days.length > 0 && (
+        <div className="card mt-4 rounded-[1.5rem] p-5">
+          <p className="text-[13px] font-medium text-muted">Revenue, last 7 days</p>
+          <div className="mt-4 flex h-36 items-end gap-2" role="img" aria-label={days.map((d) => `${d.label} ${inr(d.revenue ?? 0)}`).join(", ")}>
+            {days.map((d, i) => (
+              <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1.5">
+                <span className="text-[11px] text-muted">{d.revenue ? inr(d.revenue) : ""}</span>
+                <span className="w-full rounded-t-lg bg-lime" style={{ height: `${Math.max(4, ((d.revenue ?? 0) / peak) * 100)}px` }} />
+                <span className="text-[12px] text-muted">{d.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 flex items-center justify-between px-1">
         <h2 className="font-display text-xl font-semibold text-ink">Your products</h2>

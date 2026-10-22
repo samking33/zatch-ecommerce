@@ -35,7 +35,7 @@ const SORTS = [
 export default async function SellerOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; range?: string; sort?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; range?: string; sort?: string; page?: string; from?: string; to?: string }>;
 }) {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your orders" /></div></SellerShell>;
@@ -43,12 +43,16 @@ export default async function SellerOrdersPage({
   const gate = await sellerGate(t);
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
-  const { q = "", status = "", range = "", sort = "", page = "1" } = await searchParams;
+  const { q = "", status = "", range = "", sort = "", page = "1", from = "", to = "" } = await searchParams;
+  // A date range (the app's "Date Range (Created At)") overrides the period chips.
+  const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const custom = isDate(from) && isDate(to);
   const order = SORTS.find((x) => x.key === sort) ?? SORTS[0];
   const res = (await ordersApi.sellerOrdersRaw(t, {
     search: q || undefined,
     status: status || undefined,
-    timeRange: range || undefined,
+    timeRange: custom ? "custom" : range || undefined,
+    ...(custom ? { startDate: from, endDate: to } : {}),
     sortBy: order.sortBy,
     sortOrder: order.sortOrder,
     page: String(Math.max(1, Number(page) || 1)),
@@ -80,7 +84,9 @@ export default async function SellerOrdersPage({
         {sort && <input type="hidden" name="sort" value={sort} />}
         <input name="q" defaultValue={q} placeholder="Search order id, item, city, pincode…" className="h-11 min-w-[16rem] flex-1 rounded-full border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
         <button type="submit" className="btn-ink rounded-full px-5 text-sm font-semibold">Search</button>
-        {(q || status || range || sort) && <Link href="/seller/orders" className="grid place-items-center rounded-full border border-hairline px-4 text-sm text-muted hover:text-ink">Clear</Link>}
+        <input type="date" name="from" defaultValue={from} aria-label="From date" className="h-11 rounded-full border border-hairline bg-surface-2 px-3 text-[14px] text-ink focus:border-ink focus:outline-none" />
+        <input type="date" name="to" defaultValue={to} aria-label="To date" className="h-11 rounded-full border border-hairline bg-surface-2 px-3 text-[14px] text-ink focus:border-ink focus:outline-none" />
+        {(q || status || range || sort || from || to) && <Link href="/seller/orders" className="grid place-items-center rounded-full border border-hairline px-4 text-sm text-muted hover:text-ink">Clear</Link>}
       </form>
 
       <div className="mb-2 flex flex-wrap items-center gap-1.5 text-sm">
