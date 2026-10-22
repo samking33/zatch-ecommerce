@@ -61,6 +61,9 @@ export function ProductView({ product }: { product: Product }) {
   const outOfStock = unavailable || soldOut(selected);
   // Picking a colour clears the size; without one the server would match any size of that colour.
   const needsSize = sizes.length > 0 && !size;
+  // What the server stored for this variant: the picked size, or its hidden placeholder ("NONE").
+  // The server matches the stored text exactly, so sending nothing fails with "Size is required".
+  const sendSize = size ?? selected?.size;
   const [qty, setQty] = useState(1);
   const maxQty = Math.max(1, selected?.stock ?? 1);
 
@@ -95,7 +98,7 @@ export function ProductView({ product }: { product: Product }) {
     const token = getToken();
     if (!token) { router.push("/login"); return; }
     setStatus("adding");
-    const res = await cartApi.update({ productId: product._id, color, size, qty }, token);
+    const res = await cartApi.update({ productId: product._id, color, size: sendSize, qty }, token);
     const failure = apiError(res, "Couldn't add to cart. Try again.");
     setCartError(failure);
     setStatus(failure ? "error" : "added");
@@ -103,7 +106,7 @@ export function ProductView({ product }: { product: Product }) {
 
   // Buy now goes straight to checkout with this item; the cart is left alone (same as the app).
   function buyNow() {
-    router.push(buyHref([{ productId: product._id, variantColor: color ?? "", variantSize: size ?? "", qty }]));
+    router.push(buyHref([{ productId: product._id, variantColor: color ?? "", variantSize: sendSize ?? "", qty }]));
   }
 
   return (
@@ -312,7 +315,7 @@ export function ProductView({ product }: { product: Product }) {
             productId={product._id}
             listPrice={price}
             color={color}
-            size={size}
+            size={sendSize}
             autoAcceptDiscount={product.bargainSettings?.autoAcceptDiscount ?? 10}
             maxDiscount={product.bargainSettings?.maximumDiscount ?? 30}
             maxQty={maxQty}
