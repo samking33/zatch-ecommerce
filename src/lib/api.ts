@@ -359,7 +359,8 @@ export const address = {
     api<{ formatted?: string; line1?: string; city?: string; state?: string; pincode?: string }>(
       "/address/geocode", { method: "POST", body: { lat, lng }, token: t, pick: "address" }),
 };
-export const ifsc = { lookup: (code: string) => api(`/ifsc${qs({ ifsc: code })}`) };
+// Razorpay's IFSC data via the backend ({ BANK, BRANCH, ... }); unknown codes fail.
+export const ifsc = { lookup: (code: string) => api<{ BANK?: string; BRANCH?: string }>(`/ifsc${qs({ code })}`, { raw: true }) };
 
 // --- Live (/live) ---
 export type LiveDetails = {

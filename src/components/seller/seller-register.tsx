@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowRight, ArrowLeft, Check, Upload, X } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
+import { address as addressApi, ifsc as ifscApi } from "@/lib/api";
 import { shrinkImage } from "@/lib/shrink-image";
 
 const DOC_TYPES = [
@@ -25,7 +26,13 @@ export function SellerRegister() {
 
   const [shop, setShop] = useState({ businessName: "", gstin: "", pan: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
-  const [addr, setAddr] = useState({ pickupAddress: "", pinCode: "", state: "", shippingMethod: "self_ship" });
+  // Same fields as the app's address step. Billing is the pickup address unless unticked.
+  const [addr, setAddr] = useState({ line1: "", line2: "", pinCode: "", state: "" });
+  const [billingSame, setBillingSame] = useState(true);
+  const [billing, setBilling] = useState({ line1: "", line2: "", pinCode: "", state: "" });
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [ifscBank, setIfscBank] = useState<string | null>(null);
   const [tc, setTc] = useState(false);
   const [bank, setBank] = useState({ accountHolderName: "", accountNumber: "", ifscCode: "", bankName: "", upiId: "" });
 
@@ -56,6 +63,52 @@ export function SellerRegister() {
     setBusy(false);
     if (res?.success) { if (next === "done") { router.push("/seller/dashboard"); router.refresh(); } else setStep(next); }
     else setError(res?.message ?? "Couldn't save. Check the fields.");
+  }
+
+  function locate() {
+    const t = getToken();
+    if (!navigator.geolocation || !t) return setError("Your browser can't share your location.");
+    setLocating(true); setError(null);
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      const a = await addressApi.geocode(latitude, longitude, t);
+      setLocating(false);
+      setCoords({ latitude, longitude });
+      if (a) setAddr((x) => ({ ...x, line1: a.line1?.trim() || a.formatted || x.line1, pinCode: a.pincode || x.pinCode, state: a.state || x.state }));
+    }, () => { setLocating(false); setError("Location access was blocked. Fill in the address below."); }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  function submitAddress() {
+    const join = (a: typeof addr) => [a.line1.trim(), a.line2.trim()].filter(Boolean).join(", ");
+    const bad = (a: typeof addr, what: string) =>
+      !a.line1.trim() ? `${what} address line 1 is required.` : !/^\d{6}$/.test(a.pinCode.trim()) ? `${what} pincode must be 6 digits.` : !a.state.trim() ? `${what} state is required.` : null;
+    const problem = bad(addr, "Pickup") ?? (billingSame ? null : bad(billing, "Billing"));
+    if (problem) return setError(problem);
+    // The server keeps billing as one line, so its pincode and state go into the text.
+    const billingAddress = billingSame ? join(addr) : `${join(billing)}, ${billing.state.trim()} ${billing.pinCode.trim()}`;
+    submitJson(2, {
+      pickupAddress: join(addr), billingAddress, pinCode: addr.pinCode.trim(), state: addr.state.trim(), shippingMethod: "self_ship",
+      ...(coords ?? {}),
+    }, 3);
+  }
+
+  // The app fills the bank name from the IFSC; a code the lookup doesn't know is refused.
+  async function checkIfsc(code: string) {
+    setIfscBank(null);
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(code)) return;
+    const res = await ifscApi.lookup(code);
+    if (res?.BANK) {
+      setIfscBank(`${res.BANK}${res.BRANCH ? `, ${res.BRANCH}` : ""}`);
+      setBank((b) => (b.ifscCode === code ? { ...b, bankName: b.bankName || res.BANK! } : b));
+    }
+  }
+
+  function submitBank() {
+    if (!bank.accountHolderName.trim()) return setError("Account holder name is required.");
+    if (!/^\d{9,18}$/.test(bank.accountNumber)) return setError("Enter a valid account number (9 to 18 digits).");
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bank.ifscCode)) return setError("Enter a valid IFSC code, for example HDFC0001234.");
+    if (!bank.bankName.trim()) return setError("Bank name is required.");
+    submitJson(3, bank, 4);
   }
 
   return (
@@ -97,15 +150,33 @@ export function SellerRegister() {
 
       {step === 2 && (
         <div className="grid gap-4">
-          <Field label="Pickup address" value={addr.pickupAddress} on={(v) => setAddr({ ...addr, pickupAddress: v })} required />
+          <button type="button" onClick={locate} disabled={locating} className="inline-flex items-center justify-center gap-2 rounded-full border border-hairline py-2.5 text-sm font-medium text-ink hover:bg-surface-2 disabled:opacity-60">
+            {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {locating ? "Finding you…" : "Use my current location"}
+          </button>
+          <Field label="Pickup address line 1" value={addr.line1} on={(v) => setAddr({ ...addr, line1: v })} required />
+          <Field label="Address line 2 (optional)" value={addr.line2} on={(v) => setAddr({ ...addr, line2: v })} />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Pincode" value={addr.pinCode} on={(v) => setAddr({ ...addr, pinCode: v })} />
-            <Field label="State" value={addr.state} on={(v) => setAddr({ ...addr, state: v })} />
+            <Field label="Pincode" value={addr.pinCode} on={(v) => setAddr({ ...addr, pinCode: v.replace(/\D/g, "").slice(0, 6) })} required />
+            <Field label="State" value={addr.state} on={(v) => setAddr({ ...addr, state: v })} required />
           </div>
+          <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3">
+            <input type="checkbox" checked={billingSame} onChange={(e) => setBillingSame(e.target.checked)} className="h-4 w-4 accent-ink" />
+            <span className="text-[15px] text-ink">Billing address same as pickup address</span>
+          </label>
+          {!billingSame && (
+            <div className="grid gap-4 rounded-2xl border border-hairline p-4">
+              <Field label="Billing address line 1" value={billing.line1} on={(v) => setBilling({ ...billing, line1: v })} required />
+              <Field label="Address line 2 (optional)" value={billing.line2} on={(v) => setBilling({ ...billing, line2: v })} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Pincode" value={billing.pinCode} on={(v) => setBilling({ ...billing, pinCode: v.replace(/\D/g, "").slice(0, 6) })} required />
+                <Field label="State" value={billing.state} on={(v) => setBilling({ ...billing, state: v })} required />
+              </div>
+            </div>
+          )}
           {error && <p className="text-sm font-medium text-live">{error}</p>}
           <div className="flex gap-3">
             <Back onClick={() => setStep(1)} />
-            <button onClick={() => submitJson(2, addr, 3)} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
+            <button onClick={submitAddress} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
             </button>
           </div>
@@ -114,10 +185,13 @@ export function SellerRegister() {
 
       {step === 3 && (
         <div className="grid gap-4">
-          <Field label="Account holder name" value={bank.accountHolderName} on={(v) => setBank({ ...bank, accountHolderName: v })} required />
+          <Field label="Account holder name" value={bank.accountHolderName} on={(v) => setBank({ ...bank, accountHolderName: v.replace(/[^a-zA-Z\s.]/g, "") })} required />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Account number" value={bank.accountNumber} on={(v) => setBank({ ...bank, accountNumber: v })} />
-            <Field label="IFSC code" value={bank.ifscCode} on={(v) => setBank({ ...bank, ifscCode: v.toUpperCase() })} />
+            <Field label="Account number" value={bank.accountNumber} on={(v) => setBank({ ...bank, accountNumber: v.replace(/\D/g, "").slice(0, 18) })} required />
+            <div>
+              <Field label="IFSC code" value={bank.ifscCode} on={(v) => { const code = idChars(v, 11); setBank({ ...bank, ifscCode: code }); checkIfsc(code); }} required />
+              {ifscBank && <p className="mt-1 text-[12px] text-muted">{ifscBank}</p>}
+            </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Bank name" value={bank.bankName} on={(v) => setBank({ ...bank, bankName: v })} />
@@ -126,7 +200,7 @@ export function SellerRegister() {
           {error && <p className="text-sm font-medium text-live">{error}</p>}
           <div className="flex gap-3">
             <Back onClick={() => setStep(2)} />
-            <button onClick={() => submitJson(3, bank, 4)} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
+            <button onClick={submitBank} disabled={busy} className="pill-lime inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold disabled:opacity-70">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} Continue
             </button>
           </div>
