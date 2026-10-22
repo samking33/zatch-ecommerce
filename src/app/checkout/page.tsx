@@ -9,6 +9,7 @@ import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
 import { AddressForm, type Addr } from "@/components/account/address-form";
+import { useAuth } from "@/components/auth/auth-provider";
 import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, apiError } from "@/lib/api";
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
@@ -66,6 +67,15 @@ export default function CheckoutPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pricing, setPricing] = useState(true);
   const [paying, setPaying] = useState(false);
+  const { user } = useAuth();
+
+  // Closing the tab while the payment is being confirmed could lose the order screen; ask first.
+  useEffect(() => {
+    if (!paying) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [paying]);
   const [error, setError] = useState<string | null>(null);
   const [placed, setPlaced] = useState<Verified["orders"] | null>(null);
   const [underReview, setUnderReview] = useState<string | null>(null);
@@ -314,6 +324,11 @@ export default function CheckoutPage() {
                 </div>
                 {adding && token && (
                   <div className="mt-4"><AddressForm token={token} onSaved={(a) => { setAddrs((l) => [...l, a]); setSelected(a._id); setAdding(false); }} /></div>
+                )}
+                {(user?.email || user?.phone) && (
+                  <p className="mt-4 text-sm text-muted">
+                    Order updates go to {[user.email, user.phone].filter(Boolean).join(" and ")}.
+                  </p>
                 )}
               </section>
 
