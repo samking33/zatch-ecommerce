@@ -143,6 +143,8 @@ export function BitModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") return onClose();
+      // Typing a comment must not move the feed ("ok" would jump back a reel).
+      if ((e.target as HTMLElement).closest("input, textarea, [contenteditable]")) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); go(1); }
       if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); go(-1); }
     };
