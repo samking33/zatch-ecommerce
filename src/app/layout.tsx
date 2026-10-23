@@ -3,6 +3,7 @@ import { Inter, Inter_Tight } from "next/font/google";
 import Script from "next/script";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { RealtimeProvider } from "@/components/realtime/realtime-provider";
+import { AppPrompt } from "@/components/site/get-app";
 import "./globals.css";
 
 const interTight = Inter_Tight({
@@ -42,6 +43,7 @@ export default function RootLayout({
         <AuthProvider>
           <RealtimeProvider>{children}</RealtimeProvider>
         </AuthProvider>
+        <AppPrompt />
         <Script src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} strategy="afterInteractive" />
         <Script id="google-tag" strategy="afterInteractive">
           {`window.dataLayer = window.dataLayer || [];

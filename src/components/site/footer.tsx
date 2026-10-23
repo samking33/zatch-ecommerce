@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
+import { StoreButtons } from "./get-app";
 
 const groups = [
   {
@@ -43,6 +44,10 @@ export function Footer() {
               India&apos;s first live bargain marketplace. Watch, negotiate, and
               own it - in real time.
             </p>
+            <p className="mt-6 text-xs font-semibold uppercase tracking-widest text-muted">Get the Zatch app</p>
+            <div className="mt-3">
+              <StoreButtons />
+            </div>
           </div>
           {groups.map((g) => (
             <nav key={g.title} aria-label={g.title}>
