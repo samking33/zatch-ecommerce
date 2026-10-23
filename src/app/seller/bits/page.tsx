@@ -98,7 +98,8 @@ export default async function SellerBitsPage({ searchParams }: { searchParams: P
         ))}
       </div>
 
-      {open && <BitDetails bit={open} myProducts={myProducts ?? []} closeHref={href()} />}
+      {/* Keyed by Bit, so the edit form never carries one Bit's fields over to another. */}
+      {open && <BitDetails key={open._id} bit={open} myProducts={myProducts ?? []} closeHref={href()} />}
 
       <div className="mt-8">
         <h2 className="px-1 font-display text-xl font-semibold text-ink">Your Bits</h2>
