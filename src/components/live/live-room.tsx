@@ -9,6 +9,7 @@ import { ProductMedia } from "@/components/ui/product-media";
 import { live as liveApi, apiError, type LiveDetails } from "@/lib/api";
 import { onEvent, rooms } from "@/lib/socket";
 import { getToken } from "@/lib/client-auth";
+import { useAuth } from "@/components/auth/auth-provider";
 import { compact, inr } from "@/lib/utils";
 
 type Msg = { _id?: string; id?: number; username?: string; user?: string; text: string };
@@ -32,21 +33,24 @@ export function LiveRoom({ room }: { room: LiveDetails }) {
   const [error, setError] = useState<string | null>(null);
   const feed = useRef<HTMLDivElement>(null);
   const localId = useRef(0);
+  // The viewer's own comments are shown when sent, so the server's copy is skipped.
+  const me = useRef<string | undefined>(undefined);
+  me.current = useAuth().user?._id;
 
   // Live updates over the socket - same events the mobile app listens to (newComment / likeUpdated / viewersUpdated).
   useEffect(() => {
     rooms.joinSession(sessionId);
     const offs = [
       onEvent("newComment", (p) => {
-        const c = (p.comment ?? p) as Msg;
-        if (c?.text) setMsgs((m) => [...m, c].slice(-40));
+        const text = p.text;
+        if (!text || (me.current && p.user?._id === me.current)) return;
+        setMsgs((m) => [...m, { _id: p._id, username: p.user?.username, text }].slice(-40));
       }),
       onEvent("likeUpdated", (p) => {
         if (typeof p.likeCount === "number") setLikes(p.likeCount);
       }),
       onEvent("viewersUpdated", (p) => {
-        const n = p.viewersCount ?? p.count;
-        if (typeof n === "number") setLiveViewers(n);
+        if (typeof p.currentViewers === "number") setLiveViewers(p.currentViewers);
       }),
       onEvent("sessionEnded", () => setEnded(true)),
     ];

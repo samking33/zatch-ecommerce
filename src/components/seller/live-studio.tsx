@@ -31,13 +31,12 @@ export function LiveStudio({ room }: { room: LiveDetails }) {
     rooms.joinSession(room._id);
     const offs = [
       onEvent("newComment", (p) => {
-        const c = (p.comment ?? p) as Msg & { user?: string };
-        if (c?.text) setMsgs((m) => [...m, { username: c.username ?? c.user, text: c.text }].slice(-40));
+        const text = p.text;
+        if (text) setMsgs((m) => [...m, { username: p.user?.username, text }].slice(-40));
       }),
       onEvent("likeUpdated", (p) => { if (typeof p.likeCount === "number") setLikes(p.likeCount); }),
       onEvent("viewersUpdated", (p) => {
-        const n = p.viewersCount ?? p.count;
-        if (typeof n === "number") setViewers(n);
+        if (typeof p.currentViewers === "number") setViewers(p.currentViewers);
       }),
     ];
     return () => { offs.forEach((off) => off()); rooms.leaveSession(room._id); };
@@ -46,7 +45,9 @@ export function LiveStudio({ room }: { room: LiveDetails }) {
   useEffect(() => { feed.current?.scrollTo({ top: feed.current.scrollHeight }); }, [msgs]);
 
   // Leaving the page stops the camera; the session stays live until the host ends it, as in the app.
-  useEffect(() => () => stopMedia(), []);
+  // `onPage` stops a start that is still waiting from switching the camera on after the page has gone.
+  const onPage = useRef(true);
+  useEffect(() => () => { onPage.current = false; stopMedia(); }, []);
 
   useEffect(() => {
     if (phase !== "live") return;
@@ -68,6 +69,7 @@ export function LiveStudio({ room }: { room: LiveDetails }) {
     setPhase("starting");
     setErr(null);
     const res = await liveApi.token(room._id, t);
+    if (!onPage.current) return;
     const failure = apiError(res, "Couldn't start the live. Try again.");
     if (failure || !res?.appId || !res.token || !res.channelName) {
       setErr(failure ?? "Couldn't start the live. Try again.");
@@ -78,11 +80,13 @@ export function LiveStudio({ room }: { room: LiveDetails }) {
       const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
       // Ask for the camera first, so a refused permission never joins the channel.
       const tracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+      if (!onPage.current) { tracks.forEach((tr) => tr.close()); return; }
       const client = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
       media.current = { client, tracks };
       await client.setClientRole("host");
       await client.join(res.appId, res.channelName, res.token, res.uid ?? null);
       await client.publish(tracks);
+      if (!onPage.current) return stopMedia();
       if (preview.current) tracks[1].play(preview.current);
       setPhase("live");
     } catch (e) {

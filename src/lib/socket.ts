@@ -24,11 +24,11 @@ export type ServerEvents = {
   // bargain_<id> room
   price_updated: { bargainId: string; price: number };
   user_viewing: { bargainId: string; count?: number };
-  // live session room
-  newComment: { sessionId?: string; comment?: unknown; text?: string; username?: string; user?: unknown };
-  likeUpdated: { sessionId?: string; likeCount?: number };
-  viewersUpdated: { sessionId?: string; viewersCount?: number; count?: number };
-  sessionEnded: { sessionId?: string };
+  // live_<sessionId> room (liveController.js)
+  newComment: { _id?: string; user?: { _id?: string; username?: string }; text?: string; timestamp?: string };
+  likeUpdated: { likeCount?: number; userId?: string };
+  viewersUpdated: { currentViewers?: number; peakViewers?: number; totalViews?: number };
+  sessionEnded: { message?: string; stats?: { totalViews?: number; peakViewers?: number; duration?: number } };
   // broadcast
   sessionWentLive: { sessionId?: string; title?: string };
   newLiveStarted: { sessionId?: string; title?: string };
