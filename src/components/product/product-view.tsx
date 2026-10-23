@@ -13,6 +13,7 @@ import { getToken } from "@/lib/client-auth";
 import { buyHref } from "@/lib/checkout-link";
 import { inr } from "@/lib/utils";
 import type { Product, Variant, ProductImage } from "@/lib/types";
+import imageLoader from "@/lib/image-loader";
 
 export function ProductView({ product }: { product: Product }) {
   const router = useRouter();
@@ -134,8 +135,8 @@ export function ProductView({ product }: { product: Product }) {
           className="m-auto h-full max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-ink/90"
         >
           <div className="relative grid h-full w-full place-items-center p-4" onClick={() => viewer.current?.close()}>
-            {/* The original from the CDN, not the resized copy. */}
-            {activeUrl && <img src={activeUrl} alt={product.name} className="max-h-full max-w-full object-contain" />}
+            {/* Sized by the CDN: the originals are raw phone photos of up to ~20 MB. */}
+            {activeUrl && <img src={imageLoader({ src: activeUrl, width: 1920 })} alt={product.name} className="max-h-full max-w-full object-contain" />}
             <button type="button" onClick={() => viewer.current?.close()} aria-label="Close" autoFocus className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-ink">
               <X className="h-5 w-5" />
             </button>
