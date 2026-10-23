@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
@@ -38,6 +38,9 @@ export default function RegisterPage() {
     setWait(30);
   }
 
+  // A code works once: if account creation fails after it was accepted, a retry must not check it again.
+  const verified = useRef<string | null>(null);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -54,7 +57,11 @@ export default function RegisterPage() {
         setBusy(false);
         return;
       }
-      await verifyPhone(phone, f.countryCode, code.trim());
+      const pair = `${f.countryCode}${phone}:${code.trim()}`;
+      if (verified.current !== pair) {
+        await verifyPhone(phone, f.countryCode, code.trim());
+        verified.current = pair;
+      }
       const user = await register({
         username: f.username.trim(),
         phone,
