@@ -104,10 +104,11 @@ export default function CheckoutPage() {
     });
   }, []);
 
-  const payload = (couponCode = coupon, ids = cartIds) =>
+  // Cart mode always has ids: a checkout without them goes back to the cart (see above).
+  const payload = (couponCode = coupon) =>
     direct
       ? { addressId: selected || undefined, items: direct, couponCode }
-      : { addressId: selected || undefined, selectedItemIds: ids.length ? ids : undefined, couponCode };
+      : { addressId: selected || undefined, selectedItemIds: cartIds, couponCode };
 
   // Re-price whenever anything that changes the total changes.
   const key = JSON.stringify([selected, coupon, direct, cartIds]);
@@ -177,10 +178,8 @@ export default function CheckoutPage() {
     setError(null);
     if (!token) return router.push("/login");
     if (!selected) return setError("Add a delivery address first.");
-    // The payment step needs the exact cart lines, so a whole-cart checkout sends every line's id.
-    const ids = cartIds.length ? cartIds : lines.map((l) => l._id).filter((x): x is string => !!x);
     setPaying(true);
-    const init = (await checkoutApi.razorpayInitiate({ checkoutData: payload(coupon, ids) }, token)) as Init | null;
+    const init = (await checkoutApi.razorpayInitiate({ checkoutData: payload() }, token)) as Init | null;
     const initError = apiError(init, "Couldn't start payment. Please try again.");
     if (initError || !init?.razorpayOrderId || !init.keyId) {
       setPaying(false);
@@ -254,7 +253,10 @@ export default function CheckoutPage() {
     );
   }
 
-  const empty = direct ? direct.length === 0 : !pricing && previewError === "Cart is empty";
+  // Cart lines removed since the cart page was opened (another tab, sold out) price to nothing.
+  const empty = direct
+    ? direct.length === 0
+    : !pricing && (previewError === "Cart is empty" || (!!preview && !previewError && lines.length === 0));
 
   return (
     <>
@@ -269,7 +271,8 @@ export default function CheckoutPage() {
         ) : empty ? (
           <div className="card grid place-items-center rounded-[2rem] p-16 text-center">
             <p className="font-display text-2xl font-semibold text-ink">Nothing to check out</p>
-            <Link href="/shop" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">Browse products</Link>
+            {!direct && <p className="mt-2 text-muted">These items are no longer in your cart.</p>}
+            <Link href={direct ? "/shop" : "/cart"} className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">{direct ? "Browse products" : "Back to cart"}</Link>
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
