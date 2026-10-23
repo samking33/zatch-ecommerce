@@ -58,8 +58,12 @@ const QUIET_DAYS = 7;
 /**
  * The "get the app" prompt: a bottom banner on phones whose button goes to that phone's
  * store, and a corner card with both stores on computers. Closing it hides it for a week.
- * Not on checkout, where it could cover the pay button.
+ * Kept off pages where it would cover what people are doing: checkout (the pay button),
+ * live rooms (the chat box) and the seller console.
  */
+// `/seller/<user id>` is a public shop, so it keeps the prompt; the rest of /seller is the console.
+const HIDDEN_ON = [/^\/checkout/, /^\/live\//, /^\/seller\/(?![0-9a-f]{24}(\/|$))/i];
+
 export function AppPrompt() {
   const path = usePathname();
   const [store, setStore] = useState<Store | null>(null);
@@ -80,7 +84,7 @@ export function AppPrompt() {
     try { localStorage.setItem(CLOSED_KEY, String(Date.now())); } catch { /* storage blocked */ }
   }
 
-  if (!show || path.startsWith("/checkout")) return null;
+  if (!show || HIDDEN_ON.some((re) => re.test(path))) return null;
 
   if (store) {
     return (
