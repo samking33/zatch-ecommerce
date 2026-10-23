@@ -13,7 +13,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, apiError } from "@/lib/api";
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
-import { inr } from "@/lib/utils";
+import { inr, variantText } from "@/lib/utils";
 
 type PItem = {
   _id?: string;
@@ -405,7 +405,7 @@ function ItemRow({ line, qty, bargain, onQty, onRemove }: { line?: PItem; qty: n
   const name = line?.product?.name ?? "Item no longer available";
   const unit = line?.cartPrice ?? 0;
   const list = line?.product?.price ?? unit;
-  const variant = [line?.variant?.color, line?.variant?.size].filter((v) => v && v.toLowerCase() !== "none").join(" · ");
+  const variant = variantText(" · ", line?.variant?.color, line?.variant?.size);
   return (
     <div className="flex items-center gap-3">
       <Link href={line?.product?._id ? `/product/${line.product._id}` : "#"} className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-surface-2">

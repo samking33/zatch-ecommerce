@@ -6,7 +6,7 @@ import { ProductMedia } from "@/components/ui/product-media";
 import { OrderActions, type ServerAction } from "@/components/orders/order-actions";
 import { orders as ordersApi } from "@/lib/api";
 import { serverToken, userIdFromToken } from "@/lib/session";
-import { inr } from "@/lib/utils";
+import { inr, variantText } from "@/lib/utils";
 
 type Line = { name?: string; image?: string; qty?: number; price?: number; total?: number; productId?: string; variant?: { color?: string | null; size?: string | null } };
 type TimelineEvent = { key: string; label: string; description?: string; timestamp?: string | null; isDone?: boolean };
@@ -141,8 +141,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-[15px] font-medium text-ink">{l.name}</p>
                     <p className="text-sm text-muted">
-                      {[l.variant?.color, l.variant?.size].filter((v) => v && v.toLowerCase() !== "none").join(" · ")}
-                      {l.variant?.color || l.variant?.size ? " · " : ""}Qty {l.qty ?? 1}
+                      {[variantText(" · ", l.variant?.color, l.variant?.size), `Qty ${l.qty ?? 1}`].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                   <span className="font-medium text-ink">{inr(l.total ?? l.price ?? 0)}</span>

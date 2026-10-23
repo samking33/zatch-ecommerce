@@ -9,7 +9,7 @@ import { RefreshOn } from "@/components/realtime/refresh-on";
 import { bargains as bargainsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
-import { inr } from "@/lib/utils";
+import { inr, variantText } from "@/lib/utils";
 
 export const metadata = { title: "Seller · Bargains" };
 
@@ -131,7 +131,7 @@ function ZatchCard({ z, history }: { z: Zatch; history: boolean }) {
   const list = z.originalPrice ?? 0;
   const requested = z.requestedPrice ?? 0;
   const current = z.currentPrice ?? requested;
-  const variant = [z.variant?.color, z.variant?.size].filter(Boolean).join(" / ");
+  const variant = variantText(" / ", z.variant?.color, z.variant?.size);
   const rows = [
     ["Buyer", z.buyer?.name ?? "Buyer"],
     variant && ["Variant", variant],

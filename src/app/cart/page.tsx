@@ -9,7 +9,7 @@ import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
 import { cart as cartApi, apiError } from "@/lib/api";
 import { getToken, setAppliedCoupon } from "@/lib/client-auth";
-import { inr } from "@/lib/utils";
+import { inr, variantText } from "@/lib/utils";
 
 type CartItem = {
   _id?: string;
@@ -203,7 +203,7 @@ export default function CartPage() {
                         </button>
                       </div>
                       <p className="text-sm text-muted">
-                        {[it.variant?.color ?? it.color, it.variant?.size ?? it.size].filter(Boolean).join(" · ")}
+                        {variantText(" · ", it.variant?.color ?? it.color, it.variant?.size ?? it.size)}
                       </p>
                       <span className="mt-1.5 flex flex-wrap gap-1.5">
                         {it.bargainId && (
