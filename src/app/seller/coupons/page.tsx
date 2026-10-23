@@ -252,7 +252,8 @@ function CouponForm({ token, onSaved, initial, products }: { token: string; onSa
       maxDiscount: f.discountType === "percentage" && f.maxDiscount ? Number(f.maxDiscount) : null,
       // Create takes `productIds` (checked against the seller's own); update takes `applicableProducts`.
       ...(initial ? { applicableProducts: picked } : { productIds: picked }),
-      minSpend: f.minSpend ? Number(f.minSpend) : undefined,
+      // 0 is the server's "no minimum"; leaving it out would keep an old minimum on edit.
+      minSpend: f.minSpend ? Number(f.minSpend) : 0,
       // valid through the end of that day, IST; an unchanged date is left as the server has it
       ...(f.endDate !== initialEnd ? { endDate: new Date(`${f.endDate}T23:59:59+05:30`).toISOString() } : {}),
       // The server rejects any `code` once a coupon has been used, even an unchanged one.
