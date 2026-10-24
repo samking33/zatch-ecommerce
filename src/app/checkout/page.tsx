@@ -14,6 +14,7 @@ import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, 
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
 import { inr, variantText } from "@/lib/utils";
+import { trackPurchase } from "@/lib/gtag";
 
 type PItem = {
   _id?: string;
@@ -213,6 +214,8 @@ export default function CheckoutPage() {
         setPaying(false);
         if (v?.success) {
           if (!direct) setAppliedCoupon(undefined);
+          // Google Ads purchase conversion; the Razorpay order id keeps it to one per order.
+          trackPurchase(resp.razorpay_order_id, typeof init.amount === "number" ? init.amount / 100 : undefined, init.currency ?? "INR");
           setPlaced(v.orders ?? []);
         } else if (v?.code === "PAYMENT_UNDER_REVIEW") {
           setUnderReview(v.message ?? "Payment received. Your order is being confirmed.");
