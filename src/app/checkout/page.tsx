@@ -14,7 +14,7 @@ import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, 
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
 import { inr, variantText } from "@/lib/utils";
-import { trackPurchase } from "@/lib/gtag";
+import { trackPurchase } from "@/lib/analytics";
 
 type PItem = {
   _id?: string;
