@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { ProductOrb } from "@/components/ui/product-orb";
 import { register, otp as otpApi, verifyPhone, afterSignIn, USERNAME_MAX } from "@/lib/client-auth";
+import { trackMeta } from "@/lib/analytics";
 import { useAuth } from "@/components/auth/auth-provider";
 
 const GENDERS = ["Male", "Female", "Other"] as const;
@@ -71,6 +72,7 @@ export default function RegisterPage() {
         gender: gender || undefined,
       });
       setUser(user);
+      trackMeta("CompleteRegistration", { status: true });
       router.push(afterSignIn(user));
       router.refresh();
     } catch (err) {

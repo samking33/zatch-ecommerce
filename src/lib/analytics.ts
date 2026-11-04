@@ -24,3 +24,14 @@ export function trackPurchase(transactionId: string, value?: number, currency = 
     w.fbq("track", "Purchase", money, { eventID: transactionId });
   }
 }
+
+/**
+ * Fire a Meta Pixel standard event (ViewContent, AddToCart, AddToWishlist,
+ * InitiateCheckout, AddPaymentInfo, CompleteRegistration, Search). The purchase
+ * conversion stays in trackPurchase; these are Meta-only because Google Ads has a
+ * conversion action configured for the purchase alone.
+ */
+export function trackMeta(event: string, params?: Record<string, unknown>) {
+  const w = window as unknown as { fbq?: Fbq };
+  if (typeof w.fbq === "function") w.fbq("track", event, params);
+}

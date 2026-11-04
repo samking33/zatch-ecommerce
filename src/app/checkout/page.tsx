@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Lock, Plus, Minus, Loader2, Tag, X, CircleCheck, Clock } from "lucide-react";
 import { Nav } from "@/components/site/nav";
@@ -14,7 +14,7 @@ import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, 
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
 import { inr, variantText } from "@/lib/utils";
-import { trackPurchase } from "@/lib/analytics";
+import { trackPurchase, trackMeta } from "@/lib/analytics";
 
 type PItem = {
   _id?: string;
@@ -68,6 +68,8 @@ export default function CheckoutPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pricing, setPricing] = useState(true);
   const [paying, setPaying] = useState(false);
+  // Meta InitiateCheckout fires once, when the first priced preview loads.
+  const icFired = useRef(false);
   const { user } = useAuth();
 
   // Closing the tab while the payment is being confirmed could lose the order screen; ask first.
@@ -119,8 +121,13 @@ export default function CheckoutPage() {
     setPricing(true);
     checkoutApi.initiate(payload(), token).then((p) => {
       if (!alive) return;
-      setPreview((p as Preview | null) ?? { success: false, message: "Couldn't load prices. Try again." });
+      const pv = (p as Preview | null) ?? { success: false, message: "Couldn't load prices. Try again." };
+      setPreview(pv);
       setPricing(false);
+      if (pv.success && !icFired.current) {
+        icFired.current = true;
+        trackMeta("InitiateCheckout", { value: pv.checkout?.pricing?.total, currency: "INR", num_items: pv.checkout?.items?.length });
+      }
     });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,6 +197,7 @@ export default function CheckoutPage() {
       setPaying(false);
       return setError("The payment window couldn't load. Check your connection and try again.");
     }
+    trackMeta("AddPaymentInfo", { value: typeof init.amount === "number" ? init.amount / 100 : undefined, currency: init.currency ?? "INR" });
 
     const RZP = (window as unknown as { Razorpay: new (o: unknown) => { open: () => void } }).Razorpay;
     new RZP({
