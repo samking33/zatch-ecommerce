@@ -9,7 +9,7 @@ import { ProductMedia } from "@/components/ui/product-media";
 import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
 import { cart as cartApi, apiError } from "@/lib/api";
-import { trackMeta } from "@/lib/analytics";
+import { trackMeta, trackGoogleConversion, GCONV } from "@/lib/analytics";
 import { getToken } from "@/lib/client-auth";
 import { buyHref } from "@/lib/checkout-link";
 import { inr } from "@/lib/utils";
@@ -104,7 +104,10 @@ export function ProductView({ product }: { product: Product }) {
     const failure = apiError(res, "Couldn't add to cart. Try again.");
     setCartError(failure);
     setStatus(failure ? "error" : "added");
-    if (!failure) trackMeta("AddToCart", { content_ids: [product._id], content_type: "product", content_name: product.name, value: price * qty, currency: "INR" });
+    if (!failure) {
+      trackMeta("AddToCart", { content_ids: [product._id], content_type: "product", content_name: product.name, value: price * qty, currency: "INR" });
+      trackGoogleConversion(GCONV.addToCart, price * qty);
+    }
   }
 
   // Buy now goes straight to checkout with this item; the cart is left alone (same as the app).

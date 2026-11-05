@@ -14,7 +14,7 @@ import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, 
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
 import { inr, variantText } from "@/lib/utils";
-import { trackPurchase, trackMeta } from "@/lib/analytics";
+import { trackPurchase, trackMeta, trackGoogleConversion, GCONV } from "@/lib/analytics";
 
 type PItem = {
   _id?: string;
@@ -127,6 +127,7 @@ export default function CheckoutPage() {
       if (pv.success && !icFired.current) {
         icFired.current = true;
         trackMeta("InitiateCheckout", { value: pv.checkout?.pricing?.total, currency: "INR", num_items: pv.checkout?.items?.length });
+        trackGoogleConversion(GCONV.checkout, pv.checkout?.pricing?.total);
       }
     });
     return () => { alive = false; };
