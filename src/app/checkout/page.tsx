@@ -82,6 +82,14 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [placed, setPlaced] = useState<Verified["orders"] | null>(null);
   const [underReview, setUnderReview] = useState<string | null>(null);
+  // Fire the Google Ads + Meta purchase conversion once, when the order-success screen shows.
+  const [paid, setPaid] = useState<{ id: string; value?: number; currency: string } | null>(null);
+  const purchaseTracked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!placed || !paid || purchaseTracked.current === paid.id) return;
+    purchaseTracked.current = paid.id;
+    trackPurchase(paid.id, paid.value, paid.currency);
+  }, [placed, paid]);
 
   useEffect(() => {
     const tk = getToken();
@@ -223,8 +231,8 @@ export default function CheckoutPage() {
         setPaying(false);
         if (v?.success) {
           if (!direct) setAppliedCoupon(undefined);
-          // Google Ads purchase conversion; the Razorpay order id keeps it to one per order.
-          trackPurchase(resp.razorpay_order_id, typeof init.amount === "number" ? init.amount / 100 : undefined, init.currency ?? "INR");
+          // Record the order; the success-screen effect fires the purchase conversion once.
+          setPaid({ id: resp.razorpay_order_id, value: typeof init.amount === "number" ? init.amount / 100 : undefined, currency: init.currency ?? "INR" });
           setPlaced(v.orders ?? []);
         } else if (v?.code === "PAYMENT_UNDER_REVIEW") {
           setUnderReview(v.message ?? "Payment received. Your order is being confirmed.");
