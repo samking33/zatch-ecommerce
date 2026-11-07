@@ -62,7 +62,17 @@ function translateActionUrl(url: string): string | undefined {
   return undefined; // unknown deep link -> let the type-based fallback decide
 }
 
+// Offer notifications sent to the seller carry the buyer's /bargains/<id> link (or, once the
+// buyer accepts a counter, /orders/<bargainId>, which is no order), so they open the seller's list.
+const SELLER_BARGAIN: Record<string, string> = {
+  bargain_new: "/seller/bargains",
+  bargain_buyer_countered: "/seller/bargains",
+  bargain_buyer_accepted: "/seller/bargains?tab=history",
+  bargain_buyer_rejected: "/seller/bargains?tab=history",
+};
+
 function hrefFor(n: { type?: string; actionUrl?: string }): string | undefined {
+  if (n.type && SELLER_BARGAIN[n.type]) return SELLER_BARGAIN[n.type];
   if (n.actionUrl?.startsWith("/")) {
     const mapped = translateActionUrl(n.actionUrl);
     if (mapped) return mapped;
@@ -180,7 +190,8 @@ export default function NotificationsPage() {
                     </p>
                   )}
                 </button>
-                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {/* Always visible on touch screens; with a mouse they appear on hover or keyboard focus. */}
+                <div className="flex shrink-0 items-center gap-1 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-within:opacity-100">
                   {!isRead && (
                     <button onClick={() => markRead(n._id)} aria-label="Mark read" className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface hover:text-ink">
                       <Check className="h-4 w-4" />
