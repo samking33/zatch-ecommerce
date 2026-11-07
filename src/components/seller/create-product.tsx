@@ -20,7 +20,8 @@ const MAX_PHOTOS = 8;
 export type EditableProduct = Product & {
   hsn?: string | null; model?: string; condition?: string;
   productType?: { hasColor?: boolean; hasSize?: boolean };
-  shipping?: Product["shipping"] & { freeShipping?: boolean; weight?: number; dimensions?: { length?: number; breadth?: number; height?: number } };
+  // The model stores the parcel's breadth as `width`.
+  shipping?: Product["shipping"] & { freeShipping?: boolean; shippingFee?: number | null; weight?: number; dimensions?: { length?: number; width?: number; height?: number } };
 };
 
 // Real 4-step create matching the backend: step 1 (basics → productId),
@@ -69,7 +70,7 @@ export function CreateProduct({ categories, pickup = false, initial }: { categor
   });
   // Packed parcel for Shiprocket, pickup sellers only.
   const dims = initial?.shipping?.dimensions;
-  const [pkg, setPkg] = useState({ weightKg: str(initial?.shipping?.weight), lengthCm: str(dims?.length), breadthCm: str(dims?.breadth), heightCm: str(dims?.height) });
+  const [pkg, setPkg] = useState({ weightKg: str(initial?.shipping?.weight), lengthCm: str(dims?.length), breadthCm: str(dims?.width), heightCm: str(dims?.height) });
   const [suggesting, setSuggesting] = useState(false);
   const [suggestNote, setSuggestNote] = useState<string | null>(null);
   const uniq = (xs: (string | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x && x.toLowerCase() !== "none"))];
@@ -146,6 +147,10 @@ export function CreateProduct({ categories, pickup = false, initial }: { categor
   }
 
   const hasBargain = s1.autoAcceptDiscount !== "" || s1.maximumDiscount !== "";
+  // A self-ship product's own delivery fee (set in the app) is what checkout charges. v1 step 1
+  // drops it, so the buyer would get the default fee instead; v2 keeps it when it is sent back.
+  // Without one, v1 leaves the default in place (v2 would store 0, i.e. free).
+  const keepFee = editing && !pickup && initial?.shipping?.shippingFee != null;
   // The backend quietly clamps a too-high discounted price down to the price, so catch it here.
   function step1Problem(): string | null {
     const price = Number(s1.price);
@@ -208,7 +213,8 @@ export function CreateProduct({ categories, pickup = false, initial }: { categor
       orderAcceptingType: s1.orderAcceptingType,
       ...(hasBargain ? { bargainSettings: { autoAcceptDiscount: Number(s1.autoAcceptDiscount), maximumDiscount: Number(s1.maximumDiscount) } } : {}),
       ...(pickup ? { weightKg: Number(pkg.weightKg), lengthCm: Number(pkg.lengthCm), breadthCm: Number(pkg.breadthCm), heightCm: Number(pkg.heightCm) } : {}),
-    }, pickup ? "/api/v3/product/create-v3" : undefined);
+      ...(keepFee ? { shippingFee: initial?.shipping?.shippingFee } : {}),
+    }, pickup ? "/api/v3/product/create-v3" : keepFee ? "/api/v1/product/create-v2" : undefined);
     if (!res?.success || !res.productId) {
       setBusy(false);
       setError(res?.message ?? "Couldn't save. Check the fields.");
