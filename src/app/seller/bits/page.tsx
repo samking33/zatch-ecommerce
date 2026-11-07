@@ -61,11 +61,15 @@ export default async function SellerBitsPage({ searchParams }: { searchParams: P
   const list = dash?.buyBits ?? [];
   const open = list.find((b) => b._id === openId);
 
+  // The server's summary counts only Bits posted in the period (a quiet week reads 0 even when
+  // older Bits are being watched), so say so, and show the all-time views of every Bit too.
+  const posted = `on Bits posted ${period.label.toLowerCase()}`;
   const kpis = [
-    { icon: Eye, label: "Views", value: compact(perf.views ?? 0) },
-    { icon: TrendingUp, label: "Revenue from Bits", value: perf.revenue ?? "₹0" },
-    { icon: Activity, label: "Avg engagement", value: perf.avgEngagement ?? "0%" },
+    { icon: Eye, label: `Views ${posted}`, value: compact(perf.views ?? 0) },
+    { icon: TrendingUp, label: `Revenue ${posted}`, value: perf.revenue ?? "₹0" },
+    { icon: Activity, label: `Avg engagement ${posted}`, value: perf.avgEngagement ?? "0%" },
   ];
+  const allViews = list.reduce((n, b) => n + (b.viewCount ?? 0), 0);
 
   return (
     <SellerShell>
@@ -97,6 +101,7 @@ export default async function SellerBitsPage({ searchParams }: { searchParams: P
           </div>
         ))}
       </div>
+      {list.length > 0 && <p className="mt-3 px-1 text-[13px] text-muted">All {list.length} of your Bits: {compact(allViews)} views in total.</p>}
 
       {/* Keyed by Bit, so the edit form never carries one Bit's fields over to another. */}
       {open && <BitDetails key={open._id} bit={open} myProducts={myProducts ?? []} closeHref={href()} />}
@@ -119,7 +124,7 @@ export default async function SellerBitsPage({ searchParams }: { searchParams: P
                     <Play className="h-3 w-3 fill-current" />
                   </span>
                   <div className="absolute right-2 top-2 z-10">
-                    <BitActions bitId={b._id} isActive={(b as BitStats).status?.toLowerCase() !== "inactive"} />
+                    <BitActions bitId={b._id} isActive={(b as BitStats).status?.toLowerCase() !== "inactive"} editHref={`${href(b._id)}#bit-details`} />
                   </div>
                   <div className="absolute inset-x-2 bottom-2">
                     <p className="line-clamp-1 text-[12px] font-semibold text-white">{b.title}</p>

@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Eye, EyeOff, Trash2, Loader2, Send } from "lucide-react";
+import { MoreHorizontal, Eye, EyeOff, Trash2, Loader2, Send, Pencil } from "lucide-react";
 import { bits as bitsApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
 /** Seller reel actions → PATCH /bits/:id/action (Activate | Deactivate | Delete). */
-export function BitActions({ bitId, isActive = true }: { bitId: string; isActive?: boolean }) {
+export function BitActions({ bitId, isActive = true, editHref }: { bitId: string; isActive?: boolean; editHref: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on Escape and on a click outside, like the Categories menu.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
 
   async function run(action: "Activate" | "Deactivate" | "Delete") {
     const t = getToken();
@@ -27,16 +39,22 @@ export function BitActions({ bitId, isActive = true }: { bitId: string; isActive
   }
 
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Bit actions"
+        aria-expanded={open}
         className="grid h-7 w-7 place-items-center rounded-full bg-white/85 text-ink backdrop-blur"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-hairline bg-surface shadow-lg">
+          {/* Editing lives in the Bit's details panel; this is the way in from the menu. */}
+          <Link href={editHref} onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[13px] font-medium text-ink transition-colors hover:bg-surface-2">
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </Link>
           {isActive ? (
             <Item onClick={() => run("Deactivate")} icon={EyeOff} label="Deactivate" />
           ) : (

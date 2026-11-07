@@ -152,10 +152,20 @@ export function BitModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [go, onClose]);
 
+  // Announced as a pop-up, with keyboard focus moved into it and handed back when it closes.
+  const hasList = list.length > 0;
+  useEffect(() => {
+    if (!hasList) return;
+    const before = document.activeElement as HTMLElement | null;
+    root.current?.focus();
+    return () => before?.focus?.();
+  }, [hasList]);
+
   if (list.length === 0) return null;
 
   return (
-    <div ref={root} onWheel={onWheel} className="fixed inset-0 z-[100] overflow-hidden overscroll-none bg-ink/85 backdrop-blur-sm">
+    <div ref={root} onWheel={onWheel} role="dialog" aria-modal="true" aria-label="Videos" tabIndex={-1}
+      className="fixed inset-0 z-[100] overflow-hidden overscroll-none bg-ink/85 outline-none backdrop-blur-sm">
       <div ref={track} className="will-change-transform">
         {list.map((b, j) => (
           <div key={b._id} onClick={onClose} className="flex h-[100dvh] items-center justify-center md:p-3">
