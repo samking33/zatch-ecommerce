@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Wallet, TrendingUp, Target, ShoppingBag, PlugZap, TriangleAlert, CircleCheck, CircleDashed } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
-import { getReports, roas, sumMetrics, PLATFORM_LABEL, PLATFORM_COLOR, type Metrics, type Report, type Campaign, type Platform } from "@/lib/marketing";
+import { getReports, roas, sumMetrics, dateRange, PLATFORM_LABEL, PLATFORM_COLOR, type Metrics, type Report, type Campaign, type Platform, type Day } from "@/lib/marketing";
 import { eventHealth, type EventHealth } from "@/lib/event-health";
 import { inr, compact } from "@/lib/utils";
 
@@ -150,6 +150,128 @@ function CampaignTable({ rows }: { rows: (Campaign & { platform: Platform })[] }
   );
 }
 
+type Series = { platform: Platform; byDate: Map<string, Day> };
+
+const shortDate = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/**
+ * One metric per day, stacked by platform. Spend and revenue get a chart each
+ * rather than sharing one with two scales; both are rupees, but a second chart
+ * keeps every bar readable on its own.
+ */
+function DailyBars({ title, metric, dates, series }: { title: string; metric: "spend" | "revenue"; dates: string[]; series: Series[] }) {
+  const rows = dates.map((date) => {
+    const parts = series.map((s) => ({ platform: s.platform, value: s.byDate.get(date)?.[metric] ?? 0 }));
+    return { date, parts, total: parts.reduce((sum, p) => sum + p.value, 0) };
+  });
+  const peak = Math.max(1, ...rows.map((r) => r.total));
+  const total = rows.reduce((sum, r) => sum + r.total, 0);
+
+  return (
+    <div className="card rounded-[1.5rem] p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[13px] font-medium text-muted">{title}</p>
+        <p className="font-display text-[17px] font-semibold tabular-nums text-ink">{inr(total)}</p>
+      </div>
+      {series.length > 1 && (
+        <ul className="mt-2 flex gap-4 text-[12px] text-muted" aria-label="Legend">
+          {series.map((s) => (
+            <li key={s.platform} className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: PLATFORM_COLOR[s.platform] }} />
+              {PLATFORM_LABEL[s.platform]}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* One recessive reference line at the peak instead of a full axis. Its label
+          sits above the plot, where the tallest bar can never run into it. */}
+      <p aria-hidden className="mt-4 text-[11px] tabular-nums text-muted">{inr(peak)}</p>
+      <div className="mt-1 h-36 border-t border-dashed border-hairline">
+        <div className="flex h-full items-end gap-[2px]" role="img" aria-label={`${title}: ${inr(total)} over ${dates.length} days, highest ${inr(peak)} in a day`}>
+          {rows.map((r) => (
+            <div
+              key={r.date}
+              // ponytail: the native title tooltip; the table below carries the same numbers for keyboards and screen readers.
+              title={`${shortDate(r.date)} · ${r.parts.map((p) => `${PLATFORM_LABEL[p.platform]} ${inr(p.value)}`).join(" · ")}${r.parts.length > 1 ? ` · total ${inr(r.total)}` : ""}`}
+              className="flex h-full min-w-0 flex-1 flex-col justify-end hover:opacity-75"
+            >
+              {r.total > 0 && (
+                <div className="flex flex-col-reverse gap-[2px] overflow-hidden rounded-t-[4px]" style={{ height: `${(r.total / peak) * 100}%` }}>
+                  {r.parts.filter((p) => p.value > 0).map((p) => (
+                    <div key={p.platform} style={{ flex: `${p.value} 1 0`, background: PLATFORM_COLOR[p.platform] }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-2 flex justify-between text-[11px] text-muted">
+        <span>{shortDate(dates[0])}</span>
+        <span>{shortDate(dates[dates.length - 1])}</span>
+      </div>
+    </div>
+  );
+}
+
+function Trend({ live, days }: { live: Live[]; days: number }) {
+  if (live.every((r) => r.daily.length === 0)) return null;
+  const { since, until } = dateRange(days);
+  // Every day in the range, so a day with no spend reads as a gap rather than vanishing.
+  const dates: string[] = [];
+  for (let d = new Date(`${since}T00:00:00Z`); d <= new Date(`${until}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  const series: Series[] = live.map((r) => ({ platform: r.platform, byDate: new Map(r.daily.map((d) => [d.date, d])) }));
+  // Both platforms for one day, as Metrics so ratio() can price it.
+  const day = (date: string) =>
+    series.reduce((m, s) => {
+      m.spend += s.byDate.get(date)?.spend ?? 0;
+      m.revenue += s.byDate.get(date)?.revenue ?? 0;
+      return m;
+    }, sumMetrics([]));
+
+  return (
+    <>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <DailyBars title="Daily spend" metric="spend" dates={dates} series={series} />
+        <DailyBars title="Daily revenue" metric="revenue" dates={dates} series={series} />
+      </div>
+      <details className="card mt-4 rounded-[1.5rem] px-5 py-3">
+        <summary className="cursor-pointer text-[13px] font-medium text-ink">Daily figures as a table</summary>
+        <div className="mt-3 max-h-80 overflow-auto">
+          <table className="w-full border-collapse text-left text-[13px]">
+            <caption className="sr-only">Spend, revenue and return per day, all platforms combined</caption>
+            <thead>
+              <tr className="border-b border-hairline text-[12px] uppercase tracking-wide text-muted">
+                <th scope="col" className="py-2 font-medium">Date</th>
+                <th scope="col" className="py-2 text-right font-medium">Spend</th>
+                <th scope="col" className="py-2 text-right font-medium">Revenue</th>
+                <th scope="col" className="py-2 text-right font-medium">ROAS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...dates].reverse().map((date) => {
+                const m = day(date);
+                return (
+                  <tr key={date} className="border-b border-hairline last:border-0">
+                    <th scope="row" className="py-2 font-normal text-ink">{shortDate(date)}</th>
+                    <td className="py-2 text-right tabular-nums text-ink-soft">{inr(m.spend)}</td>
+                    <td className="py-2 text-right tabular-nums text-ink-soft">{inr(m.revenue)}</td>
+                    <td className="py-2 text-right tabular-nums text-ink">{ratio(m)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </>
+  );
+}
+
 // Every event the site fires, in funnel order, so one that never arrives still gets a row.
 const TRACKED: [string, string][] = [
   ["ViewContent", "Product views"],
@@ -268,6 +390,8 @@ export default async function MarketingPage({ searchParams }: { searchParams: Pr
           ))}
         </div>
       )}
+
+      <Trend live={live} days={days} />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {reports.map((r) => <PlatformCard key={r.platform} report={r} />)}

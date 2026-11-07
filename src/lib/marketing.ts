@@ -28,8 +28,13 @@ export type Metrics = {
 
 export type Campaign = Metrics & { id: string; name: string };
 
+/** One calendar day for one platform, in the platform's own account timezone. */
+export type Day = { date: string; spend: number; revenue: number };
+
 export type Report =
-  | { platform: Platform; status: "ok"; campaigns: Campaign[]; totals: Metrics; funnel: boolean }
+  // `daily` may be empty while `campaigns` is not: the trend is a second request,
+  // and its failing should cost the chart, not the whole report.
+  | { platform: Platform; status: "ok"; campaigns: Campaign[]; totals: Metrics; funnel: boolean; daily: Day[] }
   // "off" is missing credentials and "error" is a call that failed; the dashboard
   // shows them differently because only one of the two is anyone's fault.
   | { platform: Platform; status: "off" | "error"; reason: string };
@@ -79,6 +84,7 @@ const num = (v: unknown) => Number(v ?? 0) || 0;
 
 type MetaAction = { action_type?: string; value?: string };
 type MetaRow = {
+  date_start?: string;
   campaign_id?: string;
   campaign_name?: string;
   spend?: string;
@@ -123,24 +129,30 @@ async function fetchMeta(since: string, until: string): Promise<Report> {
   }
 
   const act = account.startsWith("act_") ? account : `act_${account}`;
-  const query = new URLSearchParams({
-    level: "campaign",
-    fields: "campaign_id,campaign_name,spend,impressions,clicks,actions,action_values",
-    time_range: JSON.stringify({ since, until }),
-    limit: "500",
-  });
-
-  try {
-    // The token goes in the header, never the query string, so it cannot be
-    // captured by anything that logs request URLs.
-    const res = await fetch(`${META_API}/${act}/insights?${query}`, {
+  const range = JSON.stringify({ since, until });
+  // The token goes in the header, never the query string, so it cannot be
+  // captured by anything that logs request URLs.
+  const insights = (params: Record<string, string>) =>
+    fetch(`${META_API}/${act}/insights?${new URLSearchParams({ time_range: range, limit: "500", ...params })}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
+
+  try {
+    const [res, dailyRes] = await Promise.all([
+      insights({ level: "campaign", fields: "campaign_id,campaign_name,spend,impressions,clicks,actions,action_values" }),
+      insights({ level: "account", fields: "spend,action_values", time_increment: "1" }).catch(() => null),
+    ]);
     const body = await res.json();
     if (!res.ok) return { platform: "meta", status: "error", reason: body?.error?.message ?? `Meta API returned ${res.status}.` };
     const campaigns: Campaign[] = (body?.data ?? []).map(toMetaCampaign);
-    return { platform: "meta", status: "ok", campaigns, totals: sumMetrics(campaigns), funnel: true };
+
+    const dailyBody = dailyRes?.ok ? await dailyRes.json().catch(() => null) : null;
+    const daily: Day[] = (dailyBody?.data ?? [])
+      .filter((r: MetaRow) => r.date_start)
+      .map((r: MetaRow) => ({ date: r.date_start as string, spend: num(r.spend), revenue: pickAction(r.action_values ?? [], "purchase") }));
+
+    return { platform: "meta", status: "ok", campaigns, totals: sumMetrics(campaigns), funnel: true, daily };
   } catch {
     return { platform: "meta", status: "error", reason: "Couldn't reach the Meta API." };
   }
@@ -149,6 +161,7 @@ async function fetchMeta(since: string, until: string): Promise<Report> {
 // --- Google (Ads API, GAQL) ---
 
 type GoogleRow = {
+  segments?: { date?: string };
   campaign?: { id?: string; name?: string };
   metrics?: { costMicros?: string; impressions?: string; clicks?: string; conversions?: number; conversionsValue?: number };
 };
@@ -185,19 +198,28 @@ async function fetchGoogle(since: string, until: string): Promise<Report> {
     if (!accessToken) return { platform: "google", status: "error", reason: "Google refused the refresh token." };
 
     const managerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replace(/-/g, "");
-    const res = await fetch(`${GOOGLE_ADS_API}/customers/${customerId}/googleAds:search`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "developer-token": developerToken,
-        "Content-Type": "application/json",
-        ...(managerId ? { "login-customer-id": managerId } : {}),
-      },
-      body: JSON.stringify({ query: gaql }),
-      cache: "no-store",
-    });
+    const search = (query: string) =>
+      fetch(`${GOOGLE_ADS_API}/customers/${customerId}/googleAds:search`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "developer-token": developerToken,
+          "Content-Type": "application/json",
+          ...(managerId ? { "login-customer-id": managerId } : {}),
+        },
+        body: JSON.stringify({ query }),
+        cache: "no-store",
+      });
+
+    const dailyGaql = `SELECT segments.date, metrics.cost_micros, metrics.conversions_value FROM customer WHERE segments.date BETWEEN '${since}' AND '${until}'`;
+    const [res, dailyRes] = await Promise.all([search(gaql), search(dailyGaql).catch(() => null)]);
     const body = await res.json();
     if (!res.ok) return { platform: "google", status: "error", reason: body?.error?.message ?? `Google Ads API returned ${res.status}.` };
+
+    const dailyBody = dailyRes?.ok ? await dailyRes.json().catch(() => null) : null;
+    const daily: Day[] = (dailyBody?.results ?? [])
+      .filter((r: GoogleRow) => r.segments?.date)
+      .map((r: GoogleRow) => ({ date: r.segments?.date as string, spend: num(r.metrics?.costMicros) / 1e6, revenue: num(r.metrics?.conversionsValue) }));
 
     const campaigns: Campaign[] = (body?.results ?? []).map((row: GoogleRow) => ({
       id: row.campaign?.id ?? "",
@@ -212,7 +234,7 @@ async function fetchGoogle(since: string, until: string): Promise<Report> {
       purchases: num(row.metrics?.conversions),
       revenue: num(row.metrics?.conversionsValue),
     }));
-    return { platform: "google", status: "ok", campaigns, totals: sumMetrics(campaigns), funnel: false };
+    return { platform: "google", status: "ok", campaigns, totals: sumMetrics(campaigns), funnel: false, daily };
   } catch {
     return { platform: "google", status: "error", reason: "Couldn't reach the Google Ads API." };
   }
