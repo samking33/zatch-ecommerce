@@ -62,7 +62,7 @@ const QUIET_DAYS = 7;
  * live rooms (the chat box) and the seller console.
  */
 // `/seller/<user id>` is a public shop, so it keeps the prompt; the rest of /seller is the console.
-const HIDDEN_ON = [/^\/checkout/, /^\/live\//, /^\/seller\/(?![0-9a-f]{24}(\/|$))/i];
+const HIDDEN_ON = [/^\/checkout/, /^\/live\//, /^\/admin/, /^\/seller\/(?![0-9a-f]{24}(\/|$))/i];
 
 export function AppPrompt() {
   const path = usePathname();
