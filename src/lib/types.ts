@@ -22,6 +22,9 @@ export interface Product {
   description?: string;
   price: number;
   discountedPrice?: number;
+  // Set by the server while a Zatch Hours event discounts this seller; `discountedPrice`
+  // is then already the event price, and bargaining is paused.
+  specialHourPercent?: number;
   images: ProductImage[];
   category: string;
   subCategory?: string;

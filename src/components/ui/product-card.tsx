@@ -15,9 +15,10 @@ export function ProductCard({ product, i = 0 }: { product: Product; i?: number }
       : 0;
   const rating = product.averageRating ?? product.analytics?.averageRating ?? 0;
   const img = product.images?.[0]?.url;
+  const event = (product.specialHourPercent ?? 0) > 0;
   // ponytail: Zatch is bargain-first, so the badge shows unless a seller
-  // explicitly disabled it (maximumDiscount === 0).
-  const canBargain = product.bargainSettings?.maximumDiscount !== 0;
+  // explicitly disabled it (maximumDiscount === 0) or Zatch Hours has paused bargaining.
+  const canBargain = !event && product.bargainSettings?.maximumDiscount !== 0;
 
   return (
     <Link
@@ -33,7 +34,7 @@ export function ProductCard({ product, i = 0 }: { product: Product; i?: number }
         />
         {off > 0 && (
           <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-surface">
-            −{off}%
+            {event ? "Zatch Hours " : ""}−{off}%
           </span>
         )}
         {canBargain && (

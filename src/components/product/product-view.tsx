@@ -194,6 +194,11 @@ export function ProductView({ product }: { product: Product }) {
               <span className="text-lg text-muted line-through">{inr(product.price)}</span>
             )}
           </div>
+          {(product.specialHourPercent ?? 0) > 0 && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1 text-[13px] font-semibold text-lime-ink">
+              <Zap className="h-3.5 w-3.5" /> Zatch Hours: {product.specialHourPercent}% off for a limited time. Bargaining is paused for this seller.
+            </p>
+          )}
 
           {shownColors.length > 0 && (
             <div className="mt-6">
