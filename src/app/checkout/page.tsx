@@ -19,6 +19,7 @@ import { trackPurchase, trackBeginCheckout, trackAddPaymentInfo, type TrackItem 
 type PItem = {
   _id?: string;
   product?: { _id?: string; name?: string; price?: number; images?: { url?: string }[]; sellerId?: string };
+  shipping?: { fulfilmentMode?: string };
   variant?: { color?: string | null; size?: string | null };
   qty?: number;
   cartPrice?: number;
@@ -167,6 +168,9 @@ export default function CheckoutPage() {
   // only with its own share and the rest is shown as the event offer.
   const couponSaving = Math.min(sum.discount ?? 0, preview?.checkout?.coupon?.discount ?? 0);
   const offerSaving = Math.max(0, (sum.discount ?? 0) - couponSaving);
+  // Zatch-pickup items are quoted by Shiprocket from the delivery pincode, so with no address
+  // yet the server leaves the whole shipping at 0. Self-ship-only orders get a real fee anyway.
+  const shippingPending = !selected && lines.some((l) => l.shipping?.fulfilmentMode === "zatch_pickup");
 
   // Coupons from the sellers in this order that cover at least one of its products.
   const [offers, setOffers] = useState<Coupon[]>([]);
@@ -421,8 +425,7 @@ export default function CheckoutPage() {
                 {productSaving > 0 && <PRow label="Discount on MRP" value={`− ${inr(productSaving)}`} />}
                 {couponSaving ? <PRow label="Coupon" value={`− ${inr(couponSaving)}`} /> : null}
                 {offerSaving ? <PRow label="Zatch Hours offer" value={`− ${inr(offerSaving)}`} /> : null}
-                {/* Without an address the server can't quote shipping yet and sends 0. */}
-                {sum.shipping != null && <PRow label="Shipping" value={!selected ? "At address" : sum.shipping ? inr(sum.shipping) : "Free"} />}
+                {sum.shipping != null && <PRow label="Shipping" value={shippingPending ? "At address" : sum.shipping ? inr(sum.shipping) : "Free"} />}
                 <div className="border-t border-hairline pt-2.5">
                   <PRow label="Total" value={pricing ? "…" : inr(sum.total ?? 0)} strong />
                 </div>
