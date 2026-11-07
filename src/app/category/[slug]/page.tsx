@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
-import { AdSlot } from "@/components/ads/ad-slot";
-import { products as productsApi, categories as categoriesApi } from "@/lib/api";
+import { AdRow } from "@/components/ads/ad-slot";
+import { products as productsApi, categories as categoriesApi, ads as adsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import type { Category } from "@/lib/types";
 
@@ -19,12 +19,13 @@ export default async function CategoryPage({
   const decoded = decodeURIComponent(slug);
   const t = await serverToken();
 
-  const [products, cats] = await Promise.all([
+  const [products, cats, listingAds] = await Promise.all([
     productsApi.filter(
       { category: decoded, subCategory: sub || undefined, limit: 40 },
       t,
     ),
     categoriesApi.list(),
+    adsApi.list("product_listing"),
   ]);
 
   // Ads (and anything else built from a category id) link by id; send those to the slug URL.
@@ -73,7 +74,7 @@ export default async function CategoryPage({
         </div>
       )}
 
-      <AdSlot placement="product_listing" className="mb-4" />
+      <AdRow ads={listingAds ?? []} className="mb-4" />
 
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">

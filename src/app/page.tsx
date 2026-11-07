@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { HeroBanner } from "@/components/home/hero-banner";
-import { AdSlot, AdPopup } from "@/components/ads/ad-slot";
+import { AdRow, AdPopup } from "@/components/ads/ad-slot";
 import { Rail } from "@/components/home/rail";
 import { VideoRail } from "@/components/home/video-rail";
 import { LiveRailCard, ProductRailCard, SellerRailCard, type RailSeller } from "@/components/home/rail-cards";
-import { api, catalog, users } from "@/lib/api";
+import { api, catalog, users, ads as adsApi } from "@/lib/api";
 import type { Bit } from "@/lib/types";
 import { serverToken } from "@/lib/session";
 
@@ -17,12 +17,13 @@ export const metadata = {
 export default async function HomePage() {
   const t = await serverToken();
   // Same rows as the app's home: live, Bits, top picks, trending, sellers to follow.
-  const [topPicks, live, bits, trending, sellers] = await Promise.all([
+  const [topPicks, live, bits, trending, sellers, bannerAds] = await Promise.all([
     catalog.topPicks(t),
     catalog.liveSessions(t),
     catalog.bits(t),
     api<{ bits?: Bit[] }>("/trending/trending", { token: t, raw: true }),
     t ? (users.all(t, { limit: "12" }) as Promise<RailSeller[] | null>) : Promise.resolve(null),
+    adsApi.list("home_banner"),
   ]);
 
   const products = topPicks ?? [];
@@ -54,7 +55,7 @@ export default async function HomePage() {
       <Nav />
       <main className="mx-auto max-w-[1400px] px-3 pb-16 pt-2 sm:px-5">
         <HeroBanner liveCount={onAir.length} topProduct={products[0]} topBit={bitList[0]} images={heroImages} />
-        <AdSlot placement="home_banner" className="mt-4" />
+        <AdRow ads={bannerAds ?? []} className="mt-4" />
         <AdPopup />
 
         {feed.length > 0 && (

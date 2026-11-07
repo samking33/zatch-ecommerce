@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
-import { AdSlot } from "@/components/ads/ad-slot";
-import { products as productsApi, categories as categoriesApi } from "@/lib/api";
+import { AdRow } from "@/components/ads/ad-slot";
+import { products as productsApi, categories as categoriesApi, ads as adsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 
 export const metadata = { title: "Shop all" };
@@ -24,7 +24,7 @@ export default async function ShopPage({
   const { category = "", sort = "", min = "", max = "", stock = "" } = await searchParams;
   const t = await serverToken();
 
-  const [products, categories] = await Promise.all([
+  const [products, categories, listingAds] = await Promise.all([
     // `filter` honours category/price/stock; `products` does not.
     productsApi.filter(
       {
@@ -38,6 +38,7 @@ export default async function ShopPage({
       t,
     ),
     categoriesApi.list(),
+    adsApi.list("product_listing"),
   ]);
 
   const items = products ?? [];
@@ -117,7 +118,7 @@ export default async function ShopPage({
         )}
       </form>
 
-      <AdSlot placement="product_listing" className="mb-4" />
+      <AdRow ads={listingAds ?? []} className="mb-4" />
 
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">

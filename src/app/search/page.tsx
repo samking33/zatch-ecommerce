@@ -3,9 +3,9 @@ import Image from "next/image";
 import { TrendingUp, Clock, Search as SearchIcon, Play, Users as UsersIcon } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { TrackSearch } from "@/components/analytics/track-event";
-import { AdSlot } from "@/components/ads/ad-slot";
+import { AdRow } from "@/components/ads/ad-slot";
 import { ProductCard } from "@/components/ui/product-card";
-import { api, search as searchApi, users } from "@/lib/api";
+import { api, search as searchApi, users, ads as adsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { compact } from "@/lib/utils";
 import type { Product } from "@/lib/types";
@@ -65,10 +65,12 @@ export default async function SearchPage({
   const tooShort = q.length > 0 && q.length < 3;
 
   // With a query: results. Without: discovery (popular + your history).
-  const [results, popular, history] = await Promise.all([
+  const [results, popular, history, searchAds] = await Promise.all([
     q && !tooShort ? api<Results>(`/search/search?${new URLSearchParams({ query: q })}`, { token: t, raw: true, revalidate: 0 }) : Promise.resolve(null),
     q && !tooShort ? Promise.resolve(null) : (searchApi.popular() as Promise<Popular[] | null>),
     (q && !tooShort) || !t ? Promise.resolve(null) : (users.searchHistory(t) as Promise<HistoryEntry[] | null>),
+    // Only the results view shows the search placement.
+    q && !tooShort ? adsApi.list("search") : Promise.resolve(null),
   ]);
 
   const items = results?.products ?? [];
@@ -163,7 +165,7 @@ export default async function SearchPage({
           </Link>
         ))}
       </nav>
-      <AdSlot placement="search" className="mb-6" />
+      <AdRow ads={searchAds ?? []} className="mb-6" />
 
       {!tab && cats.length > 0 && (
         <div className="mb-6 flex flex-wrap gap-2">

@@ -234,7 +234,6 @@ export const products = {
     api(`/product/${id}/set-top-pick`, { method: "POST", body: b, token: t }),
 };
 
-// --- Categories & search (/category, /search) ---
 // --- Ads (/ads): promotions the admin schedules per placement ---
 export type AdPlacement = "home_banner" | "home_popup" | "product_listing" | "search" | "cart";
 // product, category and bit redirects carry an id; external carries an https URL.
@@ -250,6 +249,7 @@ export const ads = {
   list: (placement: AdPlacement) => api<Ad[]>(`/ads${qs({ placement, limit: 5 })}`, { pick: "data", revalidate: 60 }),
 };
 
+// --- Categories & search (/category, /search) ---
 export const categories = {
   list: () => api<Category[]>("/category", { pick: "categories" }),
   subcategories: (id: string) => api(`/category/${id}/subcategories`, { pick: "subCategories" }),

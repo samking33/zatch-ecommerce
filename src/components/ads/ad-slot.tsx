@@ -92,21 +92,29 @@ function useAds(placement: AdPlacement) {
   const [list, setList] = useState<Ad[]>([]);
   useEffect(() => {
     let alive = true;
-    adsApi.list(placement).then((r) => { if (alive && Array.isArray(r)) setList(r.filter((a) => a?.imageUrl)); });
+    adsApi.list(placement).then((r) => { if (alive && Array.isArray(r)) setList(r); });
     return () => { alive = false; };
   }, [placement]);
   return list;
 }
 
-/** The ads the admin has scheduled for one placement; renders nothing when there are none. */
-export function AdSlot({ placement, className = "" }: { placement: Exclude<AdPlacement, "home_popup">; className?: string }) {
-  const list = useAds(placement);
+/**
+ * Ads already fetched for a placement. Server pages fetch the list themselves and pass
+ * it in, so the banner arrives with the page instead of pushing the content down after.
+ */
+export function AdRow({ ads, className = "" }: { ads: Ad[]; className?: string }) {
+  const list = ads.filter((a) => a?.imageUrl);
   if (list.length === 0) return null;
   return (
     <section aria-label="Sponsored" className={`flex snap-x snap-mandatory gap-3 overflow-x-auto ${className}`}>
       {list.map((ad) => <AdCard key={ad._id} ad={ad} wide={list.length === 1} />)}
     </section>
   );
+}
+
+/** For client pages (the cart): fetches the placement's ads itself. */
+export function AdSlot({ placement, className = "" }: { placement: Exclude<AdPlacement, "home_popup">; className?: string }) {
+  return <AdRow ads={useAds(placement)} className={className} />;
 }
 
 const POPUP_KEY = "zatch_ad_popup_closed";
@@ -122,7 +130,7 @@ export function AdPopup() {
     if (list.length === 0) return;
     let closed: Record<string, number> = {};
     try { closed = JSON.parse(localStorage.getItem(POPUP_KEY) ?? "{}"); } catch { /* storage blocked */ }
-    const next = list.find((a) => !(Date.now() - (closed[a._id] ?? 0) < POPUP_QUIET_MS));
+    const next = list.find((a) => a?.imageUrl && !(Date.now() - (closed[a._id] ?? 0) < POPUP_QUIET_MS));
     if (!next) return;
     // A moment after the page settles, so it doesn't land on top of the first paint.
     const t = setTimeout(() => { setAd(next); dialog.current?.showModal(); }, 1500);
