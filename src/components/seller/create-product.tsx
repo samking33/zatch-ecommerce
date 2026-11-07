@@ -73,7 +73,9 @@ export function CreateProduct({ categories, pickup = false, initial }: { categor
   const [pkg, setPkg] = useState({ weightKg: str(initial?.shipping?.weight), lengthCm: str(dims?.length), breadthCm: str(dims?.width), heightCm: str(dims?.height) });
   const [suggesting, setSuggesting] = useState(false);
   const [suggestNote, setSuggestNote] = useState<string | null>(null);
-  const uniq = (xs: (string | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x && x.toLowerCase() !== "none"))];
+  // Placeholder "none" colours and sizes are kept, so a product stored with them can still be
+  // saved (dropping them left no colour or size, and the steps refused to continue).
+  const uniq = (xs: (string | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))];
   const [colors, setColors] = useState<string[]>(uniq(variants.map((v) => v.color)));
   const [colorInput, setColorInput] = useState("");
   const [colorNote, setColorNote] = useState<string | null>(null);

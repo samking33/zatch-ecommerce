@@ -261,6 +261,17 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
   // Side panel: products or comments. On phones it opens as a sheet over the video.
   const [panel, setPanel] = useState<"products" | "comments" | null>(null);
   const showComments = panel === "comments";
+  // The products panel always shows beside the video from md up; on phones only once opened.
+  // The quick-buy options load only while it is on screen, so scrolling the feed fetches nothing.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setWide(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  const productsShown = active && !showComments && (wide || panel === "products");
   const [shared, setShared] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
 
@@ -525,7 +536,7 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
                     </p>
                   </div>
                 </Link>
-                {active && <QuickBuy productId={p._id} bitId={bit._id} />}
+                {productsShown && <QuickBuy productId={p._id} bitId={bit._id} />}
                 </div>
               ))}
             </div>

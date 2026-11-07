@@ -20,7 +20,8 @@ export function ProductActions({ product }: { product: Product }) {
   // One request at a time: the server toggles, so a second click mid-request flipped it back.
   // The ref blocks clicks that land before React re-renders; the state greys the button.
   const [pending, setPending] = useState<"like" | "save" | null>(null);
-  const inFlight = useRef(false);
+  const liking = useRef(false);
+  const saving = useRef(false);
 
   // Real view tracking, once per mount.
   useEffect(() => {
@@ -37,19 +38,19 @@ export function ProductActions({ product }: { product: Product }) {
 
   // The button follows the server's answer, not the guess, so it always shows what is saved.
   async function like() {
-    const t = auth(); if (!t || inFlight.current) return;
-    inFlight.current = true; setPending("like");
+    const t = auth(); if (!t || liking.current) return;
+    liking.current = true; setPending("like");
     const res = await productsApi.like(product._id, t);
-    inFlight.current = false; setPending(null);
+    liking.current = false; setPending(null);
     if (typeof res?.isLiked !== "boolean" || res.isLiked === liked) return;
     setLiked(res.isLiked); setLikes((n) => Math.max(0, n + (res.isLiked ? 1 : -1)));
   }
 
   async function save() {
-    const t = auth(); if (!t || inFlight.current) return;
-    inFlight.current = true; setPending("save");
+    const t = auth(); if (!t || saving.current) return;
+    saving.current = true; setPending("save");
     const res = await productsApi.save(product._id, t);
-    inFlight.current = false; setPending(null);
+    saving.current = false; setPending(null);
     if (typeof res?.isSaved !== "boolean") return;
     setSaved(res.isSaved);
     if (res.isSaved && !saved) trackAddToWishlist(toItem(product));
