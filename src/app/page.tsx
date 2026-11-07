@@ -20,7 +20,8 @@ export default async function HomePage() {
   const [topPicks, live, bits, trending, sellers, bannerAds] = await Promise.all([
     catalog.topPicks(t),
     catalog.liveSessions(t),
-    catalog.bits(t),
+    // Three rails of 20; more only made the page heavier (QA BUG-030).
+    catalog.bits(t, 60),
     api<{ bits?: Bit[] }>("/trending/trending", { token: t, raw: true }),
     t ? (users.all(t, { limit: "12" }) as Promise<RailSeller[] | null>) : Promise.resolve(null),
     adsApi.list("home_banner"),

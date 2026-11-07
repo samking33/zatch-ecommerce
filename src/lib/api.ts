@@ -509,7 +509,10 @@ export const catalog = {
   categories: () => categories.list(),
   trending: (t?: string) => api<Product[]>("/trending/trending", { token: t, pick: "products", revalidate: 0 }),
   liveSessions: (t?: string) => api<LiveSession[]>("/live/sessions", { token: t, pick: "sessions" }),
-  // Home shows the whole feed, so new uploads flow in below the existing ones.
+  // Home shows the whole feed, so new uploads flow in below the existing ones. Fields no
+  // screen shows are dropped here: every Bit is serialised into the page for the players,
+  // and the descriptions alone were a fifth of it (QA BUG-030).
   bits: (t?: string, limit = 100) =>
-    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits", version: "v2", revalidate: t ? 0 : 60 }),
+    api<Bit[]>(`/bits/list?limit=${limit}`, { token: t, pick: "bits", version: "v2", revalidate: t ? 0 : 60 })
+      .then((list) => list?.map(({ description, shareLink, shareCount, ...bit }): Bit => bit) ?? null),
 };
