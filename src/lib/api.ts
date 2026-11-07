@@ -203,7 +203,6 @@ export const products = {
   topPicks: () => api<Product[]>("/product/top-picks", { version: "v2" }),
   // Backend search param is `query` (not `q`).
   search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
-  searchMine: (q: string, t: string) => api<Product[]>(`/product/search/my${qs({ query: q })}`, { token: t, pick: "products", revalidate: 0 }),
   filter: (o: Record<string, string | number | undefined>, t?: string) =>
     api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products", version: "v2" }),
   get: (id: string) => api<Product>(`/product/${id}`, { pick: "product", version: "v2" }),
@@ -215,9 +214,6 @@ export const products = {
   // Permanent: removes the product and its images. The server checks ownership.
   remove: (id: string, t: string) =>
     api(`/product/${id}/action`, { method: "POST", body: { action: "delete" }, token: t }),
-  // Never send `variants` here: the server rebuilds them without their colour photos.
-  edit: (id: string, b: { name: string; description: string; price: number; discountedPrice: number }, t: string) =>
-    api(`/product/${id}/action`, { method: "POST", body: { action: "edit", ...b }, token: t, keepError: true }),
   like: (id: string, t: string) => api(`/product/${id}/like`, { method: "POST", token: t }),
   save: (id: string, t: string) => api(`/product/${id}/save`, { method: "POST", token: t }),
   view: (id: string, t?: string) => api(`/product/${id}/view`, { method: "POST", token: t }),

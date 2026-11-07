@@ -4,7 +4,7 @@ import { SellerShell, SellerHeader, EmptyState } from "@/components/seller/selle
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { BecomeSeller } from "@/components/seller/become-seller";
 import { ProductManage } from "@/components/seller/product-manage";
-import { api, products as productsApi, users } from "@/lib/api";
+import { api, users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import { sellerGate } from "@/lib/seller-gate";
 import type { Product } from "@/lib/types";
@@ -28,7 +28,7 @@ const SORTS = [
 export default async function SellerProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; stock?: string; sort?: string; added?: string }>;
+  searchParams: Promise<{ q?: string; stock?: string; sort?: string; added?: string; updated?: string }>;
 }) {
   const t = await serverToken();
   if (!t) return <SellerShell><div className="pt-2"><SignInRequired what="your products" /></div></SellerShell>;
@@ -36,19 +36,22 @@ export default async function SellerProductsPage({
   const gate = await sellerGate(t);
   if (!gate.approved) return <SellerShell><BecomeSeller status={gate.status} display={gate.display} /></SellerShell>;
 
-  const { q = "", stock = "", sort = "", added = "" } = await searchParams;
+  const { q = "", stock = "", sort = "", added = "", updated = "" } = await searchParams;
   const serverSort = sort === "stock_low" || sort === "price_desc" ? sort : undefined;
+  // Search filters the full list here: /product/search/my returns stripped rows (no photos,
+  // variants or description), which showed every hit as broken and fed Edit wrong values.
+  // ponytail: my-products is unpaged, so this is the seller's whole catalogue.
   const [mine, me] = await Promise.all([
-    q
-      ? productsApi.searchMine(q, t).then((r) => ({ products: (r as Listing[] | null) ?? [] }))
-      : api<{ products?: Listing[]; inventoryStats?: { lowStockThreshold?: number } }>(
-          `/product/seller/my-products${serverSort ? `?sortBy=${serverSort}` : ""}`, { token: t, raw: true, revalidate: 0 }),
+    api<{ products?: Listing[]; inventoryStats?: { lowStockThreshold?: number } }>(
+      `/product/seller/my-products${serverSort ? `?sortBy=${serverSort}` : ""}`, { token: t, raw: true, revalidate: 0 }),
     users.profile(t),
   ]);
   const all = mine?.products ?? [];
-  const threshold = (mine as { inventoryStats?: { lowStockThreshold?: number } } | null)?.inventoryStats?.lowStockThreshold ?? 5;
+  const threshold = mine?.inventoryStats?.lowStockThreshold ?? 5;
   const stockOf = (p: Listing) => p.totalStock ?? 0;
+  const needle = q.trim().toLowerCase();
   const list = all
+    .filter((p) => !needle || (p.name ?? "").toLowerCase().includes(needle))
     .filter((p) => (stock === "out" ? stockOf(p) === 0 : stock === "low" ? stockOf(p) > 0 && stockOf(p) <= threshold : true))
     .sort((a, b) => (sort === "az" ? a.name.localeCompare(b.name) : 0));
   const href = (k: string, v: string) => {
@@ -80,6 +83,12 @@ export default async function SellerProductsPage({
           <p className="flex-1 font-semibold">Product published. Buyers can see it now.</p>
           <Link href={`/product/${added}`} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-surface">View product</Link>
           <Link href="/seller/products/new" className="rounded-full border border-lime-ink/30 px-4 py-2 text-sm font-semibold">Add another</Link>
+        </div>
+      )}
+      {/^[a-f\d]{24}$/i.test(updated) && (
+        <div role="status" className="mb-5 flex flex-wrap items-center gap-3 rounded-[1.5rem] bg-lime px-5 py-4 text-lime-ink">
+          <p className="flex-1 font-semibold">Changes saved.</p>
+          <Link href={`/product/${updated}`} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-surface">View product</Link>
         </div>
       )}
 
