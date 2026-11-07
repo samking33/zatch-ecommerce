@@ -28,7 +28,12 @@ type PItem = {
 type Preview = {
   success?: boolean;
   message?: string;
-  checkout?: { items?: PItem[]; pricing?: { subtotal?: number; discount?: number; shipping?: number; total?: number } };
+  checkout?: {
+    items?: PItem[];
+    // `discount` is the coupon plus any Zatch Hours tier discount; `coupon.discount` is the coupon's own share.
+    pricing?: { subtotal?: number; discount?: number; shipping?: number; total?: number };
+    coupon?: { code?: string; discount?: number } | null;
+  };
 };
 type Coupon = { _id: string; code: string; name?: string; discountText?: string; minSpend?: number; appliedProducts?: { _id: string }[] };
 type Init = {
@@ -158,6 +163,10 @@ export default function CheckoutPage() {
   const previewError = preview && preview.success === false ? preview.message ?? "Couldn't load prices." : null;
   const mrp = lines.reduce((s, l) => s + (l.product?.price ?? l.cartPrice ?? 0) * (l.qty ?? 1), 0);
   const productSaving = Math.max(0, mrp - (sum.subtotal ?? mrp));
+  // The server folds the Zatch Hours tier discount into `discount`, so the coupon is credited
+  // only with its own share and the rest is shown as the event offer.
+  const couponSaving = Math.min(sum.discount ?? 0, preview?.checkout?.coupon?.discount ?? 0);
+  const offerSaving = Math.max(0, (sum.discount ?? 0) - couponSaving);
 
   // Coupons from the sellers in this order that cover at least one of its products.
   const [offers, setOffers] = useState<Coupon[]>([]);
@@ -375,7 +384,7 @@ export default function CheckoutPage() {
                 {coupon ? (
                   <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-lime px-4 py-3">
                     <span className="text-sm font-semibold text-lime-ink">
-                      {coupon} applied{sum.discount ? ` · you save ${inr(sum.discount)}` : ""}
+                      {coupon} applied{couponSaving ? ` · you save ${inr(couponSaving)}` : ""}
                     </span>
                     <button onClick={removeCoupon} className="text-sm font-medium text-lime-ink/70 hover:text-lime-ink">Remove</button>
                   </div>
@@ -410,8 +419,10 @@ export default function CheckoutPage() {
               <dl className="mt-4 space-y-2.5 text-[15px]">
                 <PRow label={`Items (${lines.length})`} value={inr(mrp)} />
                 {productSaving > 0 && <PRow label="Discount on MRP" value={`− ${inr(productSaving)}`} />}
-                {sum.discount ? <PRow label="Coupon" value={`− ${inr(sum.discount)}`} /> : null}
-                {sum.shipping != null && <PRow label="Shipping" value={sum.shipping ? inr(sum.shipping) : "Free"} />}
+                {couponSaving ? <PRow label="Coupon" value={`− ${inr(couponSaving)}`} /> : null}
+                {offerSaving ? <PRow label="Zatch Hours offer" value={`− ${inr(offerSaving)}`} /> : null}
+                {/* Without an address the server can't quote shipping yet and sends 0. */}
+                {sum.shipping != null && <PRow label="Shipping" value={!selected ? "At address" : sum.shipping ? inr(sum.shipping) : "Free"} />}
                 <div className="border-t border-hairline pt-2.5">
                   <PRow label="Total" value={pricing ? "…" : inr(sum.total ?? 0)} strong />
                 </div>
