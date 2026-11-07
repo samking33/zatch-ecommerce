@@ -457,7 +457,7 @@ export function CreateProduct({ categories, pickup = false, initial }: { categor
         <div>
           <p className="text-[15px] text-muted">
             How many units of each are in stock? The total can&apos;t be more than the {declared} you entered.
-            {/* The server drops every variant with 0 stock (B-55), so buyers never see it. */}
+            {/* The server drops every variant with 0 stock (B-57), so buyers never see it. */}
             {rows.length > 1 && " Rows left at 0 won't be listed."}
           </p>
           <div className="mt-3 space-y-2">
