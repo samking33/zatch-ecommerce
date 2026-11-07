@@ -93,11 +93,13 @@ let identified = false;
 export function identify(user: { email?: string; phone?: string; countryCode?: unknown } | null) {
   identified = true;
   const email = user?.email?.trim().toLowerCase() || undefined;
-  const digits = user?.phone?.replace(/\D/g, "");
+  // Same rule as the backend's Meta report (utils/metaCapi.js), so one shopper
+  // hashes identically from both sides: country code + number, no leading zeros.
+  const national = user?.phone?.replace(/\D/g, "").replace(/^0+/, "");
   // ponytail: assumes +91 when the stored user has no country code, since sign-up
   // defaults to India; read it from the profile if other countries are added.
   const cc = typeof user?.countryCode === "string" ? user.countryCode.replace(/\D/g, "") : "91";
-  const phone = digits ? `+${digits.length > 10 ? digits : cc + digits}` : undefined;
+  const phone = national ? `+${cc}${national}` : undefined;
   identity = { email, phone };
 
   const w = window as unknown as { gtag?: Gtag };
