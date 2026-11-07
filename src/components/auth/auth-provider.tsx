@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   getUser,
   clearSession,
   isTokenExpired,
   type SessionUser,
 } from "@/lib/client-auth";
+import { identify } from "@/lib/analytics";
 
 type AuthCtx = {
   user: SessionUser | null;
@@ -33,6 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(getUser());
   }, []);
+
+  // Sign-in, sign-up and sign-out all pass through here, so attribution follows the
+  // session. The first run is skipped: `null` then means "not loaded yet", not
+  // "signed out", and would wipe an identity a page event already picked up.
+  const loaded = useRef(false);
+  useEffect(() => {
+    if (loaded.current) identify(user);
+    else loaded.current = true;
+  }, [user]);
 
   const logout = () => {
     clearSession();

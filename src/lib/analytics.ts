@@ -1,4 +1,5 @@
 import { variantText } from "@/lib/utils";
+import { getUser } from "@/lib/client-auth";
 
 /**
  * One call per shopper action, fanned out to every destination that needs it:
@@ -79,6 +80,30 @@ function eventId(seed?: string): string {
   }
 }
 
+// The signed-in shopper, for attribution. Kept only in memory for this tab.
+let identity: { email?: string; phone?: string } = {};
+let identified = false;
+
+/**
+ * Who is shopping, so the ad platforms can attribute a sale to the click that
+ * caused it. Google Enhanced Conversions hashes these in its tag; for Meta they
+ * go to our own relay, which hashes them before they leave our server.
+ * Called whenever the session user changes, including sign-out.
+ */
+export function identify(user: { email?: string; phone?: string; countryCode?: unknown } | null) {
+  identified = true;
+  const email = user?.email?.trim().toLowerCase() || undefined;
+  const digits = user?.phone?.replace(/\D/g, "");
+  // ponytail: assumes +91 when the stored user has no country code, since sign-up
+  // defaults to India; read it from the profile if other countries are added.
+  const cc = typeof user?.countryCode === "string" ? user.countryCode.replace(/\D/g, "") : "91";
+  const phone = digits ? `+${digits.length > 10 ? digits : cc + digits}` : undefined;
+  identity = { email, phone };
+
+  const w = window as unknown as { gtag?: Gtag };
+  if (typeof w.gtag === "function") w.gtag("set", "user_data", email || phone ? { email, phone_number: phone } : {});
+}
+
 /**
  * Send the same event server-side, where an ad blocker can't stop it. The id
  * matches the pixel's, so Meta counts one action rather than two. Fire and
@@ -89,7 +114,7 @@ function relay(event: string, id: string, params: Record<string, unknown> = {}) 
     fetch("/api/capi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, eventId: id, path: location.pathname, ...params }),
+      body: JSON.stringify({ event, eventId: id, path: location.pathname, ...params, ...identity }),
       keepalive: true,
     }).catch(() => {});
   } catch {
@@ -106,6 +131,10 @@ function send(opts: {
   conversion?: Record<string, unknown>;
   id?: string;
 }): string {
+  // React runs a page's effects before the auth provider's, so a page-load event
+  // can fire before anyone has been identified. Pick up the stored session first.
+  if (!identified) identify(getUser());
+
   const w = window as unknown as { gtag?: Gtag; fbq?: Fbq };
   const id = eventId(opts.id);
 
