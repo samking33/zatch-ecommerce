@@ -61,7 +61,8 @@ export default async function SellerPayoutsPage({ searchParams }: { searchParams
             href={p === PERIODS[0] ? "/seller/payouts" : `/seller/payouts?period=${encodeURIComponent(p)}`}
             className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${p === period ? "bg-ink text-surface" : "bg-surface-2 text-ink hover:bg-canvas"}`}
           >
-            {p}
+            {/* The server's values are title case; the other dashboard filters read "This week". */}
+            {p.charAt(0) + p.slice(1).toLowerCase()}
           </Link>
         ))}
       </div>

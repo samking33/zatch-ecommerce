@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Upload, Video, X, Plus, Pencil } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
 import { shrinkImage } from "@/lib/shrink-image";
+import { FormDialog, matchesName } from "@/components/ui/form-dialog";
 import type { Product } from "@/lib/types";
 
 type EditBit = { _id: string; title?: string; description?: string; hashtags?: string[]; products: string[] };
@@ -15,6 +16,7 @@ type EditBit = { _id: string; title?: string; description?: string; hashtags?: s
 export function UploadBit({ myProducts, edit }: { myProducts: Product[]; edit?: EditBit }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [pq, setPq] = useState("");
   const [f, setF] = useState({ title: edit?.title ?? "", description: edit?.description ?? "", hashtags: (edit?.hashtags ?? []).join(" ") });
   const [video, setVideo] = useState<File | null>(null);
   const [thumb, setThumb] = useState<File | null>(null);
@@ -57,20 +59,22 @@ export function UploadBit({ myProducts, edit }: { myProducts: Product[]; edit?: 
     } else setError(res?.message ?? (edit ? "Couldn't save the changes. Try again." : "Upload failed. Try again."));
   }
 
-  if (!open) {
-    return edit ? (
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2">
-        <Pencil className="h-4 w-4" /> Edit Bit
-      </button>
-    ) : (
-      <button onClick={() => setOpen(true)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold">
-        <Plus className="h-4 w-4" /> Upload a Bit
-      </button>
-    );
-  }
+  const trigger = edit ? (
+    <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2">
+      <Pencil className="h-4 w-4" /> Edit Bit
+    </button>
+  ) : (
+    <button onClick={() => setOpen(true)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold">
+      <Plus className="h-4 w-4" /> Upload a Bit
+    </button>
+  );
+  if (!open) return trigger;
 
   return (
-    <form onSubmit={submit} className="card w-full max-w-lg rounded-[1.75rem] p-6">
+    <>
+    {trigger}
+    <FormDialog label={edit ? "Edit Bit" : "Upload a Bit"} onClose={() => setOpen(false)}>
+    <form onSubmit={submit} className="card w-full rounded-[1.75rem] p-6">
       <div className="flex items-center justify-between">
         <h2 className="font-display text-lg font-semibold text-ink">{edit ? "Edit Bit" : "Upload a Bit"}</h2>
         <button type="button" onClick={() => setOpen(false)} aria-label="Close"><X className="h-4 w-4 text-muted" /></button>
@@ -102,8 +106,9 @@ export function UploadBit({ myProducts, edit }: { myProducts: Product[]; edit?: 
         {myProducts.length > 0 && (
           <div>
             <p className="text-[12px] font-medium text-muted">Tag products (required)</p>
-            <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
-              {myProducts.map((p) => {
+            {myProducts.length > 5 && <input value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Search your products" aria-label="Search your products" className="mt-2 h-10 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[14px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />}
+            <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
+              {myProducts.filter((p) => tagged.includes(p._id) || matchesName(p.name, pq)).map((p) => {
                 const on = tagged.includes(p._id);
                 return (
                   <button
@@ -128,6 +133,8 @@ export function UploadBit({ myProducts, edit }: { myProducts: Product[]; edit?: 
         {busy ? (edit ? "Saving…" : "Uploading…") : edit ? "Save changes" : "Publish Bit"}
       </button>
     </form>
+    </FormDialog>
+    </>
   );
 }
 

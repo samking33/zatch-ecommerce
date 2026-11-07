@@ -25,15 +25,17 @@ export function SellerShell({ children }: { children: React.ReactNode }) {
     <>
       <Nav />
       <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
-        {/* seller sub-nav */}
-        <nav className="card mb-4 flex gap-1 overflow-x-auto rounded-full p-1.5">
+        {/* seller sub-nav: one scrolling row on wider screens; on phones every tab shows, as a
+            5-column grid, instead of 3 of 10 with the rest hidden off to the right. */}
+        <nav aria-label="Seller dashboard" className="card mb-4 grid grid-cols-5 gap-1 rounded-[1.5rem] p-1.5 sm:flex sm:overflow-x-auto sm:rounded-full">
           {tabs.map(([label, href, Icon]) => {
             const active = path === href || (href !== "/seller/dashboard" && path.startsWith(href));
             return (
               <Link
                 key={href}
                 href={href}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${
+                aria-current={active ? "page" : undefined}
+                className={`inline-flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[11px] font-medium transition-colors sm:flex-row sm:gap-2 sm:rounded-full sm:px-4 sm:py-2.5 sm:text-sm ${
                   active ? "bg-ink text-surface" : "text-ink hover:bg-surface-2"
                 }`}
               >

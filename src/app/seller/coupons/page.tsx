@@ -238,6 +238,9 @@ function CouponForm({ token, onSaved, initial, products }: { token: string; onSa
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // An expiry can't be in the past; an existing coupon's own date stays allowed so it can still be saved.
+  const now = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const today = initialEnd && initialEnd < now ? initialEnd : now;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   async function save(e: React.FormEvent) {
@@ -276,10 +279,11 @@ function CouponForm({ token, onSaved, initial, products }: { token: string; onSa
           <option value="fixed">Fixed ₹</option>
         </select>
       </label>
-      <F label={f.discountType === "percentage" ? "Discount %" : "Discount ₹"} v={f.discountValue} on={set("discountValue")} type="number" required />
-      {f.discountType === "percentage" && <F label="Max discount ₹ (optional)" v={f.maxDiscount} on={set("maxDiscount")} type="number" />}
-      <F label="Min spend ₹ (optional)" v={f.minSpend} on={set("minSpend")} type="number" />
-      <F label="Valid until" v={f.endDate} on={set("endDate")} type="date" required />
+      {/* Limits shown in the form, as the server checks only some of them (a negative min spend gets through). */}
+      <F label={f.discountType === "percentage" ? "Discount % (1 to 100)" : "Discount ₹"} v={f.discountValue} on={set("discountValue")} type="number" required min={1} max={f.discountType === "percentage" ? 100 : undefined} />
+      {f.discountType === "percentage" && <F label="Max discount ₹ (optional)" v={f.maxDiscount} on={set("maxDiscount")} type="number" min={1} />}
+      <F label="Min spend ₹ (optional)" v={f.minSpend} on={set("minSpend")} type="number" min={0} />
+      <F label="Valid until" v={f.endDate} on={set("endDate")} type="date" required min={today} />
       {products.length > 0 && (
         <fieldset className="sm:col-span-2">
           <legend className="text-[12px] font-medium text-muted">Applies to {picked.length ? `${picked.length} product${picked.length !== 1 ? "s" : ""}` : "all your products"}</legend>
@@ -301,11 +305,11 @@ function CouponForm({ token, onSaved, initial, products }: { token: string; onSa
     </form>
   );
 }
-function F({ label, v, on, type = "text", required }: { label: string; v: string; on: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; required?: boolean }) {
+function F({ label, v, on, type = "text", required, min, max }: { label: string; v: string; on: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; required?: boolean; min?: number | string; max?: number }) {
   return (
     <label className="block">
       <span className="text-[12px] font-medium text-muted">{label}</span>
-      <input type={type} required={required} value={v} onChange={on} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+      <input type={type} required={required} min={min} max={max} value={v} onChange={on} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
     </label>
   );
 }

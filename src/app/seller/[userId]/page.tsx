@@ -8,7 +8,7 @@ import { ProductMedia } from "@/components/ui/product-media";
 import { FollowButton, ShareProfileButton } from "@/components/seller/follow-button";
 import { RateSeller } from "@/components/seller/rate-seller";
 import { users } from "@/lib/api";
-import { serverToken } from "@/lib/session";
+import { serverToken, userIdFromToken } from "@/lib/session";
 import { compact } from "@/lib/utils";
 import type { Product, Bit } from "@/lib/types";
 
@@ -30,8 +30,11 @@ type PublicSeller = {
 
 export default async function SellerStorefront({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
-  const seller = (await users.publicProfile(userId, await serverToken())) as PublicSeller | null;
+  const token = await serverToken();
+  const seller = (await users.publicProfile(userId, token)) as PublicSeller | null;
   if (!seller?._id) notFound();
+  // The server refuses following or rating yourself, so the seller's own shop doesn't offer it.
+  const own = userIdFromToken(token) === seller._id;
 
   const name = seller.sellerProfile?.businessName || seller.username || "Seller";
   const products = seller.sellingProducts ?? [];
@@ -68,8 +71,8 @@ export default async function SellerStorefront({ params }: { params: Promise<{ u
             </div>
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <FollowButton userId={seller._id} initialFollowing={seller.isFollowing} followers={seller.followerCount ?? 0} />
-            <RateSeller userId={seller._id} />
+            {!own && <FollowButton userId={seller._id} initialFollowing={seller.isFollowing} followers={seller.followerCount ?? 0} />}
+            {!own && <RateSeller userId={seller._id} />}
             <ShareProfileButton userId={seller._id} />
           </div>
         </div>

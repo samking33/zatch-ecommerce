@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Radio, Upload, ArrowRight, ArrowLeft, X, Check, Copy } from "lucide-react";
 import { getToken } from "@/lib/client-auth";
 import { shrinkImage } from "@/lib/shrink-image";
+import { FormDialog, matchesName } from "@/components/ui/form-dialog";
 import type { Product } from "@/lib/types";
 
 type Row = { productId: string; name: string; autoAcceptDiscount: number; maximumDiscount: number };
@@ -15,6 +16,7 @@ type Row = { productId: string; name: string; autoAcceptDiscount: number; maximu
 export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [pq, setPq] = useState("");
   const [step, setStep] = useState(1);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [picked, setPicked] = useState<Row[]>([]);
@@ -111,16 +113,18 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
     );
   }
 
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold">
-        <Radio className="h-4 w-4" /> Schedule a live
-      </button>
-    );
-  }
+  const trigger = (
+    <button onClick={() => setOpen(true)} className="pill-lime inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold">
+      <Radio className="h-4 w-4" /> Schedule a live
+    </button>
+  );
+  if (!open) return trigger;
 
   return (
-    <div className="card w-full max-w-lg rounded-[1.75rem] p-6">
+    <>
+    {trigger}
+    <FormDialog label="Schedule a live drop" onClose={reset}>
+    <div className="card w-full rounded-[1.75rem] p-6">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="font-display text-lg font-semibold text-ink">Schedule a live drop</h2>
         <button onClick={reset} aria-label="Close"><X className="h-4 w-4 text-muted" /></button>
@@ -171,9 +175,10 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
 
           <div>
             <p className="text-[12px] font-medium text-muted">Products to sell ({picked.length})</p>
-            <div className="mt-2 max-h-44 space-y-1.5 overflow-y-auto">
+            {myProducts.length > 5 && <input value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Search your products" aria-label="Search your products" className="mt-2 h-10 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[14px] text-ink placeholder:text-muted focus:border-ink focus:outline-none" />}
+            <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto">
               {myProducts.length === 0 && <p className="text-sm text-muted">List a product first.</p>}
-              {myProducts.map((p) => {
+              {myProducts.filter((p) => picked.some((x) => x.productId === p._id) || matchesName(p.name, pq)).map((p) => {
                 const on = picked.some((x) => x.productId === p._id);
                 return (
                   <button key={p._id} type="button" onClick={() => toggle(p)} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-[13px] transition-colors ${on ? "border-ink bg-ink text-surface" : "border-hairline bg-surface-2 text-ink hover:border-ink"}`}>
@@ -251,6 +256,8 @@ export function ScheduleLive({ myProducts = [] }: { myProducts?: Product[] }) {
         </div>
       )}
     </div>
+    </FormDialog>
+    </>
   );
 }
 
