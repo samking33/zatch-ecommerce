@@ -16,9 +16,12 @@ export function ProductCard({ product, i = 0 }: { product: Product; i?: number }
   const rating = product.averageRating ?? product.analytics?.averageRating ?? 0;
   const img = product.images?.[0]?.url;
   const event = (product.specialHourPercent ?? 0) > 0;
-  // ponytail: Zatch is bargain-first, so the badge shows unless a seller
-  // explicitly disabled it (maximumDiscount === 0) or Zatch Hours has paused bargaining.
-  const canBargain = !event && product.bargainSettings?.maximumDiscount !== 0;
+  // ponytail: Zatch is bargain-first, so the badge shows when a listing carries no
+  // bargain settings. With settings, it follows the product page's rule: Zatch Hours
+  // pauses bargaining by nulling both values (tiered sellers get no specialHourPercent),
+  // and a seller turns it off with zeros.
+  const bs = product.bargainSettings;
+  const canBargain = !event && (!bs || !!(bs.autoAcceptDiscount || bs.maximumDiscount));
 
   return (
     <Link
