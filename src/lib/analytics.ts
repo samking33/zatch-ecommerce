@@ -110,11 +110,14 @@ export function identify(user: { email?: string; phone?: string; countryCode?: u
  * forget: analytics must never delay or break the page.
  */
 function relay(event: string, id: string, params: Record<string, unknown> = {}) {
+  const w = window as unknown as { gtag?: Gtag; fbq?: Fbq };
   try {
     fetch("/api/capi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, eventId: id, path: location.pathname, ...params, ...identity }),
+      // px/gt say whether each tag was loaded when this fired; the tracking-health
+      // panel turns them red if a tag starts loading too late again.
+      body: JSON.stringify({ event, eventId: id, path: location.pathname, ...params, ...identity, px: typeof w.fbq === "function", gt: typeof w.gtag === "function" }),
       keepalive: true,
     }).catch(() => {});
   } catch {

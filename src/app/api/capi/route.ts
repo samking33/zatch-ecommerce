@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { cookies, headers } from "next/headers";
+import { recordEvent } from "@/lib/event-health";
 
 /**
  * Relay for the Meta Conversions API.
@@ -69,11 +70,6 @@ function customData(body: Record<string, unknown>) {
 }
 
 export async function POST(req: Request) {
-  // No token is the ordinary state until one is issued; accept and drop quietly
-  // so the browser never retries and nothing is logged as an error.
-  const token = process.env.META_CAPI_TOKEN;
-  if (!token) return new Response(null, { status: 204 });
-
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -84,6 +80,14 @@ export async function POST(req: Request) {
   const event = str(body.event, 50);
   const eventId = str(body.eventId, 100);
   if (!event || !ALLOWED_EVENTS.has(event) || !eventId) return new Response(null, { status: 400 });
+
+  // Counted before the token check, so tracking health works with or without CAPI.
+  recordEvent(event, body.px === true, body.gt === true);
+
+  // No token is the ordinary state until one is issued; accept and drop quietly
+  // so the browser never retries and nothing is logged as an error.
+  const token = process.env.META_CAPI_TOKEN;
+  if (!token) return new Response(null, { status: 204 });
 
   const h = await headers();
   const jar = await cookies();

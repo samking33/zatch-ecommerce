@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Wallet, TrendingUp, Target, ShoppingBag, PlugZap, TriangleAlert } from "lucide-react";
+import { Wallet, TrendingUp, Target, ShoppingBag, PlugZap, TriangleAlert, CircleCheck, CircleDashed } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { getReports, roas, sumMetrics, PLATFORM_LABEL, PLATFORM_COLOR, type Metrics, type Report, type Campaign, type Platform } from "@/lib/marketing";
+import { eventHealth, type EventHealth } from "@/lib/event-health";
 import { inr, compact } from "@/lib/utils";
 
 export const metadata = { title: "Marketing" };
@@ -149,6 +150,72 @@ function CampaignTable({ rows }: { rows: (Campaign & { platform: Platform })[] }
   );
 }
 
+// Every event the site fires, in funnel order, so one that never arrives still gets a row.
+const TRACKED: [string, string][] = [
+  ["ViewContent", "Product views"],
+  ["AddToCart", "Add to cart"],
+  ["InitiateCheckout", "Checkout started"],
+  ["AddPaymentInfo", "Payment opened"],
+  ["Purchase", "Purchases"],
+  ["Search", "Searches"],
+  ["AddToWishlist", "Saves"],
+  ["CompleteRegistration", "Sign-ups"],
+];
+
+// The tag stubs load synchronously, so a missing tag should be ~0%. A few odd
+// browsers aside, anything above this means the loading order has regressed.
+const MISSING_ALERT = 0.05;
+
+function ago(ms: number): string {
+  const min = Math.round((Date.now() - ms) / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  return `${Math.round(min / 60)} h ago`;
+}
+
+function healthStatus(h?: EventHealth): { ok: boolean | null; text: string } {
+  if (!h || h.total === 0) return { ok: null, text: "None in the last 24 h" };
+  const pct = (n: number) => `${Math.round((n / h.total) * 100)}%`;
+  if (h.noPixel / h.total > MISSING_ALERT) return { ok: false, text: `Meta pixel missing on ${pct(h.noPixel)}` };
+  if (h.noGtag / h.total > MISSING_ALERT) return { ok: false, text: `Google tag missing on ${pct(h.noGtag)}` };
+  return { ok: true, text: "Both tags loaded" };
+}
+
+function TrackingHealth() {
+  const { since, events } = eventHealth();
+  const byName = new Map(events.map((e) => [e.event, e]));
+  return (
+    <>
+      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2 px-1">
+        <h2 className="font-display text-xl font-semibold text-ink">Tracking health</h2>
+        {/* Counts live in memory and restart with each deploy, so say from when. */}
+        <p className="text-[13px] text-muted">Last 24 h · counting since {new Date(since).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</p>
+      </div>
+      <ul className="card mt-3 divide-y divide-hairline rounded-[1.5rem]">
+        {TRACKED.map(([event, label]) => {
+          const h = byName.get(event);
+          const s = healthStatus(h);
+          return (
+            <li key={event} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3">
+              <div className="min-w-0">
+                <p className="text-[14px] font-medium text-ink">{label}</p>
+                <p className="text-[12px] text-muted">{h?.lastSeen ? `Last ${ago(h.lastSeen)}` : event}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="font-display text-[15px] font-semibold tabular-nums text-ink">{compact(h?.total ?? 0)}</span>
+                <span className={`inline-flex w-52 items-center gap-1.5 text-[13px] ${s.ok === false ? "font-medium text-live" : "text-muted"}`}>
+                  {s.ok === true ? <CircleCheck className="h-4 w-4 shrink-0" /> : s.ok === false ? <TriangleAlert className="h-4 w-4 shrink-0" /> : <CircleDashed className="h-4 w-4 shrink-0" />}
+                  {s.text}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
 export default async function MarketingPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const { days: asked } = await searchParams;
   const days = RANGES.includes(Number(asked)) ? Number(asked) : 30;
@@ -212,6 +279,8 @@ export default async function MarketingPage({ searchParams }: { searchParams: Pr
           <CampaignTable rows={campaigns} />
         </>
       )}
+
+      <TrackingHealth />
     </PageShell>
   );
 }
