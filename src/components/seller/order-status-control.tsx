@@ -117,7 +117,11 @@ export function OrderStatusControl({ orderId, status, fulfilmentMode, shipments 
               {s.courierName || "Courier"}{s.awb ? ` · AWB ${s.awb}` : ""}
             </li>
           ))}
-          <li>Shiprocket updates this order from here.</li>
+          {/* The backend saves a shipment before Shiprocket assigns its AWB, so a parcel with
+              no AWB means packing stopped partway, and the server won't retry or cancel it. */}
+          {shipments.some((s) => !s.awb)
+            ? <li role="alert" className="font-medium text-live">Packing didn&apos;t finish. Contact Zatch support.</li>
+            : <li>Shiprocket updates this order from here.</li>}
         </ul>
       )}
 
