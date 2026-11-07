@@ -71,6 +71,10 @@ fbq('init', '${META_PIXEL_ID}');
 fbq('track', 'PageView');`,
           }}
         />
+        {/* First Tab stop: skips the header and category bar (30 presses to Add to cart without it). */}
+        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-surface">
+          Skip to content
+        </a>
         <AuthProvider>
           <RealtimeProvider>{children}</RealtimeProvider>
         </AuthProvider>

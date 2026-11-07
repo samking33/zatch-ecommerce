@@ -55,7 +55,8 @@ export function CategoryMenu() {
       </button>
 
       {open && (
-        <div className="card absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[30rem] rounded-[1.25rem] p-3 shadow-xl">
+        // Measured from the button, which sits 17px above the bar's bottom edge: this hangs it just below the bar.
+        <div className="card absolute left-0 top-[calc(100%+1.25rem)] z-50 w-[30rem] rounded-[1.25rem] p-3 shadow-xl">
           {list.length === 0 && <p className="px-3 py-4 text-sm text-muted">Loading categories…</p>}
           <div className="grid grid-cols-2 gap-1">
             {list.map((c) => (
@@ -120,9 +121,10 @@ export function CategoryStrip() {
   if (list.length === 0) return null;
 
   return (
+    // The right edge fades on narrower screens, where the list scrolls, as a hint that there is more.
     <nav
       aria-label="Categories"
-      className="mx-auto mt-2 flex max-w-[1400px] gap-1 overflow-x-auto rounded-full bg-canvas/90 px-2 py-1 text-[14px] backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mx-auto -mt-1 flex max-w-[1400px] gap-1 overflow-x-auto rounded-full bg-canvas/90 px-2 py-1 text-[14px] backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-lg:[mask-image:linear-gradient(to_right,black_88%,transparent)]"
     >
       {anyoneLive && (
         <Link href="/live" className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-ink transition-colors hover:bg-surface-2">

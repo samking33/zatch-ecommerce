@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="mx-auto grid min-h-screen max-w-md place-items-center px-4 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto grid min-h-screen max-w-md place-items-center px-4 py-8">
       <div className="card w-full rounded-[2rem] p-8">
         <Logo />
         <h1 className="mt-6 font-display text-2xl font-semibold text-ink">Reset password</h1>

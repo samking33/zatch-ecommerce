@@ -62,7 +62,8 @@ export function HeroBanner({
       cta: "Go to live",
       href: "/live",
       bg: "#FF5A45",
-      ink: "#FFFFFF",
+      // Dark text: white on this red is under the 4.5:1 contrast minimum for the smaller lines.
+      ink: "#12140E",
     },
   ];
 
@@ -76,15 +77,16 @@ export function HeroBanner({
     return () => clearTimeout(t);
   }, [i, paused, slides.length]);
 
+  // No colour fade: the text colour switches at once, so a fade left white text on lime mid-change.
   return (
     <section
-      className="relative overflow-hidden rounded-[1.5rem] transition-colors duration-500"
+      className="relative overflow-hidden rounded-[1.5rem]"
       style={{ background: slide.bg }}
     >
-      <div className="grid items-center gap-6 p-7 sm:p-10 lg:grid-cols-[1.1fr_1fr] lg:gap-10">
+      <div className="grid grid-cols-1 items-center gap-6 p-7 sm:p-10 lg:grid-cols-[1.1fr_1fr] lg:gap-10">
         <div style={{ color: slide.ink }}>
           {slide.eyebrow && (
-            <p className="text-[13px] font-semibold uppercase tracking-[0.14em] opacity-70">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.14em]">
               {slide.eyebrow}
             </p>
           )}

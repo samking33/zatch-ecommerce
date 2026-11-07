@@ -116,7 +116,7 @@ export function LiveRoom({ room }: { room: LiveDetails }) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
       {/* stage */}
       <div className="card relative overflow-hidden rounded-[2rem] p-3">
         <AgoraPlayer sessionId={sessionId} viewers={liveViewers} ended={ended} signals={signals} />

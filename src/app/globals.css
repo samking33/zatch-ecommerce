@@ -16,7 +16,8 @@
   --color-surface-2: #f1f3ec;
   --color-ink: #12140e;
   --color-ink-soft: #3a3d34;
-  --color-muted: #74786b;
+  /* At least 4.5:1 on every surface, canvas-deep included (the old #74786b was 3.1 to 4.4). */
+  --color-muted: #5a5e52;
   --color-hairline: rgba(18, 20, 14, 0.08);
 
   --color-lime: #cafe38;
@@ -36,6 +37,13 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* Keeps fields scrolled to (an invalid field, an anchor) clear of the sticky header. */
+    scroll-padding-top: 7rem;
+  }
+
+  /* The skip link's target takes focus but needs no ring. */
+  main:focus {
+    outline: none;
   }
 
   body {
@@ -68,6 +76,23 @@
 }
 
 @layer components {
+  /* Legal copy from the backend (DocBody): the site's type, flowing in the page. */
+  .doc { color: var(--color-ink-soft); font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; }
+  .doc h1, .doc h2, .doc h3 { color: var(--color-ink); line-height: 1.2; margin: 2rem 0 0.75rem; }
+  .doc h1 { font-size: 1.6rem; }
+  .doc h2 { font-size: 1.3rem; }
+  .doc h3 { font-size: 1.1rem; }
+  .doc > :first-child { margin-top: 0; }
+  .doc p, .doc ul, .doc ol, .doc table { margin: 0 0 1rem; }
+  .doc ul { list-style: disc; padding-left: 1.25rem; }
+  .doc ol { list-style: decimal; padding-left: 1.25rem; }
+  .doc li { margin-bottom: 0.4rem; }
+  .doc strong { color: var(--color-ink); }
+  .doc a { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; }
+  .doc hr { margin: 1.5rem 0; border-top: 1px solid var(--color-hairline); }
+  .doc table { display: block; overflow-x: auto; border-collapse: collapse; }
+  .doc th, .doc td { border: 1px solid var(--color-hairline); padding: 0.5rem 0.75rem; text-align: left; }
+
   /* Glassy card - the bento building block */
   .card {
     background: var(--color-surface);

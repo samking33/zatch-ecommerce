@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Minus, Plus, X, Tag, ArrowRight, ShoppingBag, Loader2, Play, Radio } from "lucide-react";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
@@ -86,27 +86,34 @@ export default function CartPage() {
   }
 
   const [cartError, setCartError] = useState<string | null>(null);
+  // Only the latest change may report back: a slow reply to an earlier "+" brought back
+  // "Only 1 item(s) left" after the quantity had already been lowered.
+  const latest = useRef(0);
 
   async function changeQty(it: CartItem, qty: number) {
     if (!token) return;
+    const n = ++latest.current;
     setCartError(null);
     setCart((c) =>
       c ? { ...c, items: c.items?.map((x) => (x === it ? { ...x, qty } : x)) } : c,
     );
     // e.g. "Only 1 item(s) left in stock" - shown, then the cart is re-read so the quantity snaps back.
     const res = await cartApi.update({ ...lineKeys(it), qty }, token);
-    setCartError(apiError(res, "Couldn't update your cart. Try again."));
     const fresh = await cartApi.get(token);
+    if (n !== latest.current) return;
+    setCartError(apiError(res, "Couldn't update your cart. Try again."));
     setCart((fresh as Cart) ?? cart);
   }
 
   async function remove(it: CartItem) {
     if (!token) return;
+    const n = ++latest.current;
     setCartError(null);
     setCart((c) => (c ? { ...c, items: c.items?.filter((x) => x !== it) } : c));
     const res = await cartApi.remove(lineKeys(it), token);
-    setCartError(apiError(res, "Couldn't remove the item. Try again."));
     const fresh = await cartApi.get(token);
+    if (n !== latest.current) return;
+    setCartError(apiError(res, "Couldn't remove the item. Try again."));
     setCart((fresh as Cart) ?? { items: [] });
   }
 
@@ -149,7 +156,7 @@ export default function CartPage() {
   return (
     <>
       <Nav />
-      <main className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
         <div className="px-1 py-8">
           <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-semibold text-ink">
             Your cart
@@ -177,7 +184,8 @@ export default function CartPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
+            {/* grid-cols-1 lets the column shrink below its content on narrow phones instead of spilling sideways. */}
             <div className="flex flex-col gap-4">
               {cartError && <p role="alert" className="rounded-xl bg-live/10 px-4 py-3 text-sm font-medium text-live">{cartError}</p>}
               <AdSlot placement="cart" />
@@ -224,7 +232,7 @@ export default function CartPage() {
                           </span>
                         )}
                       </span>
-                      <div className="mt-2 flex items-center justify-between">
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                         <div className="inline-flex items-center gap-1 rounded-full border border-hairline p-1">
                           <button onClick={() => changeQty(it, Math.max(1, qty - 1))} aria-label="Decrease" className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface-2">
                             <Minus className="h-3.5 w-3.5" />

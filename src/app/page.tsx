@@ -53,7 +53,7 @@ export default async function HomePage() {
   return (
     <>
       <Nav />
-      <main className="mx-auto max-w-[1400px] px-3 pb-16 pt-2 sm:px-5">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-16 pt-2 sm:px-5">
         <HeroBanner liveCount={onAir.length} topProduct={products[0]} topBit={bitList[0]} images={heroImages} />
         <AdRow ads={bannerAds ?? []} className="mt-4" />
         <AdPopup />

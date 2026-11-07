@@ -5,7 +5,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Nav />
-      <main className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
         {children}
       </main>
       <Footer />

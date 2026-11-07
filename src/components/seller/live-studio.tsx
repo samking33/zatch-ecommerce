@@ -132,7 +132,7 @@ export function LiveStudio({ room }: { room: LiveDetails }) {
   const canEnd = phase === "live" || (phase === "ready" && room.status === "live");
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
       <div className="card rounded-[2rem] p-3">
         <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-ink">
           <div ref={preview} className="absolute inset-0" />

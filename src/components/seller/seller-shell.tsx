@@ -24,7 +24,7 @@ export function SellerShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Nav />
-      <main className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
         {/* seller sub-nav */}
         <nav className="card mb-4 flex gap-1 overflow-x-auto rounded-full p-1.5">
           {tabs.map(([label, href, Icon]) => {

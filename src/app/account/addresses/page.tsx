@@ -35,7 +35,7 @@ export default function AddressesPage() {
   return (
     <>
       <Nav />
-      <main className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
         <div className="flex items-center justify-between px-1 py-8">
           <div>
             <p className="text-[13px] font-semibold uppercase tracking-widest text-muted">Account</p>

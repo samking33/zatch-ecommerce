@@ -272,7 +272,7 @@ export default function CheckoutPage() {
     return (
       <>
         <Nav />
-        <main className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
+        <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
           <div className="card mx-auto mt-6 max-w-lg rounded-[2rem] p-8 text-center">
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-lime text-lime-ink">
               {placed ? <CircleCheck className="h-8 w-8" /> : <Clock className="h-8 w-8" />}
@@ -305,7 +305,7 @@ export default function CheckoutPage() {
   return (
     <>
       <Nav />
-      <main className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-[1400px] px-3 pb-8 pt-4 sm:px-5">
         <div className="px-1 py-8">
           <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-semibold text-ink">Checkout</h1>
         </div>
@@ -319,7 +319,7 @@ export default function CheckoutPage() {
             <Link href={direct ? "/shop" : "/cart"} className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">{direct ? "Browse products" : "Back to cart"}</Link>
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
             <div className="flex flex-col gap-4">
               <section className="card rounded-[1.75rem] p-6 sm:p-7">
                 <div className="flex items-center justify-between gap-3">

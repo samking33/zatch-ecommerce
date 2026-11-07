@@ -54,7 +54,7 @@ export default async function AccountPage() {
     <PageShell>
       <PageHeader eyebrow="Account" title={`Hi, ${name}`} />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
         <div className="card h-fit rounded-[1.75rem] p-6">
           <div className="flex items-center gap-4">
             <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-ink text-2xl font-semibold text-surface">

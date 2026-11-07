@@ -87,7 +87,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto grid min-h-screen max-w-[1400px] place-items-center px-3 py-6 sm:px-5">
+    <main id="main" tabIndex={-1} className="mx-auto grid min-h-screen max-w-[1400px] place-items-center px-3 py-6 sm:px-5">
       <div className="card grid w-full max-w-4xl overflow-hidden rounded-[2rem] md:grid-cols-2">
         <div className="relative hidden flex-col justify-between overflow-hidden bg-ink p-8 md:flex">
           <div className="pointer-events-none absolute -right-16 -top-10 h-64 w-64">

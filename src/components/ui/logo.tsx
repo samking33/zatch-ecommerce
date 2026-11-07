@@ -5,9 +5,12 @@ import { cn } from "@/lib/utils";
 export function Logo({
   className,
   light = false,
+  compact = false,
 }: {
   className?: string;
   light?: boolean;
+  // Icon only on phones: the header row has no room for the wordmark next to five buttons.
+  compact?: boolean;
 }) {
   return (
     <Link
@@ -27,6 +30,7 @@ export function Logo({
         className={cn(
           "font-display text-[1.35rem] font-semibold tracking-[-0.04em]",
           light ? "text-surface" : "text-ink",
+          compact && "max-sm:hidden",
         )}
       >
         zatch
