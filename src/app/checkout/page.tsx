@@ -14,7 +14,7 @@ import { address as addressApi, checkout as checkoutApi, coupons as couponsApi, 
 import { getToken, getAppliedCoupon, setAppliedCoupon } from "@/lib/client-auth";
 import { buyHref, parseBuyItems, type BuyItem } from "@/lib/checkout-link";
 import { inr, variantText } from "@/lib/utils";
-import { trackPurchase, trackMeta, trackGoogleConversion, GCONV } from "@/lib/analytics";
+import { trackPurchase, trackBeginCheckout, trackAddPaymentInfo, type TrackItem } from "@/lib/analytics";
 
 type PItem = {
   _id?: string;
@@ -40,6 +40,18 @@ type Verified = { success?: boolean; code?: string; message?: string; orders?: {
 const same = (a?: string | null, b?: string | null) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 const matches = (p: PItem, b: BuyItem) =>
   (p.product?._id ?? "") === b.productId && same(p.variant?.color, b.variantColor) && same(p.variant?.size, b.variantSize);
+
+/** Checkout lines as the ad tags want them. `cartPrice` is what the buyer actually pays
+ *  for the line (a won bargain or a coupon can put it below the product's list price). */
+const trackItems = (items: PItem[] = []): TrackItem[] =>
+  items.map((l) => ({
+    id: l.product?._id ?? "",
+    name: l.product?.name,
+    price: l.cartPrice ?? l.product?.price,
+    qty: l.qty ?? 1,
+    color: l.variant?.color,
+    size: l.variant?.size,
+  }));
 
 function loadRazorpay(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -83,12 +95,12 @@ export default function CheckoutPage() {
   const [placed, setPlaced] = useState<Verified["orders"] | null>(null);
   const [underReview, setUnderReview] = useState<string | null>(null);
   // Fire the Google Ads + Meta purchase conversion once, when the order-success screen shows.
-  const [paid, setPaid] = useState<{ id: string; value?: number; currency: string } | null>(null);
+  const [paid, setPaid] = useState<{ id: string; value?: number; currency: string; items: TrackItem[] } | null>(null);
   const purchaseTracked = useRef<string | null>(null);
   useEffect(() => {
     if (!placed || !paid || purchaseTracked.current === paid.id) return;
     purchaseTracked.current = paid.id;
-    trackPurchase(paid.id, paid.value, paid.currency);
+    trackPurchase(paid.id, paid.value, paid.currency, paid.items);
   }, [placed, paid]);
 
   useEffect(() => {
@@ -134,8 +146,7 @@ export default function CheckoutPage() {
       setPricing(false);
       if (pv.success && !icFired.current) {
         icFired.current = true;
-        trackMeta("InitiateCheckout", { value: pv.checkout?.pricing?.total, currency: "INR", num_items: pv.checkout?.items?.length });
-        trackGoogleConversion(GCONV.checkout, pv.checkout?.pricing?.total);
+        trackBeginCheckout(trackItems(pv.checkout?.items), pv.checkout?.pricing?.total);
       }
     });
     return () => { alive = false; };
@@ -206,7 +217,7 @@ export default function CheckoutPage() {
       setPaying(false);
       return setError("The payment window couldn't load. Check your connection and try again.");
     }
-    trackMeta("AddPaymentInfo", { value: typeof init.amount === "number" ? init.amount / 100 : undefined, currency: init.currency ?? "INR" });
+    trackAddPaymentInfo(trackItems(lines), typeof init.amount === "number" ? init.amount / 100 : undefined);
 
     const RZP = (window as unknown as { Razorpay: new (o: unknown) => { open: () => void } }).Razorpay;
     new RZP({
@@ -232,7 +243,7 @@ export default function CheckoutPage() {
         if (v?.success) {
           if (!direct) setAppliedCoupon(undefined);
           // Record the order; the success-screen effect fires the purchase conversion once.
-          setPaid({ id: resp.razorpay_order_id, value: typeof init.amount === "number" ? init.amount / 100 : undefined, currency: init.currency ?? "INR" });
+          setPaid({ id: resp.razorpay_order_id, value: typeof init.amount === "number" ? init.amount / 100 : undefined, currency: init.currency ?? "INR", items: trackItems(lines) });
           setPlaced(v.orders ?? []);
         } else if (v?.code === "PAYMENT_UNDER_REVIEW") {
           setUnderReview(v.message ?? "Payment received. Your order is being confirmed.");

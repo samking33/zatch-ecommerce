@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Heart, Bookmark, Share2, Check, Star, Send, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { products as productsApi, apiError } from "@/lib/api";
-import { trackMeta, trackGoogleConversion, GCONV } from "@/lib/analytics";
+import { trackViewItem, trackAddToWishlist, toItem } from "@/lib/analytics";
 import { getToken } from "@/lib/client-auth";
 import { compact } from "@/lib/utils";
 import type { Product, ProductComment, ProductReview } from "@/lib/types";
@@ -18,13 +18,10 @@ export function ProductActions({ product }: { product: Product }) {
   const [saved, setSaved] = useState(!!product.isSaved);
   const [shared, setShared] = useState(false);
 
-  const price = product.discountedPrice ?? product.price;
-
   // Real view tracking, once per mount.
   useEffect(() => {
     productsApi.view(product._id, getToken()).catch(() => {});
-    trackMeta("ViewContent", { content_ids: [product._id], content_type: "product", content_name: product.name, value: price, currency: "INR" });
-    trackGoogleConversion(GCONV.viewContent);
+    trackViewItem(toItem(product));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product._id]);
 
@@ -48,7 +45,7 @@ export function ProductActions({ product }: { product: Product }) {
     setSaved(next);
     const res = await productsApi.save(product._id, t);
     if (!res) setSaved(!next);
-    else if (next) trackMeta("AddToWishlist", { content_ids: [product._id], content_type: "product", value: price, currency: "INR" });
+    else if (next) trackAddToWishlist(toItem(product));
   }
 
   async function share() {

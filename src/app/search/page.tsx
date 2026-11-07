@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { TrendingUp, Clock, Search as SearchIcon, Play, Users as UsersIcon } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
-import { TrackEvent } from "@/components/analytics/track-event";
+import { TrackSearch } from "@/components/analytics/track-event";
 import { ProductCard } from "@/components/ui/product-card";
 import { api, search as searchApi, users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
@@ -143,7 +143,7 @@ export default async function SearchPage({
 
   return (
     <PageShell>
-      <TrackEvent event="Search" params={{ search_string: q }} />
+      <TrackSearch term={q} />
       <PageHeader
         eyebrow="Search"
         title={`Results for “${q}”`}
