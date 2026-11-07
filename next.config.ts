@@ -15,8 +15,9 @@ const nextConfig: NextConfig = {
     // Uploads reach the backend through the rewrite below, and Next cuts proxied
     // bodies off at 10 MB by default, which breaks multi-photo products and Bit
     // videos (the backend allows 50 MB). Photos are also shrunk in the browser.
-    // ponytail: the proxy holds up to this much per upload in memory; move uploads
-    // to direct-to-CDN tokens (/product/upload-tokens) if that ever bites.
+    // ponytail: the proxy holds up to this much per upload in memory. If that ever bites,
+    // move Bit videos to the signed GET /bits/video-upload (Bunny Stream). Never use
+    // /product/upload-tokens or /bits/upload-token: they hand out the storage key (B-41).
     middlewareClientMaxBodySize: "60mb",
   },
   images: {
