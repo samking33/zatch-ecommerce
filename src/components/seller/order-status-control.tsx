@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Check, XCircle } from "lucide-react";
+import { Loader2, Check, XCircle, PackageCheck, Truck } from "lucide-react";
 import { orders as ordersApi, apiError } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
 
@@ -21,8 +21,14 @@ const CANCELLABLE = ["pending", "confirmed", "processing", "ready_to_ship"];
 // The app's courier list.
 const COURIERS = ["Blue Dart", "Delhivery", "Ecom Express", "Ekart Logistics", "XpressBees", "Shadowfax", "Gati", "Safexpress", "DTDC", "India Post (Speed Post)", "ABC Transport"];
 const label = (s: string) => s.replace(/_/g, " ");
+// Zatch pickup: one "Pack order" books the Shiprocket courier, which the server only does
+// for orders still pending or confirmed. After that Shiprocket moves the status itself and
+// the server refuses manual shipped/delivered updates.
+const PACKABLE = ["pending", "confirmed"];
 
-export function OrderStatusControl({ orderId, status }: { orderId: string; status?: string }) {
+type Shipment = { awb?: string | null; courierName?: string | null };
+
+export function OrderStatusControl({ orderId, status, fulfilmentMode, shipments = [] }: { orderId: string; status?: string; fulfilmentMode?: string; shipments?: Shipment[] }) {
   const router = useRouter();
   const [value, setValue] = useState((status ?? "pending").toLowerCase());
   const [busy, setBusy] = useState(false);
@@ -33,7 +39,14 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
   const [courier, setCourier] = useState("");
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  const next = NEXT[value] ?? [];
+  const pickup = fulfilmentMode === "zatch_pickup";
+  // Packed here counts at once, before the refreshed list brings the shipments: the server
+  // refuses to cancel a packed order, so Cancel must not linger in between.
+  const [justPacked, setJustPacked] = useState(false);
+  const packed = shipments.length > 0 || justPacked;
+  // Pickup orders never offer the manual steps; the seller only packs, then Shiprocket takes over.
+  const next = pickup ? [] : NEXT[value] ?? [];
+  const canCancel = CANCELLABLE.includes(value) && !(pickup && packed);
 
   async function update(to: string, tracking?: { awb: string; courier: string }) {
     const t = getToken();
@@ -46,7 +59,9 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
     setBusy(false);
     const failure = apiError(res, "Couldn't update. Check the details.");
     if (failure) return setErr(failure);
-    setValue(to); setSaved(true); setShipOpen(false); router.refresh();
+    // Packing moves the order to ready_to_ship on the server.
+    if (to === "pack") setJustPacked(true);
+    setValue(to === "pack" ? "ready_to_ship" : to); setSaved(true); setShipOpen(false); router.refresh();
   }
 
   async function sellerCancel(e: React.FormEvent) {
@@ -79,7 +94,13 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
             {next.map((s) => <option key={s} value={s} className="capitalize">{label(s)}</option>)}
           </select>
         )}
-        {CANCELLABLE.includes(value) && (
+        {pickup && !packed && PACKABLE.includes(value) && (
+          <button onClick={() => update("pack")} disabled={busy} title="Books a courier pickup through Shiprocket"
+            className="pill-lime inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold disabled:opacity-60">
+            <PackageCheck className="h-4 w-4" /> Pack order
+          </button>
+        )}
+        {canCancel && (
           <button onClick={() => { setCancelOpen((v) => !v); setShipOpen(false); setErr(null); }} disabled={busy} aria-label="Cancel order" title="Cancel order"
             className="grid h-9 w-9 place-items-center rounded-full border border-hairline text-live transition-colors hover:bg-live/5 disabled:opacity-60">
             <XCircle className="h-4 w-4" />
@@ -87,6 +108,18 @@ export function OrderStatusControl({ orderId, status }: { orderId: string; statu
         )}
         {busy ? <Loader2 className="h-4 w-4 animate-spin text-muted" /> : saved ? <Check className="h-4 w-4 text-lime-deep" /> : null}
       </div>
+
+      {pickup && packed && (
+        <ul className="flex flex-col items-end gap-0.5 text-[12px] text-muted">
+          {shipments.map((s, i) => (
+            <li key={s.awb ?? i} className="inline-flex items-center gap-1.5">
+              <Truck className="h-3.5 w-3.5" />
+              {s.courierName || "Courier"}{s.awb ? ` · AWB ${s.awb}` : ""}
+            </li>
+          ))}
+          <li>Shiprocket updates this order from here.</li>
+        </ul>
+      )}
 
       {shipOpen && (
         <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl bg-surface-2 p-2">

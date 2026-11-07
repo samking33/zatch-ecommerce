@@ -9,9 +9,10 @@ export async function sellerGate(token: string): Promise<{
   approved: boolean;
   status: string;
   display?: SellerStatusDisplay;
+  shippingMethod?: string;
 }> {
   const res = await seller.status(token);
   // A failed lookup (expired session, backend hiccup) is not the same as "not a seller".
   const status = res ? (res.sellerStatus ?? "buyer").toLowerCase() : "unavailable";
-  return { approved: APPROVED.includes(status), status, display: res?.statusDisplay };
+  return { approved: APPROVED.includes(status), status, display: res?.statusDisplay, shippingMethod: res?.sellerProfile?.shippingMethod };
 }

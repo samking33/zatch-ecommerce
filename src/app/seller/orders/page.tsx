@@ -15,6 +15,7 @@ type Line = { name?: string; image?: string; qty?: number; total?: number; price
 type Order = {
   _id: string; orderId?: string; status?: string; createdAt?: string; items?: Line[]; pricing?: { total?: number };
   buyerId?: { username?: string }; sellerId?: string; sellerIds?: string[];
+  fulfilmentMode?: string; shiprocketShipments?: { awb?: string | null; courierName?: string | null }[];
 };
 type Page = { orders?: Order[]; pagination?: { currentPage?: number; totalPages?: number; totalOrders?: number } };
 
@@ -120,7 +121,7 @@ export default async function SellerOrdersPage({
                   </p>
                 </div>
                 <span className="font-display text-lg font-semibold text-ink">{inr(total)}</span>
-                <OrderStatusControl orderId={o._id} status={o.status} />
+                <OrderStatusControl orderId={o._id} status={o.status} fulfilmentMode={o.fulfilmentMode} shipments={o.shiprocketShipments} />
               </div>
             );
           })}

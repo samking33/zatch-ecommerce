@@ -14,7 +14,14 @@ const CONDITIONS = ["New", "Like New", "Good", "Fair", "Used"];
 // Real 4-step create matching the backend: step 1 (basics → productId),
 // step 2 (colors), step 3 (multipart images + sizes), step 4 (stock per variant).
 // Step 4 is what creates the variants and makes the product active.
-export function CreateProduct({ categories }: { categories: Category[] }) {
+//
+// Zatch-pickup sellers send step 1 to create-v3, the only create that marks the product
+// for Shiprocket pickup and stores its package size (v1 and v2 leave every product
+// self-ship, see B-48). Steps 2 to 4 stay on /product/create: v3 takes no image files,
+// only URLs from the upload-token endpoint that leaks the storage key (B-41). That is
+// safe because v3 step 1 writes the same draft (stepData.step1) and later v1 steps never
+// touch `shipping`.
+export function CreateProduct({ categories, pickup = false }: { categories: Category[]; pickup?: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [productId, setProductId] = useState<string | null>(null);
@@ -32,6 +39,10 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     hasColor: true, hasSize: true,
     autoAcceptDiscount: "10", maximumDiscount: "30",
   });
+  // Packed parcel for Shiprocket, pickup sellers only.
+  const [pkg, setPkg] = useState({ weightKg: "", lengthCm: "", breadthCm: "", heightCm: "" });
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
   const [colors, setColors] = useState<string[]>([]);
   const [colorInput, setColorInput] = useState("");
   const [sizes, setSizes] = useState<string[]>([]);
@@ -71,9 +82,9 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   const cat = categories.find((c) => c.slug === s1.category);
   const subs = (cat?.subCategories ?? []) as { name: string; slug: string }[];
 
-  async function postJson(body: unknown) {
+  async function postJson(body: unknown, path = "/api/v1/product/create") {
     const t = getToken();
-    return fetch("/api/v1/product/create", {
+    return fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
       body: JSON.stringify(body),
@@ -99,7 +110,21 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
     if (s1.hsn.trim() && !/^\d{4,8}$/.test(s1.hsn.trim())) return "HSN code must be 4 to 8 digits.";
     const days = Number(s1.estimatedDeliveryDays);
     if (!Number.isInteger(days) || days < 1) return "Delivery time must be a whole number of days, 1 or more.";
+    // Shiprocket quotes shipping and books the courier from these, so the server requires all four.
+    if (pickup && !Object.values(pkg).every((v) => Number(v) > 0)) return "Enter the packed weight and size, all above 0.";
     return null;
+  }
+
+  // The backend's predictor suggests a parcel size from the name and category; the seller can still edit it.
+  async function suggestPackage() {
+    if (!s1.name.trim()) { setSuggestNote("Enter the product name first."); return; }
+    setSuggesting(true); setSuggestNote(null);
+    const res = await postJson({ productName: s1.name.trim(), category: s1.category }, "/api/v1/product/predict-package");
+    setSuggesting(false);
+    const p = res?.predicted ? res.package : null;
+    if (!p) { setSuggestNote("No suggestion for this product. Enter the size yourself."); return; }
+    setPkg({ weightKg: String(p.weightKg), lengthCm: String(p.lengthCm), breadthCm: String(p.breadthCm), heightCm: String(p.heightCm) });
+    setSuggestNote("Suggested from similar products. Check it against your packed parcel.");
   }
 
   async function submitStep1(e: React.FormEvent) {
@@ -119,7 +144,8 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
       estimatedDeliveryDays: Number(s1.estimatedDeliveryDays), returnPolicy: s1.returnPolicy.trim() || undefined,
       orderAcceptingType: s1.orderAcceptingType,
       bargainSettings: { autoAcceptDiscount: Number(s1.autoAcceptDiscount), maximumDiscount: Number(s1.maximumDiscount) },
-    });
+      ...(pickup ? { weightKg: Number(pkg.weightKg), lengthCm: Number(pkg.lengthCm), breadthCm: Number(pkg.breadthCm), heightCm: Number(pkg.heightCm) } : {}),
+    }, pickup ? "/api/v3/product/create-v3" : undefined);
     if (!res?.success || !res.productId) {
       setBusy(false);
       setError(res?.message ?? "Couldn't save. Check the fields.");
@@ -223,6 +249,26 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
           <Field label="Return policy" value={s1.returnPolicy} on={(v) => setS1({ ...s1, returnPolicy: v })} />
           <Toggle label="Free shipping" checked={s1.freeShipping} on={(v) => setS1({ ...s1, freeShipping: v })} />
           <Toggle label="Cash on delivery available" checked={s1.codAvailable} on={(v) => setS1({ ...s1, codAvailable: v })} />
+          {pickup && (
+            <fieldset className="grid gap-4 rounded-2xl border border-hairline p-4 sm:col-span-2 sm:grid-cols-4">
+              <legend className="px-1 text-[13px] font-medium text-ink">Packed parcel (Zatch pickup)</legend>
+              <p className="text-[13px] text-muted sm:col-span-4">
+                Shiprocket prices delivery and books the courier from these, so measure the parcel as packed.
+              </p>
+              {/* step="any": parcels weigh fractions of a kilo (0.25 kg) and the predictor returns decimals. */}
+              <Field label="Weight (kg)" value={pkg.weightKg} on={(v) => setPkg({ ...pkg, weightKg: v })} type="number" step="any" required />
+              <Field label="Length (cm)" value={pkg.lengthCm} on={(v) => setPkg({ ...pkg, lengthCm: v })} type="number" step="any" required />
+              <Field label="Breadth (cm)" value={pkg.breadthCm} on={(v) => setPkg({ ...pkg, breadthCm: v })} type="number" step="any" required />
+              <Field label="Height (cm)" value={pkg.heightCm} on={(v) => setPkg({ ...pkg, heightCm: v })} type="number" step="any" required />
+              <div className="flex flex-wrap items-center gap-3 sm:col-span-4">
+                <button type="button" onClick={suggestPackage} disabled={suggesting}
+                  className="inline-flex items-center gap-2 rounded-full border border-hairline px-4 py-2 text-[13px] font-medium text-ink hover:bg-surface-2 disabled:opacity-60">
+                  {suggesting && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Suggest a size
+                </button>
+                {suggestNote && <p role="status" className="text-[13px] text-muted">{suggestNote}</p>}
+              </div>
+            </fieldset>
+          )}
           {error && <p role="alert" className="text-sm font-medium text-live sm:col-span-2">{error}</p>}
           <div className="sm:col-span-2">
             <Next busy={busy}>Continue</Next>
@@ -344,11 +390,11 @@ export function CreateProduct({ categories }: { categories: Category[] }) {
   );
 }
 
-function Field({ label, value, on, type = "text", full, required, min, max }: { label: string; value: string; on: (v: string) => void; type?: string; full?: boolean; required?: boolean; min?: number; max?: number }) {
+function Field({ label, value, on, type = "text", full, required, min, max, step }: { label: string; value: string; on: (v: string) => void; type?: string; full?: boolean; required?: boolean; min?: number; max?: number; step?: string }) {
   return (
     <label className={`block ${full ? "sm:col-span-2" : ""}`}>
       <span className="text-[12px] font-medium text-muted">{label}</span>
-      <input type={type} required={required} min={min} max={max} value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
+      <input type={type} required={required} min={min} max={max} step={step} value={value} onChange={(e) => on(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-hairline bg-surface-2 px-3.5 text-[15px] text-ink focus:border-ink focus:outline-none" />
     </label>
   );
 }

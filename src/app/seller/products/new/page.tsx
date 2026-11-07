@@ -21,7 +21,7 @@ export default async function NewProductPage() {
   return (
     <SellerShell>
       <SellerHeader title="Add product" sub="Four quick steps - basics, colours, images, stock." />
-      <CreateProduct categories={cats} />
+      <CreateProduct categories={cats} pickup={gate.shippingMethod === "zatch_pickup"} />
     </SellerShell>
   );
 }

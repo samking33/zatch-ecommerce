@@ -24,6 +24,8 @@ type Order = {
   statusHistory?: { status?: string; note?: string; timestamp?: string }[];
   availableActions?: ServerAction[];
   tracking?: { awb?: string; courier?: string; isAvailable?: boolean; estimatedDelivery?: string };
+  // Zatch-pickup orders ship one parcel per item; `tracking` only carries the first.
+  shiprocketShipments?: { itemIndex?: number; awb?: string | null; courierName?: string | null; status?: string | null }[];
   seller?: { id?: string; businessName?: string; name?: string } | null;
   expectedDeliveryFormatted?: string;
   // Seller-only settlement sheet (commission, GST, TCS/TDS) per order.
@@ -75,6 +77,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const cancelled = (order.status ?? "").toLowerCase() === "cancelled"
     ? [...(order.statusHistory ?? [])].reverse().find((h) => h.status === "cancelled")
     : undefined;
+  const parcels = (order.shiprocketShipments ?? []).filter((s) => s.awb);
   // Prefer the server's computed timeline (labels, descriptions, timestamps).
   const timeline: TimelineEvent[] = order.progress?.timeline?.length
     ? order.progress.timeline.filter((e) => e.key !== "in_transit")
@@ -158,7 +161,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 {order.deliveryInfo.formattedAddress}
                 {order.deliveryInfo.phone ? ` · ${order.deliveryInfo.phone}` : ""}
               </p>
-              {order.tracking?.isAvailable && (
+              {parcels.length > 1 ? (
+                <ul className="mt-2 space-y-1 text-sm text-muted">
+                  {parcels.map((s, i) => (
+                    <li key={s.awb ?? i}>
+                      {order.items?.[s.itemIndex ?? -1]?.name ?? `Parcel ${i + 1}`}: {s.courierName || "Courier"} · AWB {s.awb}
+                      {s.status ? ` · ${s.status.replace(/_/g, " ")}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : order.tracking?.isAvailable && (
                 <p className="mt-2 text-sm text-muted">Shipped with {order.tracking.courier} · AWB {order.tracking.awb}</p>
               )}
             </div>

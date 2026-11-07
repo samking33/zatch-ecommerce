@@ -39,7 +39,10 @@ export function SellerRegister({ draft, edit, initialTab = 1 }: { draft?: Seller
   const [shop, setShop] = useState({ businessName: draft?.businessName ?? "", gstin: draft?.gstin ?? draft?.enrollmentId ?? "", pan: "" });
   const [docs, setDocs] = useState<Doc[]>([]);
   // Same fields as the app's address step. Billing is the pickup address unless unticked.
-  const [addr, setAddr] = useState({ line1: draft?.address?.pickupAddress ?? "", line2: "", pinCode: draft?.address?.pinCode ?? "", state: draft?.address?.state ?? "" });
+  const [addr, setAddr] = useState({ line1: draft?.address?.pickupAddress ?? "", line2: "", pinCode: draft?.address?.pinCode ?? "", state: draft?.address?.state ?? "", city: draft?.address?.city ?? "" });
+  // Zatch pickup: Shiprocket collects from the pickup address, so the server registers it
+  // with Shiprocket and needs the city too.
+  const [shipping, setShipping] = useState<"zatch_pickup" | "self_ship">(draft?.shippingMethod ?? "self_ship");
   const [billingSame, setBillingSame] = useState(!billingDiffers);
   const [billing, setBilling] = useState({ line1: billingDiffers ? draftBilling : "", line2: "", pinCode: "", state: "" });
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -86,24 +89,29 @@ export function SellerRegister({ draft, edit, initialTab = 1 }: { draft?: Seller
       const a = await addressApi.geocode(latitude, longitude, t);
       setLocating(false);
       setCoords({ latitude, longitude });
-      if (a) setAddr((x) => ({ ...x, line1: a.line1?.trim() || a.formatted || x.line1, pinCode: a.pincode || x.pinCode, state: a.state || x.state }));
+      if (a) setAddr((x) => ({ ...x, line1: a.line1?.trim() || a.formatted || x.line1, pinCode: a.pincode || x.pinCode, state: a.state || x.state, city: a.city || x.city }));
     }, () => { setLocating(false); setError("Location access was blocked. Fill in the address below."); }, { enableHighAccuracy: true, timeout: 10000 });
   }
 
   function submitAddress() {
-    const join = (a: typeof addr) => [a.line1.trim(), a.line2.trim()].filter(Boolean).join(", ");
-    const bad = (a: typeof addr, what: string) =>
+    // Shared by the pickup and billing addresses; only pickup has a city.
+    type Lines = { line1: string; line2: string; pinCode: string; state: string };
+    const join = (a: Lines) => [a.line1.trim(), a.line2.trim()].filter(Boolean).join(", ");
+    const bad = (a: Lines, what: string) =>
       !a.line1.trim() ? `${what} address line 1 is required.` : !/^\d{6}$/.test(a.pinCode.trim()) ? `${what} pincode must be 6 digits.` : !a.state.trim() ? `${what} state is required.` : null;
     // An unchanged billing address from the server is one line, without its own pincode and state.
     const keptBilling = !billingSame && billingDiffers && billing.line1 === draftBilling && !billing.pinCode && !billing.state;
-    const problem = bad(addr, "Pickup") ?? (billingSame || keptBilling ? null : bad(billing, "Billing"));
+    const problem = bad(addr, "Pickup")
+      ?? (shipping === "zatch_pickup" && !addr.city.trim() ? "City is required for Zatch pickup." : null)
+      ?? (billingSame || keptBilling ? null : bad(billing, "Billing"));
     if (problem) return setError(problem);
     // The server keeps billing as one line, so its pincode and state go into the text.
     const billingAddress = billingSame ? join(addr) : keptBilling ? draftBilling : `${join(billing)}, ${billing.state.trim()} ${billing.pinCode.trim()}`;
     submitJson(2, {
       pickupAddress: join(addr), billingAddress, pinCode: addr.pinCode.trim(), state: addr.state.trim(),
-      // An edit leaves the seller's shipping method as the server has it.
-      ...(edit ? {} : { shippingMethod: "self_ship" }),
+      ...(addr.city.trim() ? { city: addr.city.trim() } : {}),
+      // Pre-filled from the server, so an edit only changes it when the seller does.
+      shippingMethod: shipping,
       ...(coords ?? {}),
     }, 3);
   }
@@ -183,10 +191,26 @@ export function SellerRegister({ draft, edit, initialTab = 1 }: { draft?: Seller
           </button>
           <Field label="Pickup address line 1" value={addr.line1} on={(v) => setAddr({ ...addr, line1: v })} required />
           <Field label="Address line 2 (optional)" value={addr.line2} on={(v) => setAddr({ ...addr, line2: v })} />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Pincode" value={addr.pinCode} on={(v) => setAddr({ ...addr, pinCode: v.replace(/\D/g, "").slice(0, 6) })} required />
+            <Field label={shipping === "zatch_pickup" ? "City" : "City (optional)"} value={addr.city} on={(v) => setAddr({ ...addr, city: v })} required={shipping === "zatch_pickup"} />
             <Field label="State" value={addr.state} on={(v) => setAddr({ ...addr, state: v })} required />
           </div>
+          <fieldset className="grid gap-2">
+            <legend className="mb-2 text-[13px] font-medium text-ink">How will you ship orders?</legend>
+            {([
+              ["self_ship", "I'll ship them myself", "Use any courier and add the tracking number when you ship."],
+              ["zatch_pickup", "Zatch pickup", "A Shiprocket courier collects from your pickup address. You only pack the order."],
+            ] as const).map(([value, title, hint]) => (
+              <label key={value} className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 ${shipping === value ? "border-ink bg-surface-2" : "border-hairline"}`}>
+                <input type="radio" name="shippingMethod" value={value} checked={shipping === value} onChange={() => setShipping(value)} className="mt-1 h-4 w-4 accent-ink" />
+                <span>
+                  <span className="block text-[15px] font-medium text-ink">{title}</span>
+                  <span className="block text-[13px] text-muted">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
           <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3">
             <input type="checkbox" checked={billingSame} onChange={(e) => setBillingSame(e.target.checked)} className="h-4 w-4 accent-ink" />
             <span className="text-[15px] text-ink">Billing address same as pickup address</span>
