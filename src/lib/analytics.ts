@@ -79,6 +79,24 @@ function eventId(seed?: string): string {
   }
 }
 
+/**
+ * Send the same event server-side, where an ad blocker can't stop it. The id
+ * matches the pixel's, so Meta counts one action rather than two. Fire and
+ * forget: analytics must never delay or break the page.
+ */
+function relay(event: string, id: string, params: Record<string, unknown> = {}) {
+  try {
+    fetch("/api/capi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, eventId: id, path: location.pathname, ...params }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* analytics is never worth an exception */
+  }
+}
+
 function send(opts: {
   metaEvent: string;
   metaParams?: Record<string, unknown>;
@@ -94,6 +112,7 @@ function send(opts: {
   if (typeof w.fbq === "function") {
     w.fbq("track", opts.metaEvent, opts.metaParams, { eventID: id });
   }
+  relay(opts.metaEvent, id, opts.metaParams);
   if (typeof w.gtag === "function") {
     // No send_to, so this reaches every configured destination: GA4 for reporting
     // and the Ads tag, which reads the item ids for dynamic remarketing.
