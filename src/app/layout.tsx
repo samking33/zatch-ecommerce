@@ -32,7 +32,9 @@ export const metadata: Metadata = {
   },
   description:
     "Zatch is India's first live bargain marketplace. Watch sellers go live, discover products through short videos, and negotiate your price in real time.",
-  metadataBase: new URL("https://zatch.shop"),
+  // The store. zatch.shop is the separate marketing site, which answers every
+  // path with its landing page, so share and canonical links must not point there.
+  metadataBase: new URL("https://live.zatch.shop"),
   openGraph: { type: "website", siteName: "Zatch" },
   verification: { google: "qUUEfX4LVyBz5OqcvWL_E80sPvOAh4n1a_a3CZAg1jc" },
 };
