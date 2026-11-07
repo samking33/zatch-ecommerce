@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { HeroBanner } from "@/components/home/hero-banner";
+import { AdSlot, AdPopup } from "@/components/ads/ad-slot";
 import { Rail } from "@/components/home/rail";
 import { VideoRail } from "@/components/home/video-rail";
 import { LiveRailCard, ProductRailCard, SellerRailCard, type RailSeller } from "@/components/home/rail-cards";
@@ -53,6 +54,8 @@ export default async function HomePage() {
       <Nav />
       <main className="mx-auto max-w-[1400px] px-3 pb-16 pt-2 sm:px-5">
         <HeroBanner liveCount={onAir.length} topProduct={products[0]} topBit={bitList[0]} images={heroImages} />
+        <AdSlot placement="home_banner" className="mt-4" />
+        <AdPopup />
 
         {feed.length > 0 && (
           <VideoRail

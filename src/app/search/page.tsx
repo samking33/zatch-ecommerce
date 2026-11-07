@@ -3,6 +3,7 @@ import Image from "next/image";
 import { TrendingUp, Clock, Search as SearchIcon, Play, Users as UsersIcon } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { TrackSearch } from "@/components/analytics/track-event";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { ProductCard } from "@/components/ui/product-card";
 import { api, search as searchApi, users } from "@/lib/api";
 import { serverToken } from "@/lib/session";
@@ -162,6 +163,7 @@ export default async function SearchPage({
           </Link>
         ))}
       </nav>
+      <AdSlot placement="search" className="mb-6" />
 
       {!tab && cats.length > 0 && (
         <div className="mb-6 flex flex-wrap gap-2">

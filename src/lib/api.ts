@@ -178,7 +178,8 @@ export type SellerStatusDisplay = {
 /** What the seller already entered (bank details are never sent back). */
 export type SellerProfileDraft = {
   businessName?: string; gstin?: string; enrollmentId?: string;
-  address?: { pickupAddress?: string; billingAddress?: string; pinCode?: string; state?: string };
+  address?: { pickupAddress?: string; billingAddress?: string; pinCode?: string; state?: string; city?: string };
+  shippingMethod?: "zatch_pickup" | "self_ship";
 };
 
 export const seller = {
@@ -209,7 +210,6 @@ export const products = {
   myProducts: (t: string) => api<Product[]>("/product/seller/my-products", { token: t, pick: "products", revalidate: 0 }),
   create: (b: unknown, t: string) => api("/product/create", { method: "POST", body: b, token: t }),
   createV2: (b: unknown, t: string) => api("/product/create-v2", { method: "POST", body: b, token: t }),
-  uploadTokens: (t: string) => api("/product/upload-tokens", { method: "POST", token: t }),
   updateStatus: (id: string, b: unknown, t: string) =>
     api(`/product/${id}/status`, { method: "PUT", body: b, token: t }),
   // Permanent: removes the product and its images. The server checks ownership.
@@ -235,6 +235,21 @@ export const products = {
 };
 
 // --- Categories & search (/category, /search) ---
+// --- Ads (/ads): promotions the admin schedules per placement ---
+export type AdPlacement = "home_banner" | "home_popup" | "product_listing" | "search" | "cart";
+// product, category and bit redirects carry an id; external carries an https URL.
+export type Ad = {
+  _id: string;
+  title: string;
+  description?: string;
+  imageUrl: string;
+  redirectType: "none" | "product" | "category" | "bit" | "external";
+  redirectValue?: string;
+};
+export const ads = {
+  list: (placement: AdPlacement) => api<Ad[]>(`/ads${qs({ placement, limit: 5 })}`, { pick: "data", revalidate: 60 }),
+};
+
 export const categories = {
   list: () => api<Category[]>("/category", { pick: "categories" }),
   subcategories: (id: string) => api(`/category/${id}/subcategories`, { pick: "subCategories" }),
@@ -429,7 +444,6 @@ export const bits = {
   get: (id: string, t?: string) => api<Bit>(`/bits/${id}`, { token: t, pick: "bitsDetails", version: "v2", revalidate: t ? 0 : 60 }),
   // timeFilter: This Week (default) | This Month | This Year
   dashboard: (t: string, timeFilter?: string) => api(`/bits/dashboard${qs({ timeFilter })}`, { token: t, raw: true, revalidate: 0 }),
-  uploadToken: (t: string) => api("/bits/upload-token", { token: t, raw: true, revalidate: 0 }),
   upload: (b: unknown, t: string) => api("/bits/upload", { method: "POST", body: b, token: t }),
   toggleLike: (id: string, t: string) => api(`/bits/${id}/toggleLike`, { method: "POST", token: t, raw: true }),
   save: (id: string, t: string) => api(`/bits/${id}/save`, { method: "POST", token: t, raw: true }),

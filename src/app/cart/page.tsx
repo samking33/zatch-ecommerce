@@ -7,6 +7,7 @@ import { Nav } from "@/components/site/nav";
 import { Footer } from "@/components/site/footer";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { ProductMedia } from "@/components/ui/product-media";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { cart as cartApi, apiError } from "@/lib/api";
 import { getToken, setAppliedCoupon } from "@/lib/client-auth";
 import { inr, variantText } from "@/lib/utils";
@@ -179,6 +180,7 @@ export default function CartPage() {
           <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
             <div className="flex flex-col gap-4">
               {cartError && <p role="alert" className="rounded-xl bg-live/10 px-4 py-3 text-sm font-medium text-live">{cartError}</p>}
+              <AdSlot placement="cart" />
               {items.map((it, idx) => {
                 const qty = it.qty ?? 1;
                 return (

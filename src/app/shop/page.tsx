@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { products as productsApi, categories as categoriesApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 
@@ -115,6 +116,8 @@ export default async function ShopPage({
           <Link href={`/shop${category ? `?category=${encodeURIComponent(category)}` : ""}`} className="text-muted hover:text-ink">Clear</Link>
         )}
       </form>
+
+      <AdSlot placement="product_listing" className="mb-4" />
 
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">

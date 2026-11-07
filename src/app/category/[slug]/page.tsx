@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
+import { AdSlot } from "@/components/ads/ad-slot";
 import { products as productsApi, categories as categoriesApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
 import type { Category } from "@/lib/types";
@@ -25,6 +27,11 @@ export default async function CategoryPage({
     categoriesApi.list(),
   ]);
 
+  // Ads (and anything else built from a category id) link by id; send those to the slug URL.
+  if (/^[0-9a-f]{24}$/i.test(decoded)) {
+    const byId = (cats as Category[] | null)?.find((c) => c._id === decoded);
+    if (byId?.slug) redirect(`/category/${encodeURIComponent(byId.slug)}${sub ? `?sub=${encodeURIComponent(sub)}` : ""}`);
+  }
   const cat = (cats as Category[] | null)?.find((c) => c.slug === decoded);
   const title = cat?.name ?? decoded;
   const subs = (cat?.subCategories ?? []) as { name: string; slug: string }[];
@@ -65,6 +72,8 @@ export default async function CategoryPage({
           })}
         </div>
       )}
+
+      <AdSlot placement="product_listing" className="mb-4" />
 
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">
