@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw, Zap, X, Minus, Plus } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
@@ -61,7 +61,7 @@ export function ProductView({ product }: { product: Product }) {
   // A product with no variants can never be added to a cart (the server matches a variant), so it is unavailable.
   const unavailable = variants.length === 0;
   const outOfStock = unavailable || soldOut(selected);
-  // Picking a colour clears the size; without one the server would match any size of that colour.
+  // A size must be picked; without one the server would match any size of that colour.
   const needsSize = sizes.length > 0 && !size;
   // What the server stored for this variant: the picked size, or its hidden placeholder ("NONE").
   // The server matches the stored text exactly, so sending nothing fails with "Size is required".
@@ -87,15 +87,31 @@ export function ProductView({ product }: { product: Product }) {
 
   function pickColor(c: string) {
     setColor(c);
-    setSize(undefined);
+    // Keep the buyer's size when the new colour has it in stock.
+    setSize((s) => (s && variants.some((v) => v.color === c && v.size === s && !soldOut(v)) ? s : undefined));
     setQty(1);
     // Switch the main image to this colour's image when it has one.
     const v = swatchImg(c);
     if (v?.images?.[0]?.url) setActiveUrl(v.images[0].url);
   }
 
+  const off = product.discountedPrice && product.discountedPrice < product.price
+    ? Math.round((1 - product.discountedPrice / product.price) * 100) : 0;
+
+
   const [status, setStatus] = useState<"idle" | "adding" | "added" | "error">("idle");
   const [cartError, setCartError] = useState<string | null>(null);
+
+  // Phones get a buy bar fixed to the bottom while the page's own buttons are off screen.
+  const buyRow = useRef<HTMLDivElement>(null);
+  const [buyRowVisible, setBuyRowVisible] = useState(true);
+  useEffect(() => {
+    const el = buyRow.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setBuyRowVisible(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [status]);
   async function addToCart() {
     const token = getToken();
     if (!token) { router.push("/login"); return; }
@@ -113,7 +129,8 @@ export function ProductView({ product }: { product: Product }) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    // Bottom margin on phones so the buy bar never covers the end of the page.
+    <div className="grid grid-cols-1 gap-4 max-lg:mb-20 lg:grid-cols-2">
       {/* gallery */}
       <div className="card h-fit rounded-[2rem] p-6 lg:sticky lg:top-28">
         <button
@@ -129,6 +146,7 @@ export function ProductView({ product }: { product: Product }) {
             tone="cobalt"
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="h-full w-full"
+            priority
           />
         </button>
         <dialog
@@ -145,16 +163,17 @@ export function ProductView({ product }: { product: Product }) {
           </div>
         </dialog>
         {gallery.length > 1 && (
-          <div className="mt-4 flex flex-wrap gap-3">
-            {gallery.map((im) => {
+          // One swipeable row on phones, so the price isn't pushed two screens down.
+          <div className="-mx-1 mt-4 flex gap-3 overflow-x-auto px-1 py-1 [scrollbar-width:none] lg:flex-wrap">
+            {gallery.map((im, n) => {
               const active = im.url === activeUrl;
               return (
                 <button
                   key={im.url}
                   onClick={() => setActiveUrl(im.url)}
-                  aria-label="View image"
+                  aria-label={`Photo ${n + 1} of ${gallery.length}`}
                   aria-pressed={active}
-                  className={`aspect-square w-20 overflow-hidden rounded-2xl bg-surface-2 p-0.5 ring-2 transition ${
+                  className={`aspect-square w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2 p-0.5 ring-2 transition ${
                     active ? "ring-ink" : "ring-transparent hover:ring-ink/30"
                   }`}
                 >
@@ -188,10 +207,13 @@ export function ProductView({ product }: { product: Product }) {
           )}
           {product.SKU && <p className="mt-2 text-[12px] text-muted">SKU {product.SKU}</p>}
 
-          <div className="mt-5 flex items-baseline gap-3">
+          <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-display text-3xl font-semibold text-ink">{inr(price)}</span>
-            {product.discountedPrice && product.discountedPrice < product.price && (
-              <span className="text-lg text-muted line-through">{inr(product.price)}</span>
+            {off > 0 && (
+              <>
+                <span className="text-lg text-muted line-through">{inr(product.price)}</span>
+                <span className="rounded-full bg-ink px-2.5 py-1 text-[12px] font-semibold text-surface">{off}% off</span>
+              </>
             )}
           </div>
           {(product.specialHourPercent ?? 0) > 0 && (
@@ -232,7 +254,7 @@ export function ProductView({ product }: { product: Product }) {
           )}
 
           {sizes.length > 0 && (
-            <div className="mt-5">
+            <div id="size-picker" className="mt-5">
               <p className="text-[13px] font-medium text-muted">Size</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {sizes.map((s) => (
@@ -276,7 +298,7 @@ export function ProductView({ product }: { product: Product }) {
                 </div>
               )}
               {needsSize && <p className="mb-3 text-sm font-medium text-ink">Choose a size to continue.</p>}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div ref={buyRow} className="grid gap-3 sm:grid-cols-2">
                 <button onClick={addToCart} disabled={status === "adding" || outOfStock || needsSize} className="btn-ink inline-flex w-full items-center justify-center gap-2 rounded-full py-4 text-[15px] font-semibold disabled:opacity-50">
                   {status === "adding" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ShoppingBag className="h-[18px] w-[18px]" />}
                   {unavailable ? "Not available yet" : outOfStock ? "Sold out" : status === "adding" ? "Adding…" : "Add to cart"}
@@ -315,6 +337,29 @@ export function ProductView({ product }: { product: Product }) {
             </p>
           )}
         </div>
+
+        {!product.myProduct && !unavailable && !buyRowVisible && (
+          <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-hairline bg-surface/95 px-4 py-3 backdrop-blur lg:hidden">
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg font-semibold leading-tight text-ink">{inr(price)}</p>
+              {off > 0 && <p className="text-[12px] text-muted"><span className="line-through">{inr(product.price)}</span> · {off}% off</p>}
+            </div>
+            {outOfStock ? (
+              <span className="rounded-full bg-surface-2 px-5 py-3 text-sm font-semibold text-muted">Sold out</span>
+            ) : status === "added" ? (
+              <Link href="/cart" className="btn-ink rounded-full px-5 py-3 text-sm font-semibold">View cart</Link>
+            ) : needsSize ? (
+              <a href="#size-picker" className="btn-ink rounded-full px-5 py-3 text-sm font-semibold">Choose a size</a>
+            ) : (
+              <>
+                <button onClick={addToCart} disabled={status === "adding"} className="btn-ink rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-50">
+                  {status === "adding" ? "Adding…" : "Add to cart"}
+                </button>
+                <button onClick={buyNow} disabled={status === "adding"} className="pill-lime rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-50">Buy now</button>
+              </>
+            )}
+          </div>
+        )}
 
         {!product.myProduct && canBargain && (
           needsSize ? (

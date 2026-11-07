@@ -59,10 +59,10 @@ const QUIET_DAYS = 7;
  * The "get the app" prompt: a bottom banner on phones whose button goes to that phone's
  * store, and a corner card with both stores on computers. Closing it hides it for a week.
  * Kept off pages where it would cover what people are doing: checkout (the pay button),
- * live rooms (the chat box) and the seller console.
+ * product pages (the phone buy bar), live rooms (the chat box) and the seller console.
  */
 // `/seller/<user id>` is a public shop, so it keeps the prompt; the rest of /seller is the console.
-const HIDDEN_ON = [/^\/checkout/, /^\/live\//, /^\/admin/, /^\/seller\/(?![0-9a-f]{24}(\/|$))/i];
+const HIDDEN_ON = [/^\/checkout/, /^\/live\//, /^\/admin/, /^\/product\//, /^\/seller\/(?![0-9a-f]{24}(\/|$))/i];
 
 export function AppPrompt() {
   const path = usePathname();

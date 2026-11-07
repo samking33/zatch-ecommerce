@@ -3,6 +3,7 @@ import { PageShell, PageHeader } from "@/components/site/page-shell";
 import { ProductCard } from "@/components/ui/product-card";
 import { catalog } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { Pager } from "@/components/site/listing-controls";
 
 export const metadata = { title: "Today's picks" };
 
@@ -28,13 +29,7 @@ export default async function PicksPage({ searchParams }: { searchParams: Promis
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {items.map((p) => <ProductCard key={p._id} product={p} />)}
           </div>
-          {pages > 1 && (
-            <nav aria-label="Pages" className="mt-8 flex items-center justify-center gap-3 text-sm">
-              {page > 1 && <Link href={page === 2 ? "/picks" : `/picks?page=${page - 1}`} className="rounded-full border border-hairline px-4 py-2 font-medium text-ink hover:bg-surface-2">Previous</Link>}
-              <span className="text-muted">Page {page} of {pages}</span>
-              {page < pages && <Link href={`/picks?page=${page + 1}`} className="rounded-full border border-hairline px-4 py-2 font-medium text-ink hover:bg-surface-2">Next</Link>}
-            </nav>
-          )}
+          <Pager page={page} pages={pages} href={(n) => (n === 1 ? "/picks" : `/picks?page=${n}`)} />
         </>
       )}
     </PageShell>

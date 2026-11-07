@@ -203,8 +203,9 @@ export const products = {
   topPicks: () => api<Product[]>("/product/top-picks", { version: "v2" }),
   // Backend search param is `query` (not `q`).
   search: (q: string, t?: string) => api<Product[]>(`/product/search${qs({ query: q })}`, { token: t, pick: "products", version: "v2", revalidate: t ? 0 : 60 }),
+  // Raw, for the page count: { products, pagination: { total, page, limit, pages } }.
   filter: (o: Record<string, string | number | undefined>, t?: string) =>
-    api<Product[]>(`/product/filter${qs(o)}`, { token: t, pick: "products", version: "v2" }),
+    api<{ products?: Product[]; pagination?: { pages?: number } }>(`/product/filter${qs(o)}`, { token: t, raw: true, version: "v2" }),
   get: (id: string) => api<Product>(`/product/${id}`, { pick: "product", version: "v2" }),
   myProducts: (t: string) => api<Product[]>("/product/seller/my-products", { token: t, pick: "products", revalidate: 0 }),
   create: (b: unknown, t: string) => api("/product/create", { method: "POST", body: b, token: t }),
@@ -214,8 +215,10 @@ export const products = {
   // Permanent: removes the product and its images. The server checks ownership.
   remove: (id: string, t: string) =>
     api(`/product/${id}/action`, { method: "POST", body: { action: "delete" }, token: t }),
-  like: (id: string, t: string) => api(`/product/${id}/like`, { method: "POST", token: t }),
-  save: (id: string, t: string) => api(`/product/${id}/save`, { method: "POST", token: t }),
+  // Both toggle on the server and answer the new state. Raw: unwrapped, an unlike came back
+  // as plain `false` and was taken for a failure.
+  like: (id: string, t: string) => api<{ isLiked?: boolean }>(`/product/${id}/like`, { method: "POST", token: t, raw: true }),
+  save: (id: string, t: string) => api<{ isSaved?: boolean }>(`/product/${id}/save`, { method: "POST", token: t, raw: true }),
   view: (id: string, t?: string) => api(`/product/${id}/view`, { method: "POST", token: t }),
   share: (id: string, t?: string) => api(`/product/${id}/share`, { method: "POST", token: t }),
   comment: (id: string, b: unknown, t: string) =>
@@ -263,14 +266,19 @@ export const trending = {
 };
 
 // --- Cart (/cart) ---
+// Tells the header's cart badge to re-read the count after the cart changes (browser only).
+export const CART_CHANGED = "zatch:cart-changed";
+const announceCart = <T,>(p: Promise<T>) =>
+  p.then((r) => { if (typeof window !== "undefined") window.dispatchEvent(new Event(CART_CHANGED)); return r; });
+
 export const cart = {
   get: (t: string) => api("/cart", { token: t, pick: "cart", revalidate: 0 }),
-  update: (b: unknown, t: string) => api("/cart/update", { method: "POST", body: b, token: t, keepError: true }),
-  remove: (b: unknown, t: string) => api("/cart/remove", { method: "POST", body: b, token: t, keepError: true }),
+  update: (b: unknown, t: string) => announceCart(api("/cart/update", { method: "POST", body: b, token: t, keepError: true })),
+  remove: (b: unknown, t: string) => announceCart(api("/cart/remove", { method: "POST", body: b, token: t, keepError: true })),
   applyCoupon: (b: unknown, t: string) => api("/cart/coupon", { method: "POST", body: b, token: t, keepError: true }),
   removeCoupon: (t: string) => api("/cart/coupon", { method: "DELETE", token: t }),
   addBargain: (bargainId: string, t: string) =>
-    api(`/cart/${bargainId}/add-bargain`, { method: "POST", token: t, keepError: true }),
+    announceCart(api(`/cart/${bargainId}/add-bargain`, { method: "POST", token: t, keepError: true })),
 };
 
 // --- Coupons (/coupons) ---

@@ -11,6 +11,7 @@ export function ProductMedia({
   sizes = "(max-width: 768px) 50vw, 25vw",
   className,
   float = false,
+  priority = false,
 }: {
   src?: string;
   alt: string;
@@ -18,11 +19,13 @@ export function ProductMedia({
   sizes?: string;
   className?: string;
   float?: boolean;
+  // For the photo that is the page's main content: loads first instead of lazily.
+  priority?: boolean;
 }) {
   if (src) {
     return (
       <div className={cn("relative overflow-hidden", className)}>
-        <Image src={src} alt={alt} fill sizes={sizes} className="object-cover" />
+        <Image src={src} alt={alt} fill sizes={sizes} priority={priority} className="object-cover" />
       </div>
     );
   }

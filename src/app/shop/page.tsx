@@ -4,27 +4,23 @@ import { ProductCard } from "@/components/ui/product-card";
 import { AdRow } from "@/components/ads/ad-slot";
 import { products as productsApi, categories as categoriesApi, ads as adsApi } from "@/lib/api";
 import { serverToken } from "@/lib/session";
+import { SortBar, PriceFilter, Pager, PAGE_SIZE, listingParams, listingHref } from "@/components/site/listing-controls";
 
 export const metadata = { title: "Shop all" };
-
-const SORTS = [
-  { key: "", label: "Newest" },
-  { key: "popular", label: "Popular" },
-  { key: "price_asc", label: "Price ↑" },
-  { key: "price_desc", label: "Price ↓" },
-];
 
 const ALL_SLUG = "explore-all";
 
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; sort?: string; min?: string; max?: string; stock?: string }>;
+  searchParams: Promise<{ category?: string; sort?: string; min?: string; max?: string; stock?: string; page?: string }>;
 }) {
-  const { category = "", sort = "", min = "", max = "", stock = "" } = await searchParams;
+  const sp = await searchParams;
+  const { category = "", sort = "", stock = "" } = sp;
+  const { page, min, max } = listingParams(sp);
   const t = await serverToken();
 
-  const [products, categories, listingAds] = await Promise.all([
+  const [res, categories, listingAds] = await Promise.all([
     // `filter` honours category/price/stock; `products` does not.
     productsApi.filter(
       {
@@ -33,7 +29,8 @@ export default async function ShopPage({
         minPrice: min || undefined,
         maxPrice: max || undefined,
         hasStock: stock === "1" ? "true" : undefined,
-        limit: 40,
+        limit: PAGE_SIZE,
+        page,
       },
       t,
     ),
@@ -41,7 +38,9 @@ export default async function ShopPage({
     adsApi.list("product_listing"),
   ]);
 
-  const items = products ?? [];
+  const items = res?.products ?? [];
+  const pages = res?.pagination?.pages ?? 1;
+  const current = { category, sort, min, max, stock };
   const cats = categories ?? [];
   const active = category || ALL_SLUG;
 
@@ -52,14 +51,6 @@ export default async function ShopPage({
     const q = p.toString();
     return `/shop${q ? `?${q}` : ""}`;
   };
-  const sortHref = (key: string) => {
-    const p = new URLSearchParams();
-    if (category) p.set("category", category);
-    if (key) p.set("sort", key);
-    const q = p.toString();
-    return `/shop${q ? `?${q}` : ""}`;
-  };
-
   return (
     <PageShell>
       <PageHeader
@@ -82,50 +73,19 @@ export default async function ShopPage({
           ))}
       </div>
 
-      {/* sort */}
-      <div className="mb-6 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">Sort:</span>
-        {SORTS.map((s) => (
-          <Link
-            key={s.key}
-            href={sortHref(s.key)}
-            className={`rounded-full px-3 py-1.5 font-medium transition-colors ${
-              (sort || "") === s.key
-                ? "bg-ink text-surface"
-                : "text-ink hover:bg-surface-2"
-            }`}
-          >
-            {s.label}
-          </Link>
-        ))}
-      </div>
+      <SortBar current={sort} href={(k) => listingHref("/shop", { category, sort: k }, {})} />
 
-      {/* price range + in-stock (server-side filter) */}
-      <form action="/shop" className="mb-6 flex flex-wrap items-center gap-2 text-sm">
-        {category && <input type="hidden" name="category" value={category} />}
-        {sort && <input type="hidden" name="sort" value={sort} />}
-        <span className="text-muted">Price</span>
-        <input name="min" defaultValue={min} inputMode="numeric" placeholder="Min ₹" className="h-9 w-24 rounded-full border border-hairline bg-surface-2 px-3.5 text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
-        <span className="text-muted">-</span>
-        <input name="max" defaultValue={max} inputMode="numeric" placeholder="Max ₹" className="h-9 w-24 rounded-full border border-hairline bg-surface-2 px-3.5 text-ink placeholder:text-muted focus:border-ink focus:outline-none" />
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-hairline px-3.5 py-1.5 text-ink">
-          <input type="checkbox" name="stock" value="1" defaultChecked={stock === "1"} className="accent-ink" />
-          In stock
-        </label>
-        <button type="submit" className="btn-ink rounded-full px-4 py-2 font-semibold">Apply</button>
-        {(min || max || stock) && (
-          <Link href={`/shop${category ? `?category=${encodeURIComponent(category)}` : ""}`} className="text-muted hover:text-ink">Clear</Link>
-        )}
-      </form>
+      <PriceFilter action="/shop" keep={{ category, sort }} min={min} max={max} stock={stock}
+        clearHref={listingHref("/shop", { category, sort }, {})} />
 
       <AdRow ads={listingAds ?? []} className="mb-4" />
 
       {items.length === 0 ? (
         <div className="card grid place-items-center rounded-[2rem] p-16 text-center">
           <p className="font-display text-xl font-semibold text-ink">
-            Nothing in this category yet
+            {min || max || stock ? "Nothing matches these filters" : "Nothing in this category yet"}
           </p>
-          <p className="mt-2 text-muted">Try another category or browse all.</p>
+          <p className="mt-2 text-muted">{min || max || stock ? "Try a wider price range." : "Try another category or browse all."}</p>
           <Link href="/shop" className="pill-lime mt-6 rounded-full px-6 py-3 text-sm font-semibold">
             Browse all
           </Link>
@@ -137,6 +97,7 @@ export default async function ShopPage({
           ))}
         </div>
       )}
+      <Pager page={page} pages={pages} href={(n) => listingHref("/shop", current, { page: n })} />
     </PageShell>
   );
 }

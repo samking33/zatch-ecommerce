@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart, Bookmark, Share2, Check, Star, Send, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
@@ -17,6 +17,10 @@ export function ProductActions({ product }: { product: Product }) {
   const [likes, setLikes] = useState(product.likeCount ?? 0);
   const [saved, setSaved] = useState(!!product.isSaved);
   const [shared, setShared] = useState(false);
+  // One request at a time: the server toggles, so a second click mid-request flipped it back.
+  // The ref blocks clicks that land before React re-renders; the state greys the button.
+  const [pending, setPending] = useState<"like" | "save" | null>(null);
+  const inFlight = useRef(false);
 
   // Real view tracking, once per mount.
   useEffect(() => {
@@ -31,21 +35,24 @@ export function ProductActions({ product }: { product: Product }) {
     return t;
   }
 
+  // The button follows the server's answer, not the guess, so it always shows what is saved.
   async function like() {
-    const t = auth(); if (!t) return;
-    const next = !liked;
-    setLiked(next); setLikes((n) => n + (next ? 1 : -1));
+    const t = auth(); if (!t || inFlight.current) return;
+    inFlight.current = true; setPending("like");
     const res = await productsApi.like(product._id, t);
-    if (!res) { setLiked(!next); setLikes((n) => n + (next ? -1 : 1)); }
+    inFlight.current = false; setPending(null);
+    if (typeof res?.isLiked !== "boolean" || res.isLiked === liked) return;
+    setLiked(res.isLiked); setLikes((n) => Math.max(0, n + (res.isLiked ? 1 : -1)));
   }
 
   async function save() {
-    const t = auth(); if (!t) return;
-    const next = !saved;
-    setSaved(next);
+    const t = auth(); if (!t || inFlight.current) return;
+    inFlight.current = true; setPending("save");
     const res = await productsApi.save(product._id, t);
-    if (!res) setSaved(!next);
-    else if (next) trackAddToWishlist(toItem(product));
+    inFlight.current = false; setPending(null);
+    if (typeof res?.isSaved !== "boolean") return;
+    setSaved(res.isSaved);
+    if (res.isSaved && !saved) trackAddToWishlist(toItem(product));
   }
 
   async function share() {
@@ -60,12 +67,18 @@ export function ProductActions({ product }: { product: Product }) {
 
   return (
     <div className="mt-5 flex flex-wrap gap-2.5">
-      <button onClick={like} className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${liked ? "border-live bg-live/10 text-live" : "border-hairline text-ink hover:bg-surface-2"}`}>
-        <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} /> {likes > 0 ? compact(likes) : "Like"}
-      </button>
-      <button onClick={save} className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${saved ? "border-ink bg-ink text-surface" : "border-hairline text-ink hover:bg-surface-2"}`}>
-        <Bookmark className={`h-4 w-4 ${saved ? "fill-current" : ""}`} /> {saved ? "Saved" : "Save"}
-      </button>
+      {/* Fixed widths and a word that stays, so the row doesn't jump when the label changes.
+          Hidden on the seller's own product, where a like or save only inflates the counts. */}
+      {!product.myProduct && <>
+        <button onClick={like} disabled={pending === "like"} aria-pressed={liked} aria-label={`${liked ? "Liked" : "Like"}, ${likes}`}
+          className={`inline-flex min-w-[8rem] items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-70 ${liked ? "border-live bg-live/10 text-live" : "border-hairline text-ink hover:bg-surface-2"}`}>
+          <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} /> {liked ? "Liked" : "Like"}{likes > 0 && ` · ${compact(likes)}`}
+        </button>
+        <button onClick={save} disabled={pending === "save"} aria-pressed={saved}
+          className={`inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-70 ${saved ? "border-ink bg-ink text-surface" : "border-hairline text-ink hover:bg-surface-2"}`}>
+          <Bookmark className={`h-4 w-4 ${saved ? "fill-current" : ""}`} /> {saved ? "Saved" : "Save"}
+        </button>
+      </>}
       <button onClick={share} className="inline-flex items-center gap-2 rounded-full border border-hairline px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-surface-2">
         {shared ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />} {shared ? "Copied" : "Share"}
       </button>
@@ -107,7 +120,7 @@ export function ProductReviews({ product }: { product: Product }) {
     } else {
       const res = await productsApi.comment(product._id, { text: body }, t);
       setBusy(false);
-      const failure = apiError(res, "Couldn't post your comment.");
+      const failure = apiError(res, "Couldn't post your question.");
       if (!failure) {
         setComments((c) => [...c, { _id: `local-${Date.now()}`, text: body, user: { _id: "me", username: "You" } }]);
         setText(""); setMsg(null);
@@ -124,7 +137,8 @@ export function ProductReviews({ product }: { product: Product }) {
             onClick={() => { setTab(k); setMsg(null); }}
             className={`rounded-full px-4 py-2 text-sm font-medium capitalize transition-colors ${tab === k ? "bg-ink text-surface" : "text-ink hover:bg-surface-2"}`}
           >
-            {k} ({k === "reviews" ? reviews.length : comments.length})
+            {/* The comments are questions to the seller, so the tab says so. */}
+            {k === "reviews" ? "Reviews" : "Questions"} ({k === "reviews" ? reviews.length : comments.length})
           </button>
         ))}
       </div>
@@ -180,6 +194,7 @@ export function ProductReviews({ product }: { product: Product }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={tab === "reviews" ? "Write a review…" : "Ask a question…"}
+            aria-label={tab === "reviews" ? "Your review" : "Your question"}
             className="h-11 flex-1 rounded-full border border-hairline bg-surface-2 px-4 text-[15px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
           />
           <button type="submit" disabled={busy || !text.trim()} aria-label="Post" className="btn-ink grid h-11 w-11 shrink-0 place-items-center rounded-full disabled:opacity-50">
