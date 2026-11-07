@@ -8,6 +8,7 @@ import {
   ChevronUp, ChevronDown, Volume2, VolumeX, Play,
 } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
+import { QuickBuy } from "./quick-buy";
 import { Avatar } from "@/components/ui/avatar";
 import { bits as bitsApi } from "@/lib/api";
 import { getToken } from "@/lib/client-auth";
@@ -432,7 +433,7 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
         )}
 
         <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">
-          <Rail onClick={toggleLike} label={compact(likes)} active={liked}>
+          <Rail onClick={toggleLike} name={liked ? "Liked" : "Like"} label={compact(likes)} active={liked}>
             <Heart className={`h-6 w-6 ${liked ? "fill-live text-live" : ""}`} />
           </Rail>
           {/* Products sit in the side panel on larger screens; phones open them from here. */}
@@ -441,7 +442,7 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
               <ShoppingBag className="h-6 w-6" />
             </Rail>
           </span>
-          <Rail onClick={() => setPanel((p) => (p === "comments" ? null : "comments"))} label={compact(comments.length)} active={showComments}>
+          <Rail onClick={() => setPanel((p) => (p === "comments" ? null : "comments"))} name="Comments" label={compact(comments.length)} active={showComments}>
             <MessageCircle className="h-6 w-6" />
           </Rail>
           <Rail onClick={share} label={shared ? "Copied" : "Share"}>
@@ -508,7 +509,9 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
               {products.length === 0 ? (
                 <p className="text-sm text-muted">No products tagged in this video.</p>
               ) : products.map((p) => (
-                <Link key={p._id} href={`/product/${p._id}`} onClick={() => { watch.current.tapped = p._id; }} className="flex items-center gap-3 rounded-2xl border border-hairline p-2.5 transition-colors hover:bg-surface-2">
+                // Pick a size and buy right here; only the video on screen loads the options.
+                <div key={p._id} className="rounded-2xl border border-hairline p-2.5">
+                <Link href={`/product/${p._id}`} onClick={() => { watch.current.tapped = p._id; }} className="flex items-center gap-3 rounded-xl transition-colors hover:bg-surface-2">
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface-2">
                     <ProductMedia src={p.image?.url} alt={p.name} sizes="56px" className="h-full w-full" />
                   </div>
@@ -521,10 +524,9 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
                       )}
                     </p>
                   </div>
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-lime text-lime-ink">
-                    <ShoppingBag className="h-4 w-4" />
-                  </span>
                 </Link>
+                {active && <QuickBuy productId={p._id} bitId={bit._id} />}
+                </div>
               ))}
             </div>
           </>
@@ -534,9 +536,10 @@ function BitPane({ bit, active, muted, onMuted, onClose }: { bit: Bit; active: b
   );
 }
 
-function Rail({ onClick, label, active, children }: { onClick: () => void; label: string; active?: boolean; children: React.ReactNode }) {
+// `name` says what a count-only label is for ("Like, 12"), so screen readers don't just read "12".
+function Rail({ onClick, label, name, active, children }: { onClick: () => void; label: string; name?: string; active?: boolean; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center gap-1">
+    <button onClick={onClick} aria-label={name ? `${name}, ${label}` : undefined} aria-pressed={active} className="flex flex-col items-center gap-1">
       <span className={`grid h-12 w-12 place-items-center rounded-full backdrop-blur transition-colors ${active ? "bg-white text-ink" : "bg-black/45 text-white hover:bg-black/60"}`}>
         {children}
       </span>

@@ -3,71 +3,26 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Star, ShoppingBag, Check, Loader2, Truck, ShieldCheck, RefreshCw, Zap, X, Minus, Plus } from "lucide-react";
 import { ProductMedia } from "@/components/ui/product-media";
 import { ProductActions } from "./product-social";
 import { BargainBox } from "./bargain-box";
-import { cart as cartApi, apiError } from "@/lib/api";
-import { trackAddToCart, toItem } from "@/lib/analytics";
-import { getToken } from "@/lib/client-auth";
-import { buyHref } from "@/lib/checkout-link";
+import { useVariantPicker } from "./use-variant-picker";
 import { inr } from "@/lib/utils";
 import type { Product, Variant, ProductImage } from "@/lib/types";
 import imageLoader from "@/lib/image-loader";
 
 export function ProductView({ product }: { product: Product }) {
-  const router = useRouter();
   const price = product.discountedPrice ?? product.price;
   const rating = product.averageRating ?? product.analytics?.averageRating ?? 0;
   const reviews = product.commentCount ?? product.analytics?.totalReviews ?? 0;
-  const variants = product.variants ?? [];
-
-  const colors = useMemo(
-    () => [...new Set(variants.map((v) => v.color).filter(Boolean) as string[])],
-    [variants],
-  );
-  const [color, setColor] = useState<string | undefined>(colors[0]);
-  // Some products store a placeholder colour "none"; it is still sent to the cart but not shown as a choice.
-  const shownColors = colors.filter((c) => c.toLowerCase() !== "none");
   // Same rule the server applies when an offer is made: no auto-accept or max discount means no bargaining.
   const bs = product.bargainSettings;
   const canBargain = !!(bs && (bs.autoAcceptDiscount || bs.maximumDiscount));
-
-  const sizes = useMemo(
-    () =>
-      [
-        ...new Set(
-          variants
-            .filter((v) => (color ? v.color === color : true))
-            .map((v) => v.size)
-            .filter((s): s is string => !!s && s.toLowerCase() !== "none"),
-        ),
-      ],
-    [variants, color],
-  );
-
-  const [size, setSize] = useState<string | undefined>(sizes[0]);
-
-  // Per-variant availability - backend sends isOutOfStock/stock on each combo.
-  const soldOut = (v?: Variant) => !!v && (v.isOutOfStock === true || v.stock === 0);
-  const colorSoldOut = (c: string) =>
-    variants.filter((v) => v.color === c).every((v) => soldOut(v));
-  const sizeSoldOut = (s: string) =>
-    variants.filter((v) => (color ? v.color === color : true) && v.size === s).every((v) => soldOut(v));
-  const selected = variants.find(
-    (v) => (color ? v.color === color : true) && (size ? v.size === size : true),
-  );
-  // A product with no variants can never be added to a cart (the server matches a variant), so it is unavailable.
-  const unavailable = variants.length === 0;
-  const outOfStock = unavailable || soldOut(selected);
-  // A size must be picked; without one the server would match any size of that colour.
-  const needsSize = sizes.length > 0 && !size;
-  // What the server stored for this variant: the picked size, or its hidden placeholder ("NONE").
-  // The server matches the stored text exactly, so sending nothing fails with "Size is required".
-  const sendSize = size ?? selected?.size;
-  const [qty, setQty] = useState(1);
-  const maxQty = Math.max(1, selected?.stock ?? 1);
+  const {
+    variants, color, shownColors, sizes, size, colorSoldOut, sizeSoldOut, unavailable, outOfStock,
+    needsSize, sendSize, qty, setQty, maxQty, pickColor: choose, pickSize, status, cartError, addToCart, buyNow,
+  } = useVariantPicker(product);
 
   // The selected colour's photos; the main photos only when that colour has none of its own.
   // (The main photos are copies of the first colour's, so showing both would repeat them.)
@@ -86,10 +41,7 @@ export function ProductView({ product }: { product: Product }) {
   }
 
   function pickColor(c: string) {
-    setColor(c);
-    // Keep the buyer's size when the new colour has it in stock.
-    setSize((s) => (s && variants.some((v) => v.color === c && v.size === s && !soldOut(v)) ? s : undefined));
-    setQty(1);
+    choose(c);
     // Switch the main image to this colour's image when it has one.
     const v = swatchImg(c);
     if (v?.images?.[0]?.url) setActiveUrl(v.images[0].url);
@@ -97,10 +49,6 @@ export function ProductView({ product }: { product: Product }) {
 
   const off = product.discountedPrice && product.discountedPrice < product.price
     ? Math.round((1 - product.discountedPrice / product.price) * 100) : 0;
-
-
-  const [status, setStatus] = useState<"idle" | "adding" | "added" | "error">("idle");
-  const [cartError, setCartError] = useState<string | null>(null);
 
   // Phones get a buy bar fixed to the bottom while the page's own buttons are off screen.
   const buyRow = useRef<HTMLDivElement>(null);
@@ -112,21 +60,6 @@ export function ProductView({ product }: { product: Product }) {
     io.observe(el);
     return () => io.disconnect();
   }, [status]);
-  async function addToCart() {
-    const token = getToken();
-    if (!token) { router.push("/login"); return; }
-    setStatus("adding");
-    const res = await cartApi.update({ productId: product._id, color, size: sendSize, qty }, token);
-    const failure = apiError(res, "Couldn't add to cart. Try again.");
-    setCartError(failure);
-    setStatus(failure ? "error" : "added");
-    if (!failure) trackAddToCart(toItem(product, { qty, color, size: sendSize }));
-  }
-
-  // Buy now goes straight to checkout with this item; the cart is left alone (same as the app).
-  function buyNow() {
-    router.push(buyHref([{ productId: product._id, variantColor: color ?? "", variantSize: sendSize ?? "", qty }]));
-  }
 
   return (
     // Bottom margin on phones so the buy bar never covers the end of the page.
@@ -260,7 +193,7 @@ export function ProductView({ product }: { product: Product }) {
                 {sizes.map((s) => (
                   <button
                     key={s}
-                    onClick={() => { setSize(s); setQty(1); }}
+                    onClick={() => pickSize(s)}
                     aria-pressed={s === size}
                     disabled={sizeSoldOut(s)}
                     title={sizeSoldOut(s) ? "Sold out" : undefined}
