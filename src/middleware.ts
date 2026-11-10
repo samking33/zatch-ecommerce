@@ -29,7 +29,9 @@ export function middleware(req: NextRequest) {
   const [scheme, encoded] = (req.headers.get("authorization") ?? "").split(" ");
   if (scheme === "Basic" && encoded) {
     // A password may contain ":", the username may not, so only split the first.
-    const decoded = atob(encoded);
+    // A malformed header throws in atob; treat it as no credentials (401), not a server error.
+    let decoded = "";
+    try { decoded = atob(encoded); } catch { /* falls through to 401 */ }
     const at = decoded.indexOf(":");
     if (at > -1 && safeEqual(decoded.slice(0, at), user) && safeEqual(decoded.slice(at + 1), pass)) {
       return NextResponse.next();

@@ -25,6 +25,11 @@ const ALLOWED_EVENTS = new Set([
   "AddPaymentInfo", "Purchase", "Search", "CompleteRegistration",
 ]);
 
+// Purchase is counted for tracking health but never forwarded: anyone can call this endpoint,
+// so a relayed Purchase could be any amount. The browser pixel still sends it, and the
+// server-side report belongs with the verified payment (backend `feat/meta-capi-purchase`).
+const NOT_RELAYED = new Set(["Purchase"]);
+
 const str = (v: unknown, max: number): string | undefined =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
 
@@ -70,6 +75,8 @@ function customData(body: Record<string, unknown>) {
 }
 
 export async function POST(req: Request) {
+  // A public endpoint: refuse large bodies before parsing them. Real events are well under 4 KB.
+  if (Number(req.headers.get("content-length") ?? 0) > 16_384) return new Response(null, { status: 413 });
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -87,7 +94,7 @@ export async function POST(req: Request) {
   // No token is the ordinary state until one is issued; accept and drop quietly
   // so the browser never retries and nothing is logged as an error.
   const token = process.env.META_CAPI_TOKEN;
-  if (!token) return new Response(null, { status: 204 });
+  if (!token || NOT_RELAYED.has(event)) return new Response(null, { status: 204 });
 
   const h = await headers();
   const jar = await cookies();
