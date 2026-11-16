@@ -164,6 +164,7 @@ export function trackViewItem(item: TrackItem) {
     ga4Event: "view_item",
     ga4Params: { currency: CURRENCY, value: item.price, items: ga4Items([item]) },
     sendTo: GCONV.viewItem,
+    conversion: { value: item.price, currency: CURRENCY },
   });
 }
 
