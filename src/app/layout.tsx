@@ -13,8 +13,9 @@ const interTight = Inter_Tight({
   display: "swap",
 });
 
-// Google Ads tag (gtag.js).
+// Google tag (gtag.js): the Ads account loads the library; GA4 is a second config on it.
 const GOOGLE_TAG_ID = "AW-18516509424";
+const GA4_ID = "G-ZMK8KE4VM9";
 // Meta (Facebook) Pixel.
 const META_PIXEL_ID = "1421438440165577";
 
@@ -54,7 +55,8 @@ export default function RootLayout({
             __html: `window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', '${GOOGLE_TAG_ID}');`,
+gtag('config', '${GOOGLE_TAG_ID}');
+gtag('config', '${GA4_ID}');`,
           }}
         />
         <script
@@ -79,7 +81,7 @@ fbq('track', 'PageView');`,
           <RealtimeProvider>{children}</RealtimeProvider>
         </AuthProvider>
         <AppPrompt />
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} strategy="afterInteractive" />
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} strategy="beforeInteractive" />
         <noscript>
           <img height="1" width="1" style={{ display: "none" }} alt=""
             src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`} />

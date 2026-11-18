@@ -23,8 +23,12 @@ export function ProductActions({ product }: { product: Product }) {
   const liking = useRef(false);
   const saving = useRef(false);
 
-  // Real view tracking, once per mount.
+  // Real view tracking, once per product. The ref stops Strict Mode's dev-only
+  // effect re-run from counting (and sending the conversion) twice.
+  const viewed = useRef<string | null>(null);
   useEffect(() => {
+    if (viewed.current === product._id) return;
+    viewed.current = product._id;
     productsApi.view(product._id, getToken()).catch(() => {});
     trackViewItem(toItem(product));
     // eslint-disable-next-line react-hooks/exhaustive-deps

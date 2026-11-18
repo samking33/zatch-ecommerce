@@ -24,9 +24,6 @@ const GCONV = {
 
 const CURRENCY = "INR";
 
-type Gtag = (command: string, event: string, params?: Record<string, unknown>) => void;
-type Fbq = (command: string, event: string, params?: Record<string, unknown>, opts?: Record<string, unknown>) => void;
-
 /** A product as the tags want it. `qty` defaults to 1. */
 export type TrackItem = {
   id: string;
@@ -91,6 +88,7 @@ let identified = false;
  * Called whenever the session user changes, including sign-out.
  */
 export function identify(user: { email?: string; phone?: string; countryCode?: unknown } | null) {
+  if (typeof window === "undefined") return;
   identified = true;
   const email = user?.email?.trim().toLowerCase() || undefined;
   // Same rule as the backend's Meta report (utils/metaCapi.js), so one shopper
@@ -102,7 +100,7 @@ export function identify(user: { email?: string; phone?: string; countryCode?: u
   const phone = national ? `+${cc}${national}` : undefined;
   identity = { email, phone };
 
-  const w = window as unknown as { gtag?: Gtag };
+  const w = window;
   if (typeof w.gtag === "function") w.gtag("set", "user_data", email || phone ? { email, phone_number: phone } : {});
 }
 
@@ -112,7 +110,7 @@ export function identify(user: { email?: string; phone?: string; countryCode?: u
  * forget: analytics must never delay or break the page.
  */
 function relay(event: string, id: string, params: Record<string, unknown> = {}) {
-  const w = window as unknown as { gtag?: Gtag; fbq?: Fbq };
+  const w = window;
   try {
     fetch("/api/capi", {
       method: "POST",
@@ -135,12 +133,13 @@ function send(opts: {
   sendTo?: string;
   conversion?: Record<string, unknown>;
   id?: string;
-}): string {
+}): string | undefined {
+  if (typeof window === "undefined") return undefined;
   // React runs a page's effects before the auth provider's, so a page-load event
   // can fire before anyone has been identified. Pick up the stored session first.
   if (!identified) identify(getUser());
 
-  const w = window as unknown as { gtag?: Gtag; fbq?: Fbq };
+  const w = window;
   const id = eventId(opts.id);
 
   if (typeof w.fbq === "function") {
@@ -219,6 +218,17 @@ export function trackAddPaymentInfo(items: TrackItem[], total?: number) {
  * `value` is in rupees; Razorpay quotes paise, so callers divide by 100.
  */
 export function trackPurchase(transactionId: string, value?: number, currency = CURRENCY, items: TrackItem[] = []) {
+  if (typeof window === "undefined" || !transactionId) return;
+  // Once per order across remounts, reloads and other tabs, not just within one
+  // component instance. Storage can throw (private mode); then the caller's ref
+  // and Google's own transaction_id dedupe are the fallback.
+  const key = `zatch:purchase:${transactionId}`;
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    /* fall through and send */
+  }
   send({
     id: transactionId,
     metaEvent: "Purchase",
