@@ -18,7 +18,7 @@ import { recordEvent } from "@/lib/event-health";
 
 const META_API = "https://graph.facebook.com/v26.0";
 // Same pixel as the browser tag in app/layout.tsx.
-const PIXEL_ID = "1421438440165577";
+const PIXEL_ID = "1134179232799588";
 
 const ALLOWED_EVENTS = new Set([
   "ViewContent", "AddToCart", "AddToWishlist", "InitiateCheckout",

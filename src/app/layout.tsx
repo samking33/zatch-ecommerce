@@ -17,7 +17,7 @@ const interTight = Inter_Tight({
 const GOOGLE_TAG_ID = "AW-18516509424";
 const GA4_ID = "G-ZMK8KE4VM9";
 // Meta (Facebook) Pixel.
-const META_PIXEL_ID = "1421438440165577";
+const META_PIXEL_ID = "1134179232799588";
 
 const inter = Inter({
   subsets: ["latin"],
