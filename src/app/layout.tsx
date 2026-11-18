@@ -81,7 +81,10 @@ fbq('track', 'PageView');`,
           <RealtimeProvider>{children}</RealtimeProvider>
         </AuthProvider>
         <AppPrompt />
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} strategy="beforeInteractive" />
+        {/* afterInteractive on purpose: gtag() already exists from the inline bootstrap above, so
+            events queue in dataLayer until this loads. beforeInteractive makes Next.js wait for
+            Google's script before any page becomes interactive. */}
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} strategy="afterInteractive" />
         <noscript>
           <img height="1" width="1" style={{ display: "none" }} alt=""
             src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`} />
