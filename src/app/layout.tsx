@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import { AppPrompt } from "@/components/site/get-app";
 import "./globals.css";
 
-const interTight = Inter_Tight({
-  subsets: ["latin"],
+// Fonts ship with the site (the latin files Google Fonts serves; SIL Open Font License) so the
+// build never downloads them: a Google Fonts hiccup failed a Render build in next/font.
+const interTight = localFont({
+  src: "./fonts/inter-tight-latin.woff2",
   variable: "--font-inter-tight",
-  weight: ["500", "600", "700"],
+  weight: "500 700",
   display: "swap",
 });
 
@@ -19,10 +21,10 @@ const GA4_ID = "G-ZMK8KE4VM9";
 // Meta (Facebook) Pixel.
 const META_PIXEL_ID = "1421438440165577";
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "./fonts/inter-latin.woff2",
   variable: "--font-inter",
-  weight: ["400", "500", "600"],
+  weight: "400 600",
   display: "swap",
 });
 
